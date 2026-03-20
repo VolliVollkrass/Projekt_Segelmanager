@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="flex justify-center m-10">
+
+    <div class="card w-full max-w-md bg-base-100 shadow-xl">
+
+        <div class="card-body">
+
+            <h2 class="card-title text-2xl mb-6">
+                Login
+            </h2>
+
+            <form method="post">
+
+                {% csrf_token %}
+
+                <div class="form-control mb-4">
+                    <label class="label">Email</label>
+                    {{ form.username }}
+                </div>
+
+                <div class="form-control mb-4">
+                    <label class="label">Passwort</label>
+                    {{ form.password }}
+                </div>
+
+                <button class="btn btn-primary w-full">
+                    Login
+                </button>
+
+            </form>
+            <p class="mt-4 text-center">
+                Noch keinen Account? <a href="{% url 'register' %}" class="link link-primary">hier registrieren</a>
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,42 @@
+@import "tailwindcss";
+@plugin "daisyui";
+
+
+
+
+@plugin "daisyui/theme" {
+  name: "segelmanager";
+  default: true;
+  prefersdark: true;
+  color-scheme: "light";
+  --color-base-100: #F8FAFC;
+  --color-base-200: oklch(97.466% 0.011 259.822);
+  --color-base-300: #E2E8F0;
+  --color-base-content: #0F172A;
+  --color-primary: oklch(45% 0.085 224.283);
+  --color-primary-content: #ffffff;
+  --color-secondary: #0D9488;
+  --color-secondary-content: oklch(100% 0 0);
+  --color-accent: oklch(51% 0.253 323.949);
+  --color-accent-content: oklch(100% 0 0);
+  --color-neutral: #1E293B;
+  --color-neutral-content: oklch(100% 0 0);
+  --color-info: #38BDF8;
+  --color-info-content: oklch(17.625% 0.017 214.515);
+  --color-success: oklch(51% 0.096 186.391);
+  --color-success-content: oklch(96% 0.044 156.743);
+  --color-warning: #F59E0B;
+  --color-warning-content: oklch(17.834% 0.009 71.47);
+  --color-error: oklch(50% 0.213 27.518);
+  --color-error-content: oklch(93% 0.032 17.717);
+  --radius-selector: 1rem;
+  --radius-field: 0.5rem;
+  --radius-box: 1rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 1;
+  --noise: 0;
+}
+
+

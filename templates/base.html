@@ -1,0 +1,44 @@
+{% load static %}
+
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link href="{% static 'css/src/output.css' %}" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Base Seite{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'medien/favicon.png' %}">
+    <link href="https://unpkg.com/cropperjs/dist/cropper.css" rel="stylesheet"/>
+  </head>
+  <body class="flex flex-col">
+    <nav class="sticky top-0 z-10 shadow-md">
+        <div id="nav">
+            {% include "includes/nav.html" %}
+        </div>
+    </nav>
+    
+    <main class="">
+        {% if messages %}
+        <div class="">
+            {% for message in messages %}
+                <div class="m-4 p-4 rounded-lg {% if message.tags == 'success' %}bg-success {% elif message.tags == 'error' %}bg-error {% else %}bg-gray-100 text-gray-800{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        <div class="">
+            {% block content %}
+            
+            {% endblock %}
+        </div>
+    </main>
+
+    <footer>
+        <div>
+            {% include "includes/footer.html" %}
+        </div>
+    </footer>
+    <script src="https://unpkg.com/cropperjs"></script>
+  </body>
+</html>

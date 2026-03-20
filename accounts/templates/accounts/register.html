@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="flex justify-center m-10">
+
+    <div class="card w-full max-w-lg bg-base-100 shadow-xl">
+
+        <div class="card-body">
+
+            <h2 class="card-title text-2xl mb-6">
+                Registrierung
+            </h2>
+
+            <form method="post" enctype="multipart/form-data">
+
+                {% csrf_token %}
+
+                <div class="form-control mb-3">
+                    <label class="label">Vorname</label>
+                    {{ form.first_name }}
+                </div>
+
+                <div class="form-control mb-3">
+                    <label class="label">Nachname</label>
+                    {{ form.last_name }}
+                </div>
+
+                <div class="form-control mb-3">
+                    <label class="label">E-Mail</label>
+                    {{ form.email }}
+                </div>
+
+                <div class="form-control mb-3">
+                    <label class="label">Profilbild (optional)</label>
+                    {{ form.profilbild }}
+                </div>
+
+                <div class="form-control mb-3">
+                    <label class="label">Passwort</label>
+                    {{ form.password1 }}
+                </div>
+
+                <div class="form-control mb-3">
+                    <label class="label">Passwort wiederholen</label>
+                    {{ form.password2 }}
+                </div>
+
+                <div class="card-actions justify-end mt-4">
+                    <button class="btn btn-primary">
+                        Registrieren
+                    </button>
+                </div>
+
+            </form>
+            <p class="mt-4 text-center">
+                Schon einen Account? <a href="{% url 'login' %}" class="link link-primary">hier einloggen</a> 
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

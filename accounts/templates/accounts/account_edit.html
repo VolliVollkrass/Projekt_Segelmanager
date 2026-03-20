@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}Profil bearbeiten{% endblock %}
+
+{% block content %}
+
+<div class="max-w-3xl mx-auto p-6">
+
+  <div class="card bg-base-100 shadow">
+    <div class="card-body flex flex-col items-center">
+        <h2 class="text-2xl font-bold">{{ user.first_name }} {{ user.last_name }}</h2>
+      <!-- Profilbild + Vorname/Nachname -->
+      <div class="flex flex-col items-center mb-6">
+        {% if user.profilbild %}
+          <a href="{{ user.profilbild.url }}" target="_blank">
+            <img id="profilbild-preview" src="{{ user.profilbild.url }}"
+                 alt="Profilbild" class="w-32 h-32 rounded-full object-cover border mb-2">
+          </a>
+        {% else %}
+          <img id="profilbild-preview"
+               src="https://api.dicebear.com/7.x/initials/svg?seed={{ user.first_name }}"
+               alt="Profilbild" class="w-32 h-32 rounded-full object-cover border mb-2">
+        {% endif %}
+        
+      </div>
+
+
+      <form method="post" enctype="multipart/form-data" class="w-full">
+        {% csrf_token %}
+
+        <!-- Profilbild Upload -->
+        <div class="form-control mb-4">
+          {{ form.profilbild }}
+          {% if form.profilbild.errors %}
+            <p class="text-error text-sm">{{ form.profilbild.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <!-- E-Mail readonly -->
+        <div class="form-control mb-4">
+          <label class="label"><span class="label-text">E-Mail</span></label>
+          <input type="email" value="{{ user.email }}" disabled
+                 class="input input-bordered w-full bg-gray-100 cursor-not-allowed">
+        </div>
+
+        <!-- Alle Felder in Grid -->
+        <div class="grid md:grid-cols-2 gap-4">
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Telefonnummer</span></label>
+            {{ form.telefonnummer }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Geburtsdatum</span></label>
+            {{ form.geburtsdatum }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Geburtsort</span></label>
+            {{ form.geburtsort }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Nationalität</span></label>
+            {{ form.nationalitaet }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Identifikationstyp</span></label>
+            {{ form.identifikationstyp }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Passnummer</span></label>
+            {{ form.passnummer }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Straße</span></label>
+            {{ form.strasse }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">PLZ</span></label>
+            {{ form.plz }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Ort</span></label>
+            {{ form.ort }}
+          </div>
+
+        </div>
+
+        <!-- Passwort ändern -->
+        <div class="mt-6 w-full">
+          <label class="label mb-2">
+            <span class="label-text font-semibold text-lg">Passwort ändern (optional)</span>
+          </label>
+
+          <div class="form-control mb-2">
+            <label class="label"><span class="label-text">Altes Passwort</span></label>
+            {{ form.old_password }}
+          </div>
+
+          <div class="form-control mb-2">
+            <label class="label"><span class="label-text">Neues Passwort</span></label>
+            {{ form.new_password1 }}
+          </div>
+
+          <div class="form-control mb-2">
+            <label class="label"><span class="label-text">Neues Passwort wiederholen</span></label>
+            {{ form.new_password2 }}
+          </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex gap-2 justify-end mt-6">
+          <a href="{% url 'my_account' %}" class="btn">Abbrechen</a>
+          <button class="btn btn-primary">Speichern</button>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- JS für Live-Vorschau Profilbild -->
+<script>
+  const profilbildInput = document.getElementById("id_profilbild");
+  const profilbildPreview = document.getElementById("profilbild-preview");
+
+  let cropper;
+
+  profilbildInput?.addEventListener("change", (e) => {
+
+    const file = profilbildInput.files[0];
+
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+
+    profilbildPreview.src = url;
+
+    profilbildPreview.onload = () => {
+
+      if (cropper) {
+        cropper.destroy();
+      }
+
+      cropper = new Cropper(profilbildPreview, {
+        aspectRatio: 1,
+        viewMode: 1,
+        autoCropArea: 1,
+        movable: true,
+        zoomable: true,
+        rotatable: true,
+        scalable: true
+      });
+
+    };
+
+  });
+
+  document.getElementById("rotate-left")?.addEventListener("click", () => {
+  if (cropper) cropper.rotate(-90);
+  });
+
+  document.getElementById("rotate-right")?.addEventListener("click", () => {
+  if (cropper) cropper.rotate(90);
+  });
+
+  const form = document.querySelector("form");
+
+  form.addEventListener("submit", function (e) {
+
+    if (!cropper) return;
+
+    e.preventDefault();
+
+    cropper.getCroppedCanvas({
+      width: 400,
+      height: 400
+    }).toBlob((blob) => {
+
+      const file = new File([blob], "profilbild.jpg", {
+        type: "image/jpeg"
+      });
+
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+
+      profilbildInput.files = dataTransfer.files;
+
+      form.submit();
+
+    });
+
+  });
+</script>
+
+{% endblock %}

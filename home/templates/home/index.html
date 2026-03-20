@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Startseite{% endblock %}
+
+{% block content %}
+
+<div class="max-w-7xl mx-auto px-4 py-10">
+    <h1 class="text-3xl font-bold mb-8">Segeltörns</h1>
+
+    {% if toerns %}
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+        {% for toern in toerns %}
+        <div class="card bg-base-100 shadow-xl relative">
+
+            <!-- Badge freie Plätze -->
+            <div class="badge badge-primary absolute top-3 right-3">
+                {{ toern.freie_plaetze }} Plätze frei
+            </div>
+
+            <figure>
+                {% if toern.bild_toern %}
+                    <img src="{{ toern.bild_toern.url }}" alt="{{ toern.titel }}">
+                {% else %}
+                    <img src="{% static 'medien/Segeln_dummy.jpeg' %}" alt="{{ toern.titel }}">
+                {% endif %}
+            </figure>
+
+            <div class="card-body">
+                <h2 class="card-title">{{ toern.titel }}</h2>
+                <p class="text-sm opacity-70">
+                    {{ toern.startdatum|date:"d.m.Y" }} – {{ toern.enddatum|date:"d.m.Y" }}
+                </p>
+                <p class="text-sm">{{ toern.kurzbeschreibung|default:"Hier könnte eine kurze Beschreibung des Törns stehen." }}</p>
+
+                <div class="mt-2 font-semibold">
+                    Preis pro Person: {{ toern.preis_pro_person }} €
+                </div>
+
+                <div class="card-actions justify-end mt-4">
+                    <a href="{% url 'toern_detail' pk=toern.pk %}" class="btn btn-outline btn-sm">Details</a>
+                    <a href="#" class="btn btn-primary btn-sm">Anmelden</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+    {% else %}
+        <p>Aktuell sind keine Törns verfügbar.</p>
+    {% endif %}
+
+</div>
+
+{% endblock %}

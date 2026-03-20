@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.pyc
+
+# Django
+db.sqlite3
+*.log
+media/
+
+# Environment
+.env
+venv/
+.env.*
+
+# VS Code / IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Tailwind / Node
+node_modules/
+dist/
+
+# Static files (optional je nach Setup)
+staticfiles/

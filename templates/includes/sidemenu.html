@@ -1,0 +1,50 @@
+      <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
+        <legend class="fieldset-legend">Personal</legend>
+        <ul class="menu bg-base-200 rounded-box w-56">
+          <li>
+            <ul>
+              <li><a href="{% url "personal" %}">Personalliste</a></li>
+              <li><a href="{% url "ansprech" %}">Ansprechpartner*innen</a></li>
+              <li><a href="{% url "personal" %}" class="">Personalkommision - UA</a></li>
+              <li><a href="{% url "personal" %}" class="">Beurteilungen</a></li>
+              
+            </ul>
+          </li>
+        </ul>
+      </fieldset>
+            <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
+        <legend class="fieldset-legend">Einsatz</legend>
+        <ul class="menu bg-base-200 rounded-box w-56">
+          <li>
+            <ul>
+              <li><a href="{% url "einsatz" %}" class="">Einsatzliste</a></li>
+            </ul>
+          </li>
+        </ul>
+      </fieldset>
+            <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
+        <legend class="fieldset-legend">Träger</legend>
+        <ul class="menu bg-base-200 rounded-box w-56">
+          <li>
+            <ul>
+              <li><a href="{% url "traeger" %}">Trägerliste</a></li>
+              <li><a href="{% url "einrichtung" %}">Einrichtungsliste</a></li>
+              <li><a href="{% url "stellen" %}">Stellenliste</a></li>
+            </ul>
+          </li>
+        </ul>
+      </fieldset>
+      <fieldset class="fieldset bg-base-200 border-base-300 rounded-box w-xs border p-4">
+        <legend class="fieldset-legend">Mittelbewirtschaftung</legend>
+        <ul class="menu bg-base-200 rounded-box w-56">
+          <li>
+            <ul>
+              <li><a href="{% url "abrechnungsliste" %}" class="">Abrechnungsliste</a></li>
+              <li><a href="{% url "innenauftraege" %}" class="">Innenaufträge</a></li>
+              <li><a href="{% url "quartalsuebersicht" %}" class="">Quartalsübersicht</a></li>
+              <li><a href="{% url "fakturierungsliste" %}" class="">Fakturierung</a></li>
+              <li><a href="/" class="">Refinanzierungszuschuss</a></li>
+            </ul>
+          </li>
+        </ul>
+      </fieldset>

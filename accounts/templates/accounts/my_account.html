@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+
+{% block title %}Mein Account{% endblock %}
+
+{% block content %}
+
+<div class="min-h-screen p-6">
+<div class="max-w-6xl mx-auto space-y-6">
+
+<!-- Header -->
+
+<div class="card bg-base-100 shadow border border-base-200">
+
+<div class="card-body">
+
+<div class="flex flex-col md:flex-row items-center gap-6">
+
+<div class="avatar">
+  <div class="w-24 rounded-full">
+    {% if user.profilbild %}
+      <img src="{{ user.profilbild.url }}">
+    {% else %}
+      <img src="https://api.dicebear.com/7.x/initials/svg?seed={{ user.first_name }}">
+    {% endif %}
+  </div>
+</div>
+
+<div class="flex-1 text-center md:text-left">
+
+<h1 class="text-3xl font-bold">
+{{ user.first_name }} {{ user.last_name }}
+</h1>
+
+<p class="opacity-70">{{ user.email }}</p>
+
+</div>
+
+<div class="flex flex-wrap gap-2">
+
+<a class="btn btn-secondary" href="{% url 'account_edit' %}">
+Profil bearbeiten
+</a>
+
+<a class="btn btn-primary" href="{% url "index" %}">
+Home
+</a>
+
+<form action="{% url 'logout' %}" method="post">
+{% csrf_token %}
+<button class="btn btn-error">
+Logout
+</button>
+</form>
+
+</div>
+
+</div>
+</div>
+</div>
+
+<!-- Stats -->
+
+<div class="stats shadow w-full">
+
+<div class="stat">
+<div class="stat-title">Mitgesegelte Törns</div>
+<div class="stat-value">5</div>
+<div class="stat-desc">seit {{ user.date_joined|date:"Y" }}</div>
+</div>
+
+<div class="stat">
+<div class="stat-title">Seemeilen gesegelt</div>
+<div class="stat-value">1500</div>
+</div>
+
+<div class="stat">
+<div class="stat-title">Nächster Törn</div>
+<div class="stat-value text-primary">12 Tage</div>
+<div class="stat-desc">
+<a class="link link-primary">Zum Törn</a>
+</div>
+</div>
+
+</div>
+
+<div class="grid md:grid-cols-2 gap-6">
+
+<!-- Profilinfos -->
+
+<div class="card bg-base-100 shadow border border-base-200">
+
+<div class="card-body">
+
+<div class="flex justify-between items-center">
+
+<h2 class="card-title">Profilinformationen</h2>
+
+</div>
+
+<div class="divider"></div>
+
+<div class="space-y-2">
+
+<p><b>Benutzer-ID:</b> {{ user.username }}</p>
+
+<p><b>Telefon:</b> {{ user.telefonnummer|default:"-" }}</p>
+
+<p>
+<b>Geburtsdatum:</b>
+{% if user.geburtsdatum %}
+{{ user.geburtsdatum }}
+{% else %}
+-
+{% endif %}
+</p>
+
+<p><b>Nationalität:</b> {{ user.nationalitaet|default:"-" }}</p>
+
+<p>
+<b>Adresse:</b><br>
+{{ user.strasse }}<br>
+{{ user.plz }} {{ user.ort }}
+</p>
+
+</div>
+
+</div>
+</div>
+
+
+<!-- Lizenzen -->
+
+<div class="card bg-base-100 shadow border border-base-200">
+
+<div class="card-body">
+
+<div class="flex justify-between items-center">
+
+<h2 class="card-title">Segellizenzen</h2>
+
+<button class="btn btn-primary btn-sm">
+  <a href="{% url 'lizenz_hinzufuegen' %}" class="text-white">
+    + Lizenz hinzufügen
+  </a>
+</button>
+
+</div>
+
+<div class="divider"></div>
+
+<div class="space-y-3">
+  {% for lizenz in user.lizenzen.all %}
+  <div class="flex justify-between items-center p-3 bg-base-200 rounded-box">
+    <div>
+      <p class="font-semibold">{{ lizenz.name }}</p>
+      <p class="text-sm opacity-70">Ausgestellt: {{ lizenz.ausstellungsdatum|date:"Y-m-d" }}</p>
+      {% if lizenz.ablaufdatum %}
+      <p class="text-sm opacity-70">Ablauf: {{ lizenz.ablaufdatum|date:"Y-m-d" }}</p>
+      {% endif %}
+        <div class="flex gap-3 mt-2">
+          {% if lizenz.dokument_vorne %}
+          <a href="{{ lizenz.dokument_vorne.url }}" target="_blank">
+            <img src="{{ lizenz.dokument_vorne.url }}" class="w-28 rounded-lg border hover:scale-105 transition">
+          </a>
+          {% endif %}
+
+          {% if lizenz.dokument_hinten %}
+          <a href="{{ lizenz.dokument_hinten.url }}" target="_blank">
+            <img src="{{ lizenz.dokument_hinten.url }}" class="w-28 rounded-lg border hover:scale-105 transition">
+          </a>
+          {% endif %}
+        </div>
+    </div>
+
+    <form method="post" action="{% url 'lizenz_loeschen' lizenz.id %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-error btn-xs">Löschen</button>
+    </form>
+
+  </div>
+  {% empty %}
+  <p class="opacity-50">Noch keine Lizenzen hinterlegt.</p>
+  {% endfor %}
+  </div>
+</div>
+</div>
+
+
+<!-- Törn Archiv -->
+
+<div class="card bg-base-100 shadow border border-base-200">
+
+<div class="card-body">
+
+<h2 class="card-title">⛵ Logbuch</h2>
+
+<div class="divider"></div>
+
+<ul class="timeline timeline-vertical">
+
+<li>
+
+<div class="timeline-start">2024</div>
+
+<div class="timeline-middle">⛵</div>
+
+<div class="timeline-end timeline-box">
+
+<p class="font-semibold">
+Kroatien – Kornaten Törn
+</p>
+
+<p class="text-sm opacity-70">
+420 sm gesegelt
+</p>
+
+<a class="link link-primary text-sm">
+Törn ansehen
+</a>
+
+</div>
+
+<hr>
+
+</li>
+
+<li>
+
+<div class="timeline-start">2023</div>
+
+<div class="timeline-middle">⛵</div>
+
+<div class="timeline-end timeline-box">
+
+<p class="font-semibold">
+Ionisches Meer
+</p>
+
+<p class="text-sm opacity-70">
+350 sm gesegelt
+</p>
+
+<a class="link link-primary text-sm">
+Törn ansehen
+</a>
+
+</div>
+
+<hr>
+
+</li>
+
+<li>
+
+<div class="timeline-start">2022</div>
+
+<div class="timeline-middle">⛵</div>
+
+<div class="timeline-end timeline-box">
+
+<p class="font-semibold">
+Sardinien Rundtörn
+</p>
+
+<p class="text-sm opacity-70">
+510 sm gesegelt
+</p>
+
+<a class="link link-primary text-sm">
+Törn ansehen
+</a>
+
+</div>
+
+</li>
+
+</ul>
+
+</div>
+
+</div>
+
+
+<!-- Adminbereich -->
+
+{% if user.is_staff %}
+
+<div class="card bg-base-100 shadow border border-primary">
+
+<div class="card-body">
+
+<h2 class="card-title text-primary">
+🛡 Skipper / Administrationsbereich
+</h2>
+
+<div class="divider"></div>
+
+<div class="grid md:grid-cols-3 gap-4">
+
+<a class="btn btn-outline btn-primary">
+Törns verwalten
+</a>
+
+<a class="btn btn-outline btn-primary">
+Crews verwalten
+</a>
+
+<a class="btn btn-outline btn-primary">
+Boote verwalten
+</a>
+
+</div>
+
+</div>
+
+</div>
+
+{% endif %}
+
+</div>
+</div>
+
+{% endblock %}

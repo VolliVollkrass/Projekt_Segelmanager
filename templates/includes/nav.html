@@ -1,0 +1,23 @@
+{% load static %}
+
+<div class="navbar bg-primary shadow-md text-primary-content">
+  <div class="flex-1">
+    <a class="btn btn-ghost text-xl" href="/"><img src="{% static 'medien/icons/segelboot.png' %}" " alt="Logo" class="w-8 h-8 mr-2">Startseite</a>
+  </div>
+  <div class="flex-none">
+    <ul class="menu menu-horizontal px-1">
+      <li><a class="link link-secondary" href="/">Info</a></li>
+    
+    {% if user.is_authenticated %}
+      <li><a class="link link-secondary" href="/">Törn</a></li>
+    </ul>   
+    <a class="btn btn-secondary" href="{% url 'my_account' %}">{{ user.first_name }} <img src="{% static 'medien/icons/benutzer.png' %}" " alt="Logo" class="w-6 h-6 ml-2"> </a>
+    {% else %}
+    <div class="flex space-x-2">
+    <a class="btn btn-secondary" href="{% url 'login' %}">Login</a>
+    <a class="btn btn-secondary" href="{% url 'register' %}">Registrieren</a>
+    </div>
+    {% endif %}
+            
+  </div>
+</div>
