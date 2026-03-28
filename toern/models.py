@@ -31,7 +31,6 @@ class Toern(models.Model):
     preis_pro_person = models.DecimalField(max_digits=8, decimal_places=2)
     nebenkosten = models.DecimalField(max_digits=8, decimal_places=2, default=0)
     status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="DRAFT")
-    boote = models.ManyToManyField(Boot, related_name="toerns")
     beschreibung = models.TextField(blank=True)
     kurzbeschreibung = models.CharField(max_length=500, blank=True)
     bild_toern = models.ImageField(upload_to='toern/bilder/', blank=True, null=True)

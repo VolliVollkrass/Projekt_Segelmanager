@@ -9,6 +9,8 @@ urlpatterns = [
     path('', include('home.urls')),
     path('accounts/', include('accounts.urls')),
     path('toern/', include('toern.urls')),
+    path('boote/', include('boote.urls')),
+
 ]
 if settings.DEBUG:
     urlpatterns += static(

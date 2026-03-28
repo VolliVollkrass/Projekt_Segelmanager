@@ -1,7 +1,9 @@
 from django.db import models
+from django.forms import ValidationError
 from utils.image_optimizer import optimize_image
 from utils.file_cleanup import delete_file
 from django.db.models import Sum
+
 
 class Charterunternehmen(models.Model):
     name = models.CharField(max_length=100)
@@ -11,14 +13,19 @@ class Charterunternehmen(models.Model):
     adresse = models.TextField(blank=True)
 
     def __str__(self):
-        return f"{self.name} - {self.internetseite}"
+        return f"{self.name}"
 
 class Boot(models.Model):
     name = models.CharField(max_length=100)
     typ = models.CharField(max_length=100)
     charterunternehmen = models.ForeignKey(Charterunternehmen, on_delete=models.SET_NULL, null=True, related_name="boote")
-    Hafen = models.CharField(max_length=100, blank=True)
-    Hafen_googlemaps = models.CharField(max_length=100, blank=True)  # für Google Maps Suche
+    toern = models.ForeignKey(
+        "toern.Toern",
+        on_delete=models.CASCADE,
+        related_name="boote"
+        ) 
+    hafen = models.CharField(max_length=100, blank=True)
+    hafen_googlemaps = models.CharField(max_length=100, blank=True)  # für Google Maps Suche
     baujahr = models.PositiveIntegerField(blank=True, null=True)
     laenge = models.FloatField(blank=True, null=True)
     tiefe = models.FloatField(blank=True, null=True)
@@ -50,7 +57,10 @@ class Boot(models.Model):
     @property
     def anzahl_betten_boot(self):
         return self.kabinen.aggregate(total_betten=Sum('betten'))['total_betten'] or 0
-
+    @property
+    def hat_kapazitaet(self):
+        return self.anzahl_betten_boot > 0
+    
     def __str__(self):
         return self.name
 
@@ -59,5 +69,9 @@ class Kabine(models.Model):
     name = models.CharField(max_length=50)
     betten = models.PositiveIntegerField(default=2)
 
+    def clean(self):
+        if self.betten <= 0:
+            raise ValidationError("Kabine muss mindestens 1 Bett haben")
+        
     def __str__(self):
         return f"{self.boot.name} - {self.name}"

@@ -1,4 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
+
+
+from boote.models import Boot
 from .models import Toern, Teilnahme
 from django.contrib.auth.decorators import login_required
 from utils.permissions import anbieter_required, is_owner
@@ -61,7 +64,7 @@ def anbieter_dashboard(request):
     toerns = Toern.objects.filter(anbieter=request.user).order_by("-startdatum")
 
     ctx = {
-        "toerns": toerns
+        "toerns": toerns.prefetch_related("boote__kabinen")
     }
 
     return render(request, "toern/anbieter_dashboard.html", ctx)
@@ -77,8 +80,6 @@ def toern_create(request):
             toern = form.save(commit=False)
             toern.anbieter = request.user
             toern.save()
-
-            form.save_m2m()  # wichtig für boote!
 
             return redirect("anbieter_dashboard")
 

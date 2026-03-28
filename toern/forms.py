@@ -1,6 +1,7 @@
 from django import forms
 from .models import Toern
 
+
 class ToernForm(forms.ModelForm):
     startdatum = forms.DateTimeField(
         required=False,
@@ -91,3 +92,6 @@ class ToernForm(forms.ModelForm):
         self.fields['startdatum'].input_formats = ['%Y-%m-%dT%H:%M']
         self.fields['enddatum'].input_formats = ['%Y-%m-%dT%H:%M']
         self.fields['anmeldeschluss'].input_formats = ['%Y-%m-%dT%H:%M']
+
+
+

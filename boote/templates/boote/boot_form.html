@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {% if boot %}Boot bearbeiten{% else %}Boot erstellen{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="max-w-4xl mx-auto p-6">
+
+    <div class="card bg-base-100 shadow-xl">
+        <div class="card-body">
+
+            <!-- Header -->
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">
+                    {% if boot %}⚓ Boot bearbeiten{% else %}⚓ Neues Boot{% endif %}
+                </h2>
+
+                {% if toern %}
+                    <div class="text-sm opacity-70">
+                        Törn: {{ toern.titel }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <form method="post" enctype="multipart/form-data" class="space-y-6">
+                {% csrf_token %}
+
+                <!-- ===================== -->
+                <!-- BOOT DATEN -->
+                <!-- ===================== -->
+                <div>
+                    <h3 class="font-semibold mb-3 text-lg">Bootsdaten</h3>
+
+                    <div class="grid md:grid-cols-2 gap-4">
+                        {{ form.name.label_tag }} {{ form.name }}
+                        {{ form.typ.label_tag }} {{ form.typ }}
+
+                        {{ form.charterunternehmen.label_tag }} {{ form.charterunternehmen }}
+                        {{ form.neues_charterunternehmen.label_tag }} {{ form.neues_charterunternehmen }}
+
+                        {{ form.hafen.label_tag }} {{ form.hafen }}
+                        {{ form.hafen_googlemaps.label_tag }} {{ form.hafen_googlemaps }}
+
+                        {{ form.baujahr.label_tag }} {{ form.baujahr }}
+                        {{ form.preis.label_tag }} {{ form.preis }}
+
+                        {{ form.laenge.label_tag }} {{ form.laenge }}
+                        {{ form.tiefe.label_tag }} {{ form.tiefe }}
+                    </div>
+
+                    <div class="mt-4">
+                        {{ form.bild_boot.label_tag }}
+                        {{ form.bild_boot }}
+                    </div>
+                </div>
+
+                <!-- ===================== -->
+                <!-- KABINEN -->
+                <!-- ===================== -->
+                <div>
+                    <h3 class="font-semibold text-lg mb-2">Kabinen</h3>
+
+                    <!-- Vorlagen -->
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        <button type="button" class="btn btn-xs btn-outline" onclick="addKabine('Heck Backbord', 2)">Heck Backbord</button>
+                        <button type="button" class="btn btn-xs btn-outline" onclick="addKabine('Heck Steuerbord', 2)">Heck Steuerbord</button>
+                        <button type="button" class="btn btn-xs btn-outline" onclick="addKabine('Bugkabine', 2)">Bugkabine</button>
+                        <button type="button" class="btn btn-xs btn-outline" onclick="addKabine('Salon', 2)">Salon</button>
+                    </div>
+
+                    {{ formset.management_form }}
+
+                    <div id="kabinen-container" class="space-y-3">
+
+                        {% for form in formset %}
+                        <div class="card bg-base-200 shadow-sm p-4 relative kabine-form">
+
+                            {{ form.id }} <!-- WICHTIG -->
+
+                            <div class="grid grid-cols-2 gap-3">
+
+                                <div>
+                                    <label class="text-xs">Name</label>
+                                    {{ form.name }}
+                                </div>
+
+                                <div>
+                                    <label class="text-xs">Betten</label>
+                                    {{ form.betten }}
+                                </div>
+
+                            </div>
+
+                            <div class="flex justify-between items-center mt-3">
+
+                                <!-- Delete Checkbox -->
+                                <label class="flex items-center gap-2 text-error text-xs">
+                                    {{ form.DELETE }} Löschen
+                                </label>
+
+                                <!-- JS Remove -->
+                                <button type="button"
+                                        class="btn btn-xs btn-error"
+                                        onclick="removeKabine(this)">
+                                    Entfernen
+                                </button>
+
+                            </div>
+
+                        </div>
+                        {% endfor %}
+
+                    </div>
+
+                    <!-- Add empty -->
+                    <button type="button" class="btn btn-sm btn-outline mt-3" onclick="addKabine('', 2)">
+                        + Leere Kabine
+                    </button>
+
+                </div>
+
+                <!-- ===================== -->
+                <!-- BUTTONS -->
+                <!-- ===================== -->
+                <div class="flex justify-between items-center pt-4 border-t">
+
+                    <a href="{% if boot %}{% url 'toern_detail' boot.toern.id %}{% else %}{% url 'anbieter_dashboard' %}{% endif %}"
+                       class="btn btn-ghost">
+                        Abbrechen
+                    </a>
+
+                    <button class="btn btn-primary">
+                        💾 Speichern
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- ===================== -->
+<!-- JS -->
+<!-- ===================== -->
+<script>
+function addKabine(name, betten) {
+    const totalForms = document.querySelector('[name="kabine_set-TOTAL_FORMS"]');
+    const container = document.getElementById('kabinen-container');
+
+    const index = parseInt(totalForms.value);
+
+    const template = `
+        <div class="card bg-base-200 shadow-sm p-4 kabine-form">
+
+            <input type="hidden" name="kabine_set-${index}-id" />
+
+            <div class="grid grid-cols-2 gap-3">
+
+                <input type="text"
+                       name="kabine_set-${index}-name"
+                       value="${name}"
+                       class="input input-bordered w-full" />
+
+                <input type="number"
+                       name="kabine_set-${index}-betten"
+                       value="${betten}"
+                       class="input input-bordered w-full" />
+
+            </div>
+
+            <div class="flex justify-end mt-3">
+                <button type="button"
+                        class="btn btn-xs btn-error"
+                        onclick="removeKabine(this)">
+                    Entfernen
+                </button>
+            </div>
+
+        </div>
+    `;
+
+    container.insertAdjacentHTML('beforeend', template);
+    totalForms.value = index + 1;
+}
+
+function removeKabine(button) {
+    const form = button.closest('.kabine-form');
+
+    const deleteCheckbox = form.querySelector('input[type="checkbox"]');
+
+    if (deleteCheckbox) {
+        deleteCheckbox.checked = true;
+        form.style.display = 'none';
+    } else {
+        form.remove();
+    }
+}
+</script>
+
+{% endblock %}
