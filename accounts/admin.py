@@ -1,10 +1,13 @@
 from django.contrib import admin
 from .models import User, Lizenz, Notiz
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.models import Group
+
 
 
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
+    filter_horizontal = ("groups", "user_permissions")
 
     fieldsets = UserAdmin.fieldsets + (
         ("Zusätzliche Informationen", {

@@ -17,9 +17,10 @@ from utils.file_cleanup import delete_file
 
 def profilbild_upload_path(instance, filename):
     ext = filename.split('.')[-1]
-    filename = f"{uuid.uuid4()}.{ext}"
-    return os.path.join("accounts/profilbilder", filename)
-
+    return os.path.join(
+        "accounts/profilbilder",
+        f"{instance.profilbild_uuid}.{ext}"
+    )
 
 # --------------------------------------------------
 # User Model
@@ -37,6 +38,11 @@ class User(AbstractUser):
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
+
+    profilbild_uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False
+    )
 
     IDENTIFIKATIONSTYPEN = [
         ("pers", "Personalausweis"),
@@ -78,17 +84,33 @@ class User(AbstractUser):
         if self.email:
             self.email = self.email.lower()
 
-        # Bild optimieren
-        if self.profilbild:
+        try:
+            old = User.objects.get(pk=self.pk)
+        except User.DoesNotExist:
+            old = None
+
+        # 👉 Nur optimieren wenn Bild wirklich neu ist
+        if self.profilbild and (not old or old.profilbild != self.profilbild):
+
             optimized = optimize_image(self.profilbild)
 
+            # 👉 EXT sauber extrahieren
+            ext = self.profilbild.name.split('.')[-1]
+
             self.profilbild.save(
-                self.profilbild.name,
+                f"{self.profilbild_uuid}.{ext}",
                 optimized,
                 save=False
             )
 
         super().save(*args, **kwargs)
+
+    # --------------------------------------------------
+    def is_anbieter(self):
+        return self.groups.filter(name="Anbieter").exists()
+
+    def is_admin(self):
+        return self.is_superuser
 
     # --------------------------------------------------
 

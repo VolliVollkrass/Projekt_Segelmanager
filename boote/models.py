@@ -1,6 +1,7 @@
 from django.db import models
 from utils.image_optimizer import optimize_image
 from utils.file_cleanup import delete_file
+from django.db.models import Sum
 
 class Charterunternehmen(models.Model):
     name = models.CharField(max_length=100)
@@ -45,6 +46,11 @@ class Boot(models.Model):
             )
 
         super().save(*args, **kwargs)
+
+    @property
+    def anzahl_betten_boot(self):
+        return self.kabinen.aggregate(total_betten=Sum('betten'))['total_betten'] or 0
+
     def __str__(self):
         return self.name
 

@@ -136,7 +136,8 @@ Logout
 
 <div class="flex justify-between items-center">
 
-<h2 class="card-title">Segellizenzen</h2>
+<h2 class="card-title">Segellizenzen / Ausweisdokumente
+</h2>
 
 <button class="btn btn-primary btn-sm">
   <a href="{% url 'lizenz_hinzufuegen' %}" class="text-white">
@@ -279,7 +280,33 @@ Törn ansehen
 </div>
 
 </div>
+{% if user.is_anbieter %}
+<div class="card bg-base-100 shadow border border-secondary">
 
+    <div class="card-body">
+
+        <h2 class="card-title text-secondary">
+            ⚓ Anbieterbereich
+        </h2>
+
+        <div class="divider"></div>
+
+        <div class="flex gap-4 flex-wrap">
+
+            <a href="{% url 'anbieter_dashboard' %}" class="btn btn-secondary">
+                Meine Törns
+            </a>
+
+            <a href="{% url 'toern_create' %}" class="btn btn-outline">
+                + Törn erstellen
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+{% endif %}
 
 <!-- Adminbereich -->
 

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Törn erstellen{% endblock %}
+
+{% block content %}
+
+<div class="max-w-3xl mx-auto p-6">
+
+  <div class="card bg-base-100 shadow">
+    <div class="card-body">
+
+      <h2 class="text-2xl font-bold mb-4">
+        {{ title }}
+      </h2>
+
+      <form method="post" enctype="multipart/form-data" class="w-full">
+        {% csrf_token %}
+
+        <!-- Titel -->
+        <div class="form-control mb-4">
+          <label class="label">
+            <span class="label-text">Titel</span>
+          </label>
+          {{ form.titel }}
+          {% if form.titel.errors %}
+            <p class="text-error text-sm">{{ form.titel.errors.0 }}</p>
+          {% endif %}
+        </div>
+
+        <!-- Grid -->
+        <div class="grid md:grid-cols-2 gap-4">
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Startdatum</span></label>
+            {{ form.startdatum }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Enddatum</span></label>
+            {{ form.enddatum }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Revier</span></label>
+            {{ form.revier }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Preis pro Person (€)</span></label>
+            {{ form.preis_pro_person }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Nebenkosten (€)</span></label>
+            {{ form.nebenkosten }}
+          </div>
+
+          <div class="form-control md:col-span-2">
+            <label class="label"><span class="label-text">Kurzbeschreibung</span></label>
+            {{ form.kurzbeschreibung }}
+          </div>
+
+        </div>
+
+        <!-- Beschreibung -->
+        <div class="form-control mt-4">
+          <label class="label"><span class="label-text">Beschreibung</span></label>
+          {{ form.beschreibung }}
+        </div>
+
+        <!-- Bild -->
+        <div class="form-control mt-4">
+          <label class="label"><span class="label-text">Törnbild</span></label>
+          {{ form.bild_toern }}
+        </div>
+
+        <!-- Boote -->
+        <div class="form-control mt-4">
+          <label class="label"><span class="label-text">Boote zuweisen</span></label>
+          {{ form.boote }}
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-4 mt-4">
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Status</span>
+            </label>
+            {{ form.status }}
+          </div>
+
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text">Anmeldeschluss</span>
+            </label>
+            {{ form.anmeldeschluss }}
+          </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="flex gap-2 justify-end mt-6">
+          <a href="{% url 'anbieter_dashboard' %}" class="btn">Abbrechen</a>
+          <button class="btn btn-primary">Speichern</button>
+        </div>
+
+      </form>
+
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

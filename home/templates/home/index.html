@@ -27,7 +27,7 @@
             </figure>
 
             <div class="card-body">
-                <h2 class="card-title">{{ toern.titel }}</h2>
+                <h2 class="card-title">{{ toern.titel }} - {{ toern.revier }}</h2>
                 <p class="text-sm opacity-70">
                     {{ toern.startdatum|date:"d.m.Y" }} – {{ toern.enddatum|date:"d.m.Y" }}
                 </p>
@@ -39,7 +39,7 @@
 
                 <div class="card-actions justify-end mt-4">
                     <a href="{% url 'toern_detail' pk=toern.pk %}" class="btn btn-outline btn-sm">Details</a>
-                    <a href="#" class="btn btn-primary btn-sm">Anmelden</a>
+                    <a href="{% url 'toern_anmeldung' pk=toern.pk %}" class="btn btn-primary btn-sm">Anmelden</a>
                 </div>
             </div>
         </div>

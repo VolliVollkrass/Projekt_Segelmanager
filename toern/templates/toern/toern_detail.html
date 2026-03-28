@@ -9,6 +9,14 @@
     <!-- Titel & Badge -->
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-3xl font-bold">{{ toern.titel }}</h1>
+        {% if user.is_authenticated and user.is_anbieter and toern.anbieter == user %}
+            <a href="{% url 'toern_edit' toern.pk %}" class="btn btn-sm btn-outline">
+                ✏️ Bearbeiten
+            </a>
+        {% endif %}
+            <div class="badge badge-outline">
+                {{ toern.get_status_display }}
+            </div>
         <div class="badge 
             {% if toern.freie_plaetze == 0 %}badge-error
             {% elif toern.freie_plaetze <= 5 %}badge-warning
@@ -62,7 +70,7 @@
                     Nebenkosten
 
                     <div class="tooltip tooltip-bottom"
-                        data-tip="Die Nebenkosten beinhalten meist Diesel, Hafengebühren, Endreinigung und die Bordkasse für gemeinsame Einkäufe wie Lebensmittel oder Wasser. Die tatsächlichen Kosten können je nach Route und Bedürfnissenvariieren.">
+                        data-tip="Die Nebenkosten beinhalten meist Diesel, Hafengebühren, Endreinigung und die Bordkasse für gemeinsame Einkäufe wie Lebensmittel oder Wasser. Die tatsächlichen Kosten können je nach Route und Bedürfnisse variieren.">
 
                         <button class="btn btn-xs btn-circle ">
                             i
@@ -182,7 +190,7 @@
 
     <!-- Buttons -->
     <div class="flex gap-4 mt-6">
-        <a href="#" class="btn btn-primary">Anmelden</a>
+        <a href="{% url 'toern_anmeldung' pk=toern.pk %}" class="btn btn-primary">Anmelden</a>
         <a href="{% url 'index' %}" class="btn btn-outline">Zurück zur Übersicht</a>
     </div>
 

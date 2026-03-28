@@ -10,7 +10,7 @@ media/
 # Environment
 .env
 venv/
-.env.*
+
 
 # VS Code / IDE
 .vscode/
