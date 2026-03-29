@@ -10,6 +10,7 @@ urlpatterns = [
     path('accounts/', include('accounts.urls')),
     path('toern/', include('toern.urls')),
     path('boote/', include('boote.urls')),
+    path('schema-viewer/', include('schema_viewer.urls')),
 
 ]
 if settings.DEBUG:

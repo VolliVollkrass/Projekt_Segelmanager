@@ -131,6 +131,7 @@ class Teilnahme(models.Model):
     gesegelte_meilen = models.PositiveIntegerField(default=0)  # optionales Feld für die Anzahl gesegelter Meilen
     seglerische_erfahrung = models.CharField(max_length=30, choices=SEGELERFAHRUNG_CHOICES, default="1")
     notizen = models.TextField(blank=True)  # private Notizen für Skipper/Admin
+    teilnahmebedingungen_akzeptiert = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

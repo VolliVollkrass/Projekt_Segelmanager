@@ -34,6 +34,14 @@
             </li>
           {% endif %}
 
+          {% if user.is_anbieter or user.is_staff %}
+            <li>
+              <a href="{% url 'anbieter_dashboard' %}">
+                ⛵️ Anbieterbereich
+              </a>
+            </li>
+          {% endif %}
+
           <div class="divider my-1"></div>
 
           <li>
@@ -70,6 +78,14 @@
             <a href="{% url 'admin:index' %}" class="flex items-center">
               Admin
               <span class="badge badge-secondary badge-sm ml-1">PRO</span>
+            </a>
+          </li>
+        {% endif %}
+        
+        {% if user.is_anbieter or user.is_staff %}
+          <li>
+            <a href="{% url 'anbieter_dashboard' %}">
+              Anbieterbereich
             </a>
           </li>
         {% endif %}

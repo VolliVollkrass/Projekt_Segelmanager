@@ -6,8 +6,13 @@ from .models import Toern, Teilnahme
 from django.contrib.auth.decorators import login_required
 from utils.permissions import anbieter_required, is_owner
 from django.core.exceptions import PermissionDenied
-from .forms import ToernForm
+from .forms import ToernForm, TeilnahmeForm
+from django.contrib import messages
+from django.contrib.auth import authenticate, login
+from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_POST
+
+User = get_user_model()
 
 def toern_detail(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
@@ -37,25 +42,75 @@ def toern_detail(request, pk):
 
 def toern_anmeldung(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
-    boote = toern.boote.all()
-    # Skipper pro Boot
-    skipper_pro_boot = {
-        boot.id: Teilnahme.objects.filter(
-            toern=toern,
-            boot=boot,
-            rolle="skipper",
-            status__in=["angemeldet", "bestaetigt"]
-        ).select_related("user").first()
-        for boot in boote
-    }
 
-    rtx = {
-        'toern': toern,
-        'boote': boote,
-        'skipper_pro_boot': skipper_pro_boot,
-    }
+    if request.method == "POST":
+        form = TeilnahmeForm(request.POST)
 
-    return render(request, 'toern/toern_anmeldung.html', rtx )
+        if form.is_valid():
+
+            # =========================
+            # USER LOGIK
+            # =========================
+            if request.user.is_authenticated:
+                user = request.user
+                if not user.geburtsdatum:
+                    user.geburtsdatum = form.cleaned_data.get("geburtsdatum")
+                    user.save()
+            else:
+                email = request.POST.get("email")
+
+                user, created = User.objects.get_or_create(
+                    email=email,
+                    defaults={
+                        "username": email,
+                        "first_name": request.POST.get("first_name"),
+                        "last_name": request.POST.get("last_name"),
+                        "geburtsdatum": form.cleaned_data.get("geburtsdatum"),
+                    }
+                )
+
+                # nur wenn neu → Passwort setzen
+                if created:
+                    password = form.cleaned_data.get("password1")
+                    user.set_password(password)
+                    user.save()
+
+                    user = authenticate(
+                        request,
+                        username=user.email,
+                        password=password
+                    )
+
+                    if user:
+                        login(request, user)
+
+                else:
+                    # 👉 User existiert aber ist nicht eingeloggt
+                    messages.error(request, "Bitte logge dich zuerst ein.")
+                    return redirect("login")
+            # =========================
+            # Teilnahme erstellen
+            # =========================
+            if Teilnahme.objects.filter(user=user, toern=toern).exists():
+                messages.warning(request, "Du bist bereits angemeldet.")
+                return redirect("toern_detail", pk=toern.pk)
+
+            teilnahme = form.save(commit=False)
+            teilnahme.user = user
+            teilnahme.toern = toern
+            teilnahme.rolle = "crew"
+            teilnahme.save()
+
+            messages.success(request, "Erfolgreich angemeldet!")
+            return redirect("toern_detail", pk=toern.pk)
+
+    else:
+        form = TeilnahmeForm()
+
+    return render(request, "toern/toern_anmeldung.html", {
+        "toern": toern,
+        "form": form
+    })
 
 @login_required
 @anbieter_required
@@ -138,3 +193,4 @@ def toern_status_update(request, pk):
         toern.save()
 
     return redirect("anbieter_dashboard")
+

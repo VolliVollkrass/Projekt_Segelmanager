@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'toern',
     'logistik',
     'finance',
+    'schema_viewer',
 ]
 
 MIDDLEWARE = [

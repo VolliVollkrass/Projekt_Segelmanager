@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-semibold">Crewbereich</h1>
+        <a href="{% url 'profil_bearbeiten' %}" 
+           class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+            Daten vervollständigen
+        </a>
+    </div>
+
+    <!-- TABS -->
+    <div class="border-b mb-6">
+        <nav class="flex space-x-6">
+            <button class="tab-button active" data-tab="toerns">Meine Törns</button>
+            <button class="tab-button" data-tab="crew">Crew & Kabine</button>
+            <button class="tab-button" data-tab="kommunikation">Kommunikation</button>
+            <button class="tab-button" data-tab="finanzen">Finanzen</button>
+            <button class="tab-button" data-tab="logbuch">Logbuch</button>
+        </nav>
+    </div>
+
+    <!-- ===================== -->
+    <!-- TAB: TÖRNS -->
+    <!-- ===================== -->
+    <div id="toerns" class="tab-content">
+
+        {% for teilnahme in teilnahmen %}
+        <div class="bg-white shadow rounded-xl p-5 mb-4">
+
+            <h2 class="text-xl font-semibold mb-2">
+                {{ teilnahme.toern.titel }}
+            </h2>
+
+            <p class="text-sm text-gray-500 mb-3">
+                {{ teilnahme.toern.startdatum }} – {{ teilnahme.toern.enddatum }}
+            </p>
+
+            <!-- Skipper -->
+            <div class="mb-2">
+                <span class="font-medium">Skipper:</span>
+                {% for skipper in teilnahme.toern.skipper %}
+                    {{ skipper.first_name }} {{ skipper.last_name }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </div>
+
+            <!-- Co-Skipper -->
+            <div class="mb-2">
+                <span class="font-medium">Co-Skipper:</span>
+                {% for coskipper in teilnahme.toern.coskipper %}
+                    {{ coskipper.first_name }} {{ coskipper.last_name }}{% if not forloop.last %}, {% endif %}
+                {% empty %}
+                    Keine
+                {% endfor %}
+            </div>
+
+            <!-- Crew -->
+            <div class="mt-3">
+                <span class="font-medium">Crew:</span>
+                <ul class="list-disc list-inside text-sm text-gray-700">
+                    {% for crew in teilnahme.toern.crew %}
+                        <li>{{ crew.first_name }} {{ crew.last_name }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+        </div>
+        {% empty %}
+            <p>Du bist aktuell bei keinem Törn angemeldet.</p>
+        {% endfor %}
+
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- TAB: CREW & KABINE -->
+    <!-- ===================== -->
+    <div id="crew" class="tab-content hidden">
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <!-- Zimmerpartner -->
+            <div class="bg-white shadow rounded-xl p-5 mb-6">
+                <h2 class="text-lg font-semibold mb-3">Zimmerpartner wählen</h2>
+
+                <select name="zimmerpartner" class="w-full border rounded-lg p-2">
+                    <option value="">-- auswählen --</option>
+                    {% for crew in crew_liste %}
+                        <option value="{{ crew.id }}">
+                            {{ crew.first_name }} {{ crew.last_name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Nicht zusammen fahren -->
+            <div class="bg-white shadow rounded-xl p-5 mb-6">
+                <h2 class="text-lg font-semibold mb-3">Nicht zusammen aufs Boot</h2>
+
+                <div class="grid grid-cols-2 gap-2">
+                    {% for crew in crew_liste %}
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" name="avoid[]" value="{{ crew.id }}">
+                            <span>{{ crew.first_name }} {{ crew.last_name }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <button type="submit"
+                class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                Speichern
+            </button>
+
+        </form>
+
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- TAB: KOMMUNIKATION -->
+    <!-- ===================== -->
+    <div id="kommunikation" class="tab-content hidden">
+
+        <div class="bg-white shadow rounded-xl p-5 mb-4">
+            <h2 class="text-lg font-semibold mb-3">Einkauf / Packliste / Infos</h2>
+
+            <textarea class="w-full border rounded-lg p-3 h-32"
+                placeholder="Teile Infos, Packlisten oder Empfehlungen..."></textarea>
+
+            <button class="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg">
+                Posten
+            </button>
+        </div>
+
+        <!-- Nachrichten -->
+        <div class="space-y-3">
+            {% for message in messages %}
+                <div class="bg-gray-100 p-3 rounded-lg">
+                    <p class="text-sm">{{ message.text }}</p>
+                    <span class="text-xs text-gray-500">
+                        {{ message.user }} – {{ message.created_at }}
+                    </span>
+                </div>
+            {% endfor %}
+        </div>
+
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- TAB: FINANZEN -->
+    <!-- ===================== -->
+    <div id="finanzen" class="tab-content hidden">
+
+        <div class="bg-white shadow rounded-xl p-5 mb-4">
+            <h2 class="text-lg font-semibold mb-3">Gemeinsame Ausgaben</h2>
+
+            <button class="bg-green-600 text-white px-4 py-2 rounded-lg">
+                Ausgabe hinzufügen
+            </button>
+        </div>
+
+        {% for expense in expenses %}
+        <div class="bg-gray-100 p-3 rounded-lg mb-2">
+            <p>{{ expense.title }} – {{ expense.amount }} €</p>
+            <span class="text-xs text-gray-500">{{ expense.user }}</span>
+        </div>
+        {% endfor %}
+
+    </div>
+
+
+    <!-- ===================== -->
+    <!-- TAB: LOGBUCH -->
+    <!-- ===================== -->
+    <div id="logbuch" class="tab-content hidden">
+
+        <div class="bg-white shadow rounded-xl p-5 mb-4">
+            <h2 class="text-lg font-semibold mb-3">Logbuch Eintrag</h2>
+
+            <textarea class="w-full border rounded-lg p-3 h-32"
+                placeholder="Was ist heute passiert?"></textarea>
+
+            <button class="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg">
+                Speichern
+            </button>
+        </div>
+
+        {% for entry in logbuch %}
+        <div class="bg-gray-100 p-3 rounded-lg mb-2">
+            <p>{{ entry.text }}</p>
+            <span class="text-xs text-gray-500">{{ entry.date }}</span>
+        </div>
+        {% endfor %}
+
+    </div>
+
+</div>
+
+
+<!-- ===================== -->
+<!-- TAB SCRIPT -->
+<!-- ===================== -->
+<script>
+    const tabs = document.querySelectorAll('.tab-button');
+    const contents = document.querySelectorAll('.tab-content');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            contents.forEach(c => c.classList.add('hidden'));
+            document.getElementById(tab.dataset.tab).classList.remove('hidden');
+        });
+    });
+</script>
+
+<style>
+.tab-button {
+    padding: 10px;
+    border-bottom: 2px solid transparent;
+}
+.tab-button.active {
+    border-color: #2563eb;
+    color: #2563eb;
+    font-weight: 600;
+}
+</style>
+
+{% endblock %}

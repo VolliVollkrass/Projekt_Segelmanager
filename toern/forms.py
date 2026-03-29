@@ -1,5 +1,5 @@
 from django import forms
-from .models import Toern
+from .models import Toern, Teilnahme
 
 
 class ToernForm(forms.ModelForm):
@@ -94,4 +94,80 @@ class ToernForm(forms.ModelForm):
         self.fields['anmeldeschluss'].input_formats = ['%Y-%m-%dT%H:%M']
 
 
+class TeilnahmeForm(forms.ModelForm):
 
+    password1 = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(attrs={
+            "class": "input input-bordered w-full"
+        })
+    )
+
+    password2 = forms.CharField(
+        required=False,
+        widget=forms.PasswordInput(attrs={
+            "class": "input input-bordered w-full"
+        })
+    )
+
+    gesegelte_meilen = forms.IntegerField(
+        required=False,
+        widget=forms.NumberInput(attrs={
+            "class": "input input-bordered w-full",
+            "placeholder": "z.B. 250",
+            "min": "0"
+        })
+    )
+
+    gesegelte_meilen = forms.IntegerField(
+        required=False,
+        widget=forms.NumberInput(attrs={
+            "class": "input input-bordered w-full",
+            "placeholder": "z.B. 250",
+            "min": "0"
+        })
+    )
+    teilnahmebedingungen_akzeptiert = forms.BooleanField(
+        required=True,
+        widget=forms.CheckboxInput(attrs={
+            "class": "checkbox checkbox-primary"
+        })
+    )
+
+    notizen = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            "class": "textarea textarea-bordered w-full",
+            "placeholder": "z.B. besondere Wünsche, Fragen...",
+            "rows": 3
+        })
+    )
+    geburtsdatum = forms.DateField(
+        required=True,
+        widget=forms.DateInput(attrs={
+            "type": "date",
+            "class": "input input-bordered w-full"
+        })
+    )
+
+
+    class Meta:
+        model = Teilnahme
+        fields = [
+            "gesegelte_meilen",
+            "seglerische_erfahrung",
+            "notizen",
+            "teilnahmebedingungen_akzeptiert"
+        ]
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
+
+        if password1 or password2:
+            if password1 != password2:
+                raise forms.ValidationError("Passwörter stimmen nicht überein.")
+
+        return cleaned_data

@@ -19,14 +19,12 @@
         <div class="w-full lg:w-1/2 flex">
             <div class="card bg-base-300 shadow-xl overflow-hidden flex flex-col w-full">
 
-                <!-- Bild -->
                 <figure>
                     <img src="{{ toern.bild_toern.url }}" 
                          alt="{{ toern.titel }}"
                          class="w-full h-64 sm:h-72 object-cover">
                 </figure>
 
-                <!-- Content -->
                 <div class="card-body flex flex-col justify-between space-y-4">
 
                     <div>
@@ -41,36 +39,36 @@
                         <p class="text-sm mt-3">
                             {{ toern.kurzbeschreibung|default:"Hier könnte eine kurze Beschreibung des Törns stehen." }}
                         </p>
+
                         <div>
                             <h2 class="font-semibold mt-4">Boote:</h2>
-                            <p class="text-sm mt-1">
-                                {% for boot in boote %}
-                                    <p class="text-sm">
-                                        {{ boot.name }} - {{ boot.modell }} ({{ boot.laenge }}m, {{ boot.baujahr }}) - {{ boot.anzahl_betten_boot }} Personen   
-                                    </p>
-                                {% endfor %}
-                            </p>
+                            {% for boot in boote %}
+                                <p class="text-sm">
+                                    {{ boot.name }} - {{ boot.modell }} ({{ boot.laenge }}m, {{ boot.baujahr }}) - {{ boot.anzahl_betten_boot }} Personen   
+                                </p>
+                            {% endfor %}
                         </div>
+
                         <div>
                             <h2 class="font-semibold mt-4">Leistungen:</h2>
-                            <p class="text-sm mt-1">
-                                <ul class="list-disc list-inside">
-                                    <li>Unterbringung in 2er Kabinen</li>
-                                    <li>Bettwäsche sowie Handtücher</li>
-                                    <li>Endreinigung</li>
-                                    <li>Beiboot mit Außenborder</li>
-                                    <li>Skipper</li>
-                                    <li>Segel- und Sicherheitsausrüstung</li>
-                                </ul>
-                            </p>
+                            <ul class="list-disc list-inside text-sm mt-1">
+                                <li>Unterbringung in 2er Kabinen</li>
+                                <li>Bettwäsche sowie Handtücher</li>
+                                <li>Endreinigung</li>
+                                <li>Beiboot mit Außenborder</li>
+                                <li>Skipper</li>
+                                <li>Segel- und Sicherheitsausrüstung</li>
+                            </ul>
                         </div>
 
                     </div>
 
-                    <!-- Preis -->
                     <div class="card bg-primary text-primary-content shadow">
                         <div class="card-body p-4 text-center">
-                            <div class="text-sm opacity-80">Gesamt ca. <br> (Entspricht den Preis p. Person und die Nebenkosten)</div>
+                            <div class="text-sm opacity-80">
+                                Gesamt ca.<br>
+                                (Preis p.P. + Nebenkosten)
+                            </div>
                             <div class="text-xl font-bold">
                                 {{ toern.gesamtpreis }} €
                             </div>
@@ -92,78 +90,152 @@
                 <form method="post" class="space-y-4 flex flex-col h-full">
                     {% csrf_token %}
 
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-error">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
                     {% if not user.is_authenticated %}
 
-                    <div class="form-control w-full">
-                        <label class="label"><span class="label-text">Vorname</span></label>
-                        <input type="text" name="first_name" class="input input-bordered w-full" required>
-                    </div>
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">Vorname</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                name="first_name" 
+                                value="{{ user.first_name|default:'' }}"
+                                class="input input-bordered w-full" 
+                                required
+                            >
+                        </div>
 
-                    <div class="form-control w-full">
-                        <label class="label"><span class="label-text">Nachname</span></label>
-                        <input type="text" name="last_name" class="input input-bordered w-full" required>
-                    </div>
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">Nachname</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                name="last_name" 
+                                value="{{ user.last_name|default:'' }}"
+                                class="input input-bordered w-full" 
+                                required
+                            >
+                        </div>
 
-                    <div class="form-control w-full">
-                        <label class="label"><span class="label-text">E-Mail</span></label>
-                        <input type="email" name="email" class="input input-bordered w-full" required>
-                    </div>
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">E-Mail</span>
+                            </label>
+                            <input 
+                                type="email" 
+                                name="email" 
+                                value="{{ user.email|default:'' }}"
+                                class="input input-bordered w-full" 
+                                required
+                            >
+                        </div>
 
-                    <div class="form-control w-full">
-                        <label class="label"><span class="label-text">Passwort</span></label>
-                        <input type="password" name="password" class="input input-bordered w-full" required>
-                    </div>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Passwort</span></label>
+                            {{ form.password1 }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Passwort wiederholen</span></label>
+                            {{ form.password2 }}
+                        </div>
+
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">Geburtsdatum</span>
+                            </label>
+
+                            {{ form.geburtsdatum }}
+
+                            {% if form.geburtsdatum.errors %}
+                                <p class="text-error text-sm mt-1">
+                                    {{ form.geburtsdatum.errors.0 }}
+                                </p>
+                            {% endif %}
+                        </div>
 
                     {% else %}
 
-                    <div class="form-control w-full">
-                        <label class="label"><span class="label-text">Vorname</span></label>
-                        <input type="text" name="first_name" value="{{ user.first_name }}" class="input input-bordered w-full">
-                    </div>
+                        <p class="text-sm opacity-60">
+                            Angemeldet als {{ user.email }}
+                        </p>
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">Vorname</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                name="first_name" 
+                                value="{{ user.first_name|default:'' }}"
+                                class="input input-bordered w-full" 
+                                required
+                            >
+                        </div>
 
-                    <div class="form-control w-full">
-                        <label class="label"><span class="label-text">Nachname</span></label>
-                        <input type="text" name="last_name" value="{{ user.last_name }}" class="input input-bordered w-full">
-                    </div>
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">Nachname</span>
+                            </label>
+                            <input 
+                                type="text" 
+                                name="last_name" 
+                                value="{{ user.last_name|default:'' }}"
+                                class="input input-bordered w-full" 
+                                required
+                            >
+                        </div>
 
-                    <p class="text-sm opacity-60 text-center lg:text-left">
-                        Angemeldet als {{ user.email }}
-                    </p>
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">Geburtsdatum</span>
+                            </label>
+
+                            <input 
+                                type="date"
+                                name="geburtsdatum"
+                                value="{{ user.geburtsdatum|date:'Y-m-d' }}"
+                                class="input input-bordered w-full"
+                            >
+                        </div>
 
                     {% endif %}
 
                     <!-- Seemeilen -->
-                    <div class="form-control w-full">
+                    <div class="form-control">
                         <label class="label">
                             <span class="label-text">Gesegelte Seemeilen</span>
                         </label>
-                        <input 
-                            type="number" 
-                            name="seemeilen" 
-                            min="0"
-                            placeholder="z.B. 250" 
-                            class="input input-bordered w-full">
+                        {{ form.gesegelte_meilen }}
                         <p class="text-xs opacity-60 mt-1">
                             Falls du unsicher bist: einfach schätzen 👍
                         </p>
                     </div>
 
-                    <!-- Bewertung -->
-                    <div class="form-control w-full">
+                    <!-- Bewertung (⭐) -->
+                    <div class="form-control">
                         <label class="label">
                             <span class="label-text">Seglerisches Können</span>
                         </label>
 
-                        <!-- Sterne -->
                         <div class="rating w-full grid grid-cols-5">
-                            <input type="radio" name="rating" value="1" class="mask mask-star-2 bg-orange-400 mx-auto"/>
-                            <input type="radio" name="rating" value="2" class="mask mask-star-2 bg-orange-400 mx-auto"/>
-                            <input type="radio" name="rating" value="3" class="mask mask-star-2 bg-orange-400 mx-auto"/>
-                            <input type="radio" name="rating" value="4" class="mask mask-star-2 bg-orange-400 mx-auto"/>
-                            <input type="radio" name="rating" value="5" class="mask mask-star-2 bg-orange-400 mx-auto"/>
+                            {% for i in "12345" %}
+                                <input 
+                                    type="radio"
+                                    name="seglerische_erfahrung"
+                                    value="{{ i }}"
+                                    {% if form.seglerische_erfahrung.value == i %}checked{% endif %}
+                                    class="mask mask-star-2 bg-orange-400 mx-auto"
+                                />
+                            {% endfor %}
                         </div>
 
-                        <!-- Labels -->
                         <div class="grid grid-cols-5 text-xs mt-1 opacity-70 text-center">
                             <span>Landratte</span>
                             <span>Mitsegler</span>
@@ -171,17 +243,22 @@
                             <span>Steuermann</span>
                             <span>Skipper</span>
                         </div>
+
+                        {% if form.seglerische_erfahrung.errors %}
+                            <p class="text-error text-sm mt-1">
+                                {{ form.seglerische_erfahrung.errors.0 }}
+                            </p>
+                        {% endif %}
                     </div>
 
                     <!-- Notizen -->
                     <div class="form-control w-full">
-                        <label class="label"><span class="label-text">Notizen</span></label>
-                        <textarea name="notizen" 
-                                  class="textarea textarea-bordered w-full"
-                                  placeholder="z.B. besondere Wünsche, Fragen..."></textarea>
+                        <label class="label">
+                            <span class="label-text">Notizen</span>
+                        </label>
+                        {{ form.notizen }}
                     </div>
 
-                    <!-- Spacer (drückt Button nach unten für gleiche Höhe) -->
                     <div class="grow"></div>
 
                     <!-- Preis -->
@@ -190,13 +267,22 @@
                     </div>
 
                     <!-- AGB -->
-                    <div class="form-control mt-4">
-                        <label class="flex items-start gap-3 cursor-pointer">
-                            <input type="checkbox" name="agb" class="checkbox checkbox-primary mt-1" required>
-                            <span class="text-sm leading-relaxed wrap-break-word">
+                    <div class="form-control w-full">
+                        <label class="label cursor-pointer items-start gap-3">
+
+                            {{ form.teilnahmebedingungen_akzeptiert }}
+
+                            <span class="label-text whitespace-normal wrap-break-words leading-relaxed">
                                 Ich melde mich verbindlich an und akzeptiere die Teilnahmebedingungen.
                             </span>
+
                         </label>
+
+                        {% if form.teilnahmebedingungen_akzeptiert.errors %}
+                            <p class="text-error text-sm mt-1">
+                                {{ form.teilnahmebedingungen_akzeptiert.errors.0 }}
+                            </p>
+                        {% endif %}
                     </div>
 
                     <!-- Button -->
