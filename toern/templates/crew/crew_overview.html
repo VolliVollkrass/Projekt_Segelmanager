@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+    <h1 class="text-2xl font-semibold mb-6">Meine Törns</h1>
+
+    <!-- KOMMENDE TÖRNS -->
+    <div class="mb-10">
+        <h2 class="text-lg font-semibold mb-4 text-green-700">Kommende Törns</h2>
+
+        {% for t in kommende_toerns %}
+        <a href="{% url 'crew_dashboard' t.id %}">
+            <div class="bg-white shadow rounded-xl p-5 mb-3 hover:shadow-md transition">
+
+                <div class="flex justify-between">
+                    <h3 class="text-lg font-semibold">{{ t.titel }}</h3>
+                    <span class="text-sm text-gray-500">
+                        {{ t.startdatum }} – {{ t.enddatum }}
+                    </span>
+                </div>
+
+                <p class="text-sm text-gray-600 mt-2">
+                    {{ t.revier }}
+                </p>
+
+            </div>
+        </a>
+        {% empty %}
+            <p class="text-gray-500">Keine kommenden Törns</p>
+        {% endfor %}
+    </div>
+
+
+    <!-- VERGANGENE TÖRNS -->
+    <div>
+        <h2 class="text-lg font-semibold mb-4 text-gray-600">Vergangene Törns</h2>
+
+        {% for t in vergangene_toerns %}
+        <a href="{% url 'crew_dashboard' t.id %}">
+            <div class="bg-gray-100 rounded-xl p-5 mb-3 hover:bg-gray-200 transition">
+
+                <div class="flex justify-between">
+                    <h3 class="text-lg font-semibold">{{ t.titel }}</h3>
+                    <span class="text-sm text-gray-500">
+                        {{ t.startdatum }} – {{ t.enddatum }}
+                    </span>
+                </div>
+
+                <p class="text-sm text-gray-600 mt-2">
+                    {{ t.revier }}
+                </p>
+
+            </div>
+        </a>
+        {% empty %}
+            <p class="text-gray-500">Keine vergangenen Törns</p>
+        {% endfor %}
+    </div>
+
+</div>
+
+{% endblock %}

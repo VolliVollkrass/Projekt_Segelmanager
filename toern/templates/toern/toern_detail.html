@@ -193,6 +193,12 @@
         <a href="{% url 'toern_anmeldung' pk=toern.pk %}" class="btn btn-primary">Anmelden</a>
         <a href="{% url 'index' %}" class="btn btn-outline">Zurück zur Übersicht</a>
     </div>
+    {% if user_ist_teilnehmer %}
+        <a href="{% url 'crew_dashboard' toern.id %}"
+        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+            Zum Crewbereich
+        </a>
+    {% endif %}
 
 </div>
 {% endblock %}

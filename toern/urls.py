@@ -8,5 +8,7 @@ urlpatterns = [
     path('create/', toern_create, name='toern_create'),
     path('edit/<int:pk>/', toern_edit, name='toern_edit'),
     path('status/<int:pk>/', toern_status_update, name='toern_status_update'),
+    path("toern/<int:toern_id>/crew/", crew_dashboard, name="crew_dashboard"),
+    path("crew/", crew_overview, name="crew_overview"),
 
 ]

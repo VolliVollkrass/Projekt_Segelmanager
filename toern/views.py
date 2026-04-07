@@ -11,6 +11,7 @@ from django.contrib import messages
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_POST
+from django.utils.timezone import now
 
 User = get_user_model()
 
@@ -194,3 +195,59 @@ def toern_status_update(request, pk):
 
     return redirect("anbieter_dashboard")
 
+def crew_overview(request):
+    teilnahmen = Teilnahme.objects.filter(user=request.user).select_related("toern")
+
+    kommende_toerns = []
+    vergangene_toerns = []
+
+    jetzt = now()  # <-- datetime!
+
+    for t in teilnahmen:
+        if t.toern.startdatum >= jetzt:
+            kommende_toerns.append(t.toern)
+        else:
+            vergangene_toerns.append(t.toern)
+
+    context = {
+        "kommende_toerns": kommende_toerns,
+        "vergangene_toerns": vergangene_toerns,
+    }
+
+    return render(request, "crew/crew_overview.html", context)
+
+def crew_dashboard(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+
+    # Teilnahme prüfen (Crew darf nur eigene sehen!)
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=toern
+    ).first()
+
+    # Berechtigungslogik
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=toern
+    ).first()
+
+    is_skipper = teilnahme and teilnahme.rolle == "skipper"
+    is_coskipper = teilnahme and teilnahme.rolle == "coskipper"
+
+    if not teilnahme:
+        return render(request, "403.html")
+
+    # Alle Teilnahmen für diesen Törn
+    teilnahmen = Teilnahme.objects.filter(toern=toern).select_related("user")
+
+    crew_liste = [t.user for t in teilnahmen]
+
+    context = {
+        "toern": toern,
+        "teilnahmen": teilnahmen,
+        "crew_liste": crew_liste,
+        "is_skipper": is_skipper,
+        "is_coskipper": is_coskipper,
+    }
+
+    return render(request, "crew/crew_dashboard.html", context)

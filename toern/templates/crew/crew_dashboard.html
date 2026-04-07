@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-6xl mx-auto px-4 py-8 space-y-6">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-start">
+        <div>
+            <a href="{% url 'crew_overview' %}" class="link link-hover text-sm text-base-content/60">
+                ← Meine Törns
+            </a>
+            <h1 class="text-3xl font-bold mt-1">{{ toern.titel }}</h1>
+        </div>
+
+        <button class="btn btn-primary">
+            Daten vervollständigen
+        </button>
+    </div>
+
+    <!-- TÖRN DETAILS -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Törn-Details</h2>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                    <p class="text-base-content/60">Boot</p>
+                    <p class="font-medium">{{ toern.boot }}</p>
+                </div>
+                <div>
+                    <p class="text-base-content/60">Revier</p>
+                    <p class="font-medium">{{ toern.revier }}</p>
+                </div>
+                <div>
+                    <p class="text-base-content/60">Start</p>
+                    <p class="font-medium">{{ toern.startdatum|date:"d.m.Y" }}</p>
+                </div>
+                <div>
+                    <p class="text-base-content/60">Ende</p>
+                    <p class="font-medium">{{ toern.enddatum|date:"d.m.Y" }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CREW -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+
+            <div class="flex justify-between items-center">
+                <h2 class="card-title">Crew</h2>
+
+                <!-- später Toggle -->
+                <div class="badge badge-outline">Alle Crewmitglieder</div>
+            </div>
+
+            <!-- Rollen -->
+            <div class="flex flex-wrap gap-2 mt-2">
+                {% for t in teilnahmen %}
+                    {% if t.rolle == "skipper" %}
+                        <span class="badge badge-primary">
+                            Skipper: {{ t.user.first_name }} {{ t.user.last_name }}
+                        </span>
+                    {% endif %}
+                    {% if t.rolle == "coskipper" %}
+                        <span class="badge badge-secondary">
+                            Co-Skipper: {{ t.user.first_name }} {{ t.user.last_name }}
+                        </span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <!-- Liste -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+                {% for t in teilnahmen %}
+                    <div class="p-3 rounded-xl border bg-base-200">
+                        <p class="font-medium">
+                            {{ t.user.first_name }} {{ t.user.last_name }}
+                        </p>
+                        <p class="text-xs text-base-content/60">
+                            {{ t.user.email }}
+                        </p>
+                    </div>
+                {% endfor %}
+            </div>
+
+        </div>
+    </div>
+
+    <!-- KABINENWUNSCH -->
+    <div class="grid md:grid-cols-2 gap-6">
+
+        <div class="card bg-base-100 shadow">
+            <div class="card-body">
+                <h2 class="card-title">Kabinenpartner</h2>
+                <p class="text-sm text-base-content/60">
+                    Mit wem möchtest du in eine Kabine?
+                </p>
+
+                <select class="select select-bordered w-full mt-3">
+                    <option>Bitte wählen</option>
+                    {% for t in teilnahmen %}
+                        <option>{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="card bg-base-100 shadow">
+            <div class="card-body">
+                <h2 class="card-title">Lieber nicht</h2>
+                <p class="text-sm text-base-content/60">
+                    Wen möchtest du vermeiden?
+                </p>
+
+                <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+                    {% for t in teilnahmen %}
+                        <label class="flex items-center gap-2">
+                            <input type="checkbox" class="checkbox checkbox-sm">
+                            {{ t.user.first_name }} {{ t.user.last_name }}
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FINANZEN -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+
+            <div class="flex justify-between items-center">
+                <h2 class="card-title">Finanzen</h2>
+                <button class="btn btn-sm btn-primary">
+                    + Ausgabe hinzufügen
+                </button>
+            </div>
+
+            <!-- Übersicht -->
+            <div class="stats stats-vertical md:stats-horizontal shadow mt-4">
+
+                <div class="stat">
+                    <div class="stat-title">Gesamtausgaben</div>
+                    <div class="stat-value">200€</div>
+                </div>
+
+                <div class="stat">
+                    <div class="stat-title">Dein Saldo</div>
+                    <div class="stat-value text-error">-35€</div>
+                </div>
+
+            </div>
+
+            <!-- Schulden -->
+            <div class="mt-4 space-y-2">
+                <div class="alert">
+                    <span>Du schuldest Max 20€</span>
+                </div>
+                <div class="alert">
+                    <span>Lisa schuldet dir 10€</span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- KOMMUNIKATION -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Kommunikation</h2>
+
+            <textarea class="textarea textarea-bordered w-full"
+                placeholder="Packliste, Einkauf, Infos..."></textarea>
+
+            <div class="space-y-2 mt-4">
+                <div class="chat chat-start">
+                    <div class="chat-bubble">Ich bringe Bier 🍻</div>
+                </div>
+                <div class="chat chat-start">
+                    <div class="chat-bubble">Bitte Regenjacke mitnehmen!</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGBUCH -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Logbuch</h2>
+
+            <div class="space-y-2">
+                <div class="alert">
+                    Tag 1 – perfekter Wind!
+                </div>
+                <div class="alert">
+                    Tag 2 – alle nass 😄
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
