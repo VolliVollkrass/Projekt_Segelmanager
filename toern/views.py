@@ -1,8 +1,8 @@
 from django.shortcuts import render, get_object_or_404, redirect
 
-
-from boote.models import Boot
-from .models import Toern, Teilnahme
+from boote.models import Boot, Kabine
+from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz
+from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from utils.permissions import anbieter_required, is_owner
 from django.core.exceptions import PermissionDenied
@@ -12,8 +12,28 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_POST
 from django.utils.timezone import now
+import json
+from django.http import JsonResponse
+
 
 User = get_user_model()
+
+# =========================
+# HELPER FUNCTIONS
+# =========================
+def get_partner_map(toern):
+    pairs = KabinenWunsch.objects.filter(
+        toern=toern,
+        status="accepted"
+    ).select_related("from_user", "to_user")
+
+    partner_map = {}
+
+    for p in pairs:
+        partner_map[p.from_user.id] = p.to_user
+        partner_map[p.to_user.id] = p.from_user
+
+    return partner_map
 
 def toern_detail(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
@@ -32,11 +52,20 @@ def toern_detail(request, pk):
         for boot in boote
     }
 
+    user_teilnahme = None
+
+    if request.user.is_authenticated:
+        user_teilnahme = Teilnahme.objects.filter(
+            user=request.user,
+            toern=toern
+        ).first()
+
 
     rtx = {
         'toern': toern,
         'boote': boote,
         'skipper_pro_boot': skipper_pro_boot,
+        'user_teilnahme': user_teilnahme,
     }
 
     return render(request, 'toern/toern_detail.html', rtx )
@@ -219,35 +248,878 @@ def crew_overview(request):
 def crew_dashboard(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
 
-    # Teilnahme prüfen (Crew darf nur eigene sehen!)
+    # =========================
+    # 1. Teilnahme prüfen
+    # =========================
     teilnahme = Teilnahme.objects.filter(
         user=request.user,
         toern=toern
     ).first()
-
-    # Berechtigungslogik
-    teilnahme = Teilnahme.objects.filter(
-        user=request.user,
-        toern=toern
-    ).first()
-
-    is_skipper = teilnahme and teilnahme.rolle == "skipper"
-    is_coskipper = teilnahme and teilnahme.rolle == "coskipper"
 
     if not teilnahme:
         return render(request, "403.html")
 
-    # Alle Teilnahmen für diesen Törn
-    teilnahmen = Teilnahme.objects.filter(toern=toern).select_related("user")
+    # =========================
+    # 2. Rollen
+    # =========================
+    is_skipper = teilnahme.rolle == "skipper"
+    is_coskipper = teilnahme.rolle == "coskipper"
 
-    crew_liste = [t.user for t in teilnahmen]
+    # =========================
+    # 3. Crew
+    # =========================
+    teilnahmen = Teilnahme.objects.filter(
+        toern=toern
+    ).select_related("user")
 
+    teilnahmen_ohne_mich = teilnahmen.exclude(user=request.user)
+
+    # =========================
+    # 4. Kabinen-System
+    # =========================
+    kabinenwuensche = KabinenWunsch.objects.filter(
+        toern=toern
+    ).select_related("from_user", "to_user")
+
+    anfragen = kabinenwuensche.filter(
+        to_user=request.user,
+        status="pending"
+    )
+
+    eigene_anfrage = kabinenwuensche.filter(
+        from_user=request.user,
+        status="pending"
+    ).first()
+
+    accepted_pairs = kabinenwuensche.filter(status="accepted")
+    pending_requests = kabinenwuensche.filter(status="pending")
+
+    # =========================
+    # 5. Status Sets (optimiert)
+    # =========================
+    vergebene_user_ids = {
+        u
+        for w in accepted_pairs
+        for u in [w.from_user.id, w.to_user.id]
+    }
+
+    pending_user_ids = {
+        u
+        for w in pending_requests
+        for u in [w.from_user.id, w.to_user.id]
+    }
+
+    # Wer wartet auf wen
+    pending_map = {
+        w.from_user.id: w.to_user
+        for w in pending_requests
+    }
+
+    # =========================
+    # 6. Eigener Partner
+    # =========================
+    eigener_partner = None
+
+    eigener_wunsch = accepted_pairs.filter(
+        Q(from_user=request.user) | Q(to_user=request.user)
+    ).first()
+
+    if eigener_wunsch:
+        eigener_partner = (
+            eigener_wunsch.to_user
+            if eigener_wunsch.from_user == request.user
+            else eigener_wunsch.from_user
+        )
+
+    # =========================
+    # 7. Präferenzen
+    # =========================
+    praeferenzen = CrewPraeferenz.objects.filter(
+        toern=toern,
+        from_user=request.user
+    )
+
+    exclude_ids = set(
+        praeferenzen.filter(typ="exclude")
+        .values_list("to_user_id", flat=True)
+    )
+
+    avoid_ids = set(
+        praeferenzen.filter(typ="avoid")
+        .values_list("to_user_id", flat=True)
+    )
+
+    # ❗ wichtig: Konflikt vermeiden
+    avoid_ids -= exclude_ids
+
+    # =========================
+    # 8. Context
+    # =========================
     context = {
         "toern": toern,
         "teilnahmen": teilnahmen,
-        "crew_liste": crew_liste,
+        "teilnahmen_ohne_mich": teilnahmen_ohne_mich,
+
         "is_skipper": is_skipper,
         "is_coskipper": is_coskipper,
+
+        # Kabinen
+        "anfragen": anfragen,
+        "eigene_anfrage": eigene_anfrage,
+        "accepted_pairs": accepted_pairs,
+        "vergebene_user_ids": vergebene_user_ids,
+        "pending_user_ids": pending_user_ids,
+        "pending_map": pending_map,
+        "eigener_partner": eigener_partner,
+
+        # Präferenzen
+        "exclude_ids": exclude_ids,
+        "avoid_ids": avoid_ids,
     }
 
     return render(request, "crew/crew_dashboard.html", context)
+
+@login_required
+@anbieter_required
+@require_POST
+def boot_skipper_assign(request, boot_id):
+    boot = get_object_or_404(Boot, id=boot_id)
+    toern = boot.toern
+
+    if not is_owner(request.user, toern):
+        raise PermissionDenied
+
+    skipper_id = request.POST.get("skipper_id")
+    coskipper_id = request.POST.get("coskipper_id")
+
+    # 🔄 Reset nur für dieses Boot
+    Teilnahme.objects.filter(
+        toern=toern,
+        boot=boot,
+        rolle="skipper"
+    ).update(rolle="crew")
+
+    Teilnahme.objects.filter(
+        toern=toern,
+        boot=boot,
+        rolle="coskipper"
+    ).update(rolle="crew")
+
+    # 👨‍✈️ Skipper setzen
+    if skipper_id:
+        Teilnahme.objects.filter(
+            toern=toern,
+            user_id=skipper_id
+        ).update(
+            rolle="skipper",
+            boot=boot
+        )
+
+    # 🧭 Co-Skipper setzen
+    if coskipper_id and coskipper_id != skipper_id:
+        Teilnahme.objects.filter(
+            toern=toern,
+            user_id=coskipper_id
+        ).update(
+            rolle="coskipper",
+            boot=boot
+        )
+
+    return redirect("anbieter_dashboard")
+
+def user_has_accepted_partner(user, toern):
+    return KabinenWunsch.objects.filter(
+        toern=toern,
+        status="accepted"
+    ).filter(
+        Q(from_user=user) | Q(to_user=user)
+    ).exists()
+
+@login_required
+@require_POST
+def kabinenpartner_anfragen(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    partner_id = request.POST.get("partner_id")
+
+    if not partner_id:
+        return redirect("crew_dashboard", toern_id=toern.id)
+
+    partner = get_object_or_404(User, id=partner_id)
+
+    # ❌ sich selbst wählen
+    if partner == request.user:
+        messages.error(request, "Du kannst dich nicht selbst wählen.")
+        return redirect("crew_dashboard", toern_id=toern.id)
+
+    # ❌ schon vergeben?
+    if user_has_accepted_partner(request.user, toern):
+        messages.error(request, "Du hast bereits einen Kabinenpartner.")
+        return redirect("crew_dashboard", toern_id=toern.id)
+
+    if user_has_accepted_partner(partner, toern):
+        messages.error(request, "Diese Person ist bereits vergeben.")
+        return redirect("crew_dashboard", toern_id=toern.id)
+
+    # Anfrage erstellen / updaten
+    KabinenWunsch.objects.update_or_create(
+        toern=toern,
+        from_user=request.user,
+        to_user=partner,
+        defaults={"status": "pending"}
+    )
+
+    messages.success(request, "Anfrage gesendet!")
+    return redirect("crew_dashboard", toern_id=toern.id)
+
+@login_required
+@require_POST
+def kabinenpartner_antwort(request, wunsch_id):
+    wunsch = get_object_or_404(KabinenWunsch, id=wunsch_id)
+
+    if wunsch.to_user != request.user:
+        raise PermissionDenied
+
+    action = request.POST.get("action")
+
+    if action == "accept":
+        wunsch.status = "accepted"
+
+        # 🔥 alles andere löschen (beide User blockieren)
+        KabinenWunsch.objects.filter(
+            toern=wunsch.toern
+        ).filter(
+            Q(from_user=wunsch.from_user) |
+            Q(to_user=wunsch.from_user) |
+            Q(from_user=wunsch.to_user) |
+            Q(to_user=wunsch.to_user)
+        ).exclude(id=wunsch.id).delete()
+
+        messages.success(request, "Kabinenpartner bestätigt!")
+
+    elif action == "reject":
+        wunsch.status = "rejected"
+        messages.info(request, "Anfrage abgelehnt.")
+
+    wunsch.save()
+
+    return redirect("crew_dashboard", toern_id=wunsch.toern.id)
+
+@login_required
+@require_POST
+def praeferenzen_speichern(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=toern
+    ).first()
+
+    if not teilnahme:
+        raise PermissionDenied
+
+    # Alte löschen
+    CrewPraeferenz.objects.filter(
+        toern=toern,
+        from_user=request.user
+    ).delete()
+
+    # Sets verhindern doppelte Werte
+    exclude_ids = set(request.POST.getlist("exclude"))
+    avoid_ids = set(request.POST.getlist("avoid"))
+
+    # ❗ Konfliktregel: exclude gewinnt
+    avoid_ids -= exclude_ids
+
+    # ❌ speichern
+    CrewPraeferenz.objects.bulk_create([
+        CrewPraeferenz(
+            toern=toern,
+            from_user=request.user,
+            to_user_id=uid,
+            typ="exclude"
+        )
+        for uid in exclude_ids
+    ])
+
+    # ⚠️ speichern
+    CrewPraeferenz.objects.bulk_create([
+        CrewPraeferenz(
+            toern=toern,
+            from_user=request.user,
+            to_user_id=uid,
+            typ="avoid"
+        )
+        for uid in avoid_ids
+    ])
+
+    messages.success(request, "Präferenzen gespeichert")
+    return redirect("crew_dashboard", toern_id=toern.id)
+
+@login_required
+def skipper_dashboard(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+
+    # =========================
+    # 1. Berechtigung prüfen
+    # =========================
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=toern
+    ).first()
+
+    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    # =========================
+    # 2. Grunddaten laden
+    # =========================
+    teilnahmen = Teilnahme.objects.filter(
+        toern=toern
+    ).select_related("user", "boot", "kabine")
+
+    boote = toern.boote.prefetch_related("kabinen")
+
+    # =========================
+    # 3. Kabinenpaare
+    # =========================
+    accepted_pairs = KabinenWunsch.objects.filter(
+        toern=toern,
+        status="accepted"
+    ).select_related("from_user", "to_user")
+
+    kabinenpaare = []
+    pair_lookup = {}
+
+    for w in accepted_pairs:
+        kabinenpaare.append({
+            "user1": w.from_user,
+            "user2": w.to_user
+        })
+
+        pair_lookup[w.from_user.id] = w.to_user
+        pair_lookup[w.to_user.id] = w.from_user
+
+    # 👉 Partner direkt an Teilnahme hängen
+    for t in teilnahmen:
+        t.partner = pair_lookup.get(t.user.id)
+
+    # =========================
+    # 4. Präferenzen
+    # =========================
+    praeferenzen = CrewPraeferenz.objects.filter(
+        toern=toern
+    ).select_related("from_user", "to_user")
+
+    exclude_map = {}
+    avoid_map = {}
+
+    harte_konflikte = []
+    kritische_konflikte = []
+    gesehen = set()
+
+    for p in praeferenzen:
+        # Maps für spätere Logik
+        if p.typ == "exclude":
+            exclude_map.setdefault(p.from_user.id, []).append(p.to_user)
+        elif p.typ == "avoid":
+            avoid_map.setdefault(p.from_user.id, []).append(p.to_user)
+
+        # Konfliktlisten für UI (ohne Duplikate)
+        key = tuple(sorted([p.from_user.id, p.to_user.id]))
+        if key in gesehen:
+            continue
+
+        gesehen.add(key)
+
+        if p.typ == "exclude":
+            harte_konflikte.append({
+                "von": p.from_user,
+                "zu": p.to_user
+            })
+        elif p.typ == "avoid":
+            kritische_konflikte.append({
+                "von": p.from_user,
+                "zu": p.to_user
+            })
+
+    # 👉 direkt an Teilnahme hängen
+    for t in teilnahmen:
+        t.exclude_list = exclude_map.get(t.user.id, [])
+        t.avoid_list = avoid_map.get(t.user.id, [])
+
+    # =========================
+    # 5. Boot → Kabinen → Crew Struktur
+    # =========================
+    processed_user_ids = set()
+    boots_data = []
+
+    for boot in boote:
+        kabinen_data = []
+
+        for kabine in boot.kabinen.all():
+            crew = []
+
+            for t in teilnahmen:
+                if t.kabine != kabine:
+                    continue
+
+                if t.user.id in processed_user_ids:
+                    continue
+
+                if t.partner:
+                    crew.append({
+                        "type": "pair",
+                        "users": [t.user, t.partner]
+                    })
+                    processed_user_ids.add(t.user.id)
+                    processed_user_ids.add(t.partner.id)
+
+                else:
+                    crew.append({
+                        "type": "single",
+                        "users": [t.user]
+                    })
+                    processed_user_ids.add(t.user.id)
+
+            kabinen_data.append({
+                "kabine": kabine,
+                "crew": crew
+            })
+
+        boots_data.append({
+            "boot": boot,
+            "kabinen": kabinen_data
+        })
+
+    # =========================
+    # 6. Unassigned Crew
+    # =========================
+    unassigned = []
+
+    for t in teilnahmen:
+        if t.user.id in processed_user_ids:
+            continue
+
+        if t.partner:
+            unassigned.append({
+                "type": "pair",
+                "users": [t.user, t.partner]
+            })
+            processed_user_ids.add(t.user.id)
+            processed_user_ids.add(t.partner.id)
+
+        else:
+            unassigned.append({
+                "type": "single",
+                "users": [t.user]
+            })
+            processed_user_ids.add(t.user.id)
+
+    # =========================
+    # 7. Context
+    # =========================
+    context = {
+        "toern": toern,
+
+        # Drag & Drop
+        "boots_data": boots_data,
+        "unassigned": unassigned,
+
+        # Übersicht
+        "kabinenpaare": kabinenpaare,
+        "harte_konflikte": harte_konflikte,
+        "kritische_konflikte": kritische_konflikte,
+        "teilnahmen": teilnahmen,
+    }
+
+    return render(request, "skipper/skipper_dashboard.html", context)
+
+@login_required
+@require_POST
+def kabine_update(request, toern_id):
+    try:
+        # =========================
+        # 1. Törn + Permission
+        # =========================
+        toern = get_object_or_404(Toern, id=toern_id)
+
+        teilnahme = Teilnahme.objects.filter(
+            user=request.user,
+            toern=toern
+        ).first()
+
+        if not teilnahme or teilnahme.rolle not in ["skipper", "co_skp"]:
+            raise PermissionDenied
+
+        # =========================
+        # 2. Request Daten
+        # =========================
+        data = json.loads(request.body.decode("utf-8"))
+
+        user_ids_raw = data.get("user_ids", "")
+        kabine_id = data.get("kabine_id")
+
+        user_ids = [uid for uid in user_ids_raw.split(",") if uid]
+
+        if not user_ids:
+            return JsonResponse({
+                "status": "error",
+                "message": "Keine User IDs"
+            }, status=400)
+
+        # =========================
+        # 3. Partner erzwingen 🔥
+        # =========================
+        partner_map = get_partner_map(toern)
+
+        all_user_ids = set(user_ids)
+
+        for uid in user_ids:
+            partner = partner_map.get(uid)
+            if partner:
+                all_user_ids.add(str(partner.id))  # wichtig: string!
+
+        # =========================
+        # 4. Kabine + Boot bestimmen
+        # =========================
+        kabine = None
+        boot = None
+
+        if kabine_id:
+            kabine = Kabine.objects.select_related("boot").get(id=int(kabine_id))
+            boot = kabine.boot
+
+        # =========================
+        # 4.5 KAPAZITÄT PRÜFEN 🔥
+        # =========================
+
+        # 👉 aktuelle Belegung der Ziel-Kabine
+        if kabine:
+            current_users = Teilnahme.objects.filter(
+                toern=toern,
+                kabine=kabine
+            ).exclude(
+                user_id__in=all_user_ids  # wichtig: aktuelle Bewegung ignorieren
+            )
+
+            current_count = current_users.count()
+            incoming_count = len(all_user_ids)
+
+            if current_count + incoming_count > kabine.betten:
+                return JsonResponse({
+                    "status": "error",
+                    "message": f"Kabine voll ({kabine.betten} Plätze)"
+                }, status=400)
+
+
+        # 👉 Boot Kapazität prüfen
+        if boot:
+            current_boot_users = Teilnahme.objects.filter(
+                toern=toern,
+                boot=boot
+            ).exclude(
+                user_id__in=all_user_ids
+            )
+
+            current_boot_count = current_boot_users.count()
+            incoming_count = len(all_user_ids)
+
+            if current_boot_count + incoming_count > boot.anzahl_betten_boot:
+                return JsonResponse({
+                    "status": "error",
+                    "message": f"Boot voll ({boot.anzahl_betten_boot} Plätze)"
+                }, status=400)
+
+        # =========================
+        # 5. DB Update
+        # =========================
+        teilnahmen = Teilnahme.objects.filter(
+            toern=toern,
+            user_id__in=all_user_ids
+        )
+
+        if not teilnahmen.exists():
+            return JsonResponse({
+                "status": "error",
+                "message": "Teilnahmen nicht gefunden"
+            }, status=404)
+
+        for t in teilnahmen:
+            t.kabine = kabine
+            t.boot = boot
+            t.save()
+
+        # =========================
+        # 6. Response
+        # =========================
+        return JsonResponse({
+            "status": "ok",
+            "updated_users": list(all_user_ids),
+            "kabine_id": kabine_id,
+            "boot_id": boot.id if boot else None
+        })
+
+    except Kabine.DoesNotExist:
+        return JsonResponse({
+            "status": "error",
+            "message": "Kabine existiert nicht"
+        }, status=400)
+
+    except PermissionDenied:
+        return JsonResponse({
+            "status": "error",
+            "message": "Keine Berechtigung"
+        }, status=403)
+
+    except Exception as e:
+        print("❌ kabine_update ERROR:", str(e))
+        return JsonResponse({
+            "status": "error",
+            "message": str(e)
+        }, status=500)
+    
+@login_required
+@require_POST
+def reset_zuteilung(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=toern
+    ).first()
+
+    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    # =========================
+    # RESET LOGIK
+    # =========================
+    Teilnahme.objects.filter(
+        toern=toern
+    ).exclude(
+        rolle__in=["skipper", "coskipper"]
+    ).update(
+        boot=None,
+        kabine=None
+    )
+
+    messages.success(request, "Zuteilung wurde zurückgesetzt")
+
+    return redirect("skipper_dashboard", toern_id=toern.id)
+    
+@login_required
+@require_POST
+def auto_assign(request, toern_id):
+    import json
+
+    toern = get_object_or_404(Toern, id=toern_id)
+    data = json.loads(request.body or "{}")
+
+    avoid_mode = data.get("avoid_mode", "soft")
+    balance = data.get("balance", True)
+
+    teilnahmen = list(
+        Teilnahme.objects.filter(toern=toern)
+        .select_related("user", "boot", "kabine")
+    )
+
+    boote = list(toern.boote.prefetch_related("kabinen"))
+
+    # =========================
+    # 1. PARTNER MAP
+    # =========================
+    partner_map = get_partner_map(toern)
+
+    # =========================
+    # 2. GRUPPEN BAUEN (🔥 CORE)
+    # =========================
+    assigned = set()
+    groups = []
+
+    for t in teilnahmen:
+
+        if t.user.id in assigned:
+            continue
+
+        partner = partner_map.get(t.user.id)
+
+        # 👉 Paar
+        if partner and partner.id not in assigned:
+            groups.append({
+                "users": [t.user, partner],
+                "size": 2,
+                "type": "pair"
+            })
+            assigned.add(t.user.id)
+            assigned.add(partner.id)
+
+        # 👉 Single
+        else:
+            groups.append({
+                "users": [t.user],
+                "size": 1,
+                "type": "single"
+            })
+            assigned.add(t.user.id)
+
+    # =========================
+    # 3. KAPAZITÄT
+    # =========================
+    boot_state = {
+        b.id: {
+            "boot": b,
+            "capacity": sum(k.betten for k in b.kabinen.all()),
+            "used": 0,
+            "groups": []
+        }
+        for b in boote
+    }
+
+    # =========================
+    # 4. SKIPPER FIXIEREN
+    # =========================
+    for g in groups:
+        for u in g["users"]:
+            t = next(x for x in teilnahmen if x.user.id == u.id)
+
+            if t.rolle in ["skipper", "coskipper"] and t.boot:
+
+                state = boot_state[t.boot.id]
+
+                state["groups"].append(g)
+                state["used"] += g["size"]
+
+                g["fixed"] = True
+
+    # =========================
+    # 5. REST GRUPPEN
+    # =========================
+    free_groups = [g for g in groups if not g.get("fixed")]
+
+    # größere Gruppen zuerst
+    free_groups.sort(key=lambda g: -g["size"])
+
+    # =========================
+    # 6. PRÄFERENZEN
+    # =========================
+    praeferenzen = CrewPraeferenz.objects.filter(toern=toern)
+
+    exclude = set()
+    avoid = set()
+
+    for p in praeferenzen:
+        key = tuple(sorted([p.from_user.id, p.to_user.id]))
+        if p.typ == "exclude":
+            exclude.add(key)
+        else:
+            avoid.add(key)
+
+    def score(group, boot_groups):
+        s = 0
+
+        for g2 in boot_groups:
+            for u1 in group["users"]:
+                for u2 in g2["users"]:
+
+                    key = tuple(sorted([u1.id, u2.id]))
+
+                    if key in exclude:
+                        return None
+
+                    if key in avoid:
+                        s += 20 if avoid_mode == "strict" else 5
+
+        return s
+
+    # =========================
+    # 7. BOOT ZUWEISUNG
+    # =========================
+    unassigned = []
+
+    for g in free_groups:
+
+        best = None
+        best_score = 9999
+
+        for b_id, state in boot_state.items():
+
+            if state["used"] + g["size"] > state["capacity"]:
+                continue
+
+            s = score(g, state["groups"])
+            if s is None:
+                continue
+
+            if balance:
+                s += state["used"] * 0.5
+
+            if s < best_score:
+                best_score = s
+                best = state
+
+        if not best:
+            unassigned.extend(g["users"])
+            continue
+
+        best["groups"].append(g)
+        best["used"] += g["size"]
+
+    # =========================
+    # 8. BOOT SPEICHERN
+    # =========================
+    Teilnahme.objects.filter(toern=toern).update(boot=None)
+
+    for state in boot_state.values():
+        for g in state["groups"]:
+            for u in g["users"]:
+                Teilnahme.objects.filter(
+                    toern=toern,
+                    user=u
+                ).update(boot=state["boot"])
+
+    # =========================
+    # 9. KABINEN ZUWEISUNG
+    # =========================
+    Teilnahme.objects.filter(toern=toern).update(kabine=None)
+
+    for state in boot_state.values():
+
+        kabinen = list(state["boot"].kabinen.all())
+
+        kabinen_state = [
+            {
+                "kabine": k,
+                "free": k.betten,
+                "users": []
+            }
+            for k in kabinen
+        ]
+
+        for g in state["groups"]:
+
+            placed = False
+
+            for k in kabinen_state:
+
+                if k["free"] >= g["size"]:
+                    k["users"].extend(g["users"])
+                    k["free"] -= g["size"]
+                    placed = True
+                    break
+
+            if not placed:
+                for u in g["users"]:
+                    unassigned.append(u)
+
+        # speichern
+        for k in kabinen_state:
+            for u in k["users"]:
+                Teilnahme.objects.filter(
+                    toern=toern,
+                    user=u
+                ).update(kabine=k["kabine"])
+
+    return JsonResponse({
+        "status": "ok",
+        "unassigned": [u.id for u in unassigned]
+    })

@@ -39,7 +39,21 @@
 
                 <div class="card-actions justify-end mt-4">
                     <a href="{% url 'toern_detail' pk=toern.pk %}" class="btn btn-outline btn-sm">Details</a>
-                    <a href="{% url 'toern_anmeldung' pk=toern.pk %}" class="btn btn-primary btn-sm">Anmelden</a>
+                    {% if user_teilnahme %}
+
+                        <a href="{% url 'crew_dashboard' toern.pk %}" 
+                        class="btn btn-success btn-sm">
+                            Zum Crew Dashboard
+                        </a>
+
+                    {% else %}
+
+                        <a href="{% url 'toern_anmeldung' pk=toern.pk %}" 
+                        class="btn btn-primary btn-sm">
+                            Anmelden
+                        </a>
+
+                    {% endif %}
                 </div>
             </div>
         </div>

@@ -4,6 +4,7 @@
 
 <div class="max-w-6xl mx-auto p-6 space-y-6">
 
+    <!-- HEADER -->
     <div class="flex justify-between items-center">
         <h1 class="text-3xl font-bold">⚓ Meine Törns</h1>
 
@@ -12,6 +13,7 @@
         </a>
     </div>
 
+    <!-- TÖRNS -->
     <div class="grid md:grid-cols-2 gap-6">
 
         {% for toern in toerns %}
@@ -24,6 +26,8 @@
             {% endif %}
 
             <div class="card-body">
+
+                <!-- HEADER -->
                 <h2 class="card-title">{{ toern.titel }}</h2>
 
                 <p class="text-sm opacity-70">
@@ -31,9 +35,13 @@
                 </p>
 
                 <p>{{ toern.revier }}</p>
-                
-                <div class="mt-4 border-t pt-4">
-                    <div class="flex justify-between items-center mb-2">
+
+                <!-- ========================= -->
+                <!-- BOOTE -->
+                <!-- ========================= -->
+                <div class="mt-4 border-t pt-4 space-y-3">
+
+                    <div class="flex justify-between items-center">
                         <h3 class="font-semibold">Boote</h3>
 
                         <a href="{% url 'boot_create' toern.id %}" class="btn btn-xs btn-primary">
@@ -42,72 +50,150 @@
                     </div>
 
                     {% for boot in toern.boote.all %}
-                        <div class="bg-base-200 p-3 rounded mb-2">
+                    <div class="bg-base-200 p-4 rounded-xl space-y-3">
 
-                            <div class="flex justify-between items-center">
-
-                                <div>
-                                    <div class="font-semibold">{{ boot.name }}</div>
-                                    <div class="text-xs opacity-70">
-                                        {{ boot.typ }} | {{ boot.charterunternehmen }}
-                                    </div>
+                        <!-- Boot Header -->
+                        <div class="flex justify-between items-center">
+                            <div>
+                                <div class="font-semibold text-lg">
+                                    {{ boot.name }}
                                 </div>
-
-                                <a href="{% url 'boot_update' boot.id %}" class="btn btn-xs">
-                                    Bearbeiten
-                                </a>
-
+                                <div class="text-xs opacity-70">
+                                    {{ boot.typ }} | {{ boot.charterunternehmen }}
+                                </div>
                             </div>
 
-                            <div class="text-xs mt-2 opacity-70">
-                                {{ boot.kabinen.count }} Kabinen | {{ boot.anzahl_betten_boot }} Betten
-                            </div>
+                            <a href="{% url 'boot_update' boot.id %}" class="btn btn-xs">
+                                Bearbeiten
+                            </a>
+                        </div>
+
+                        <div class="text-xs opacity-70">
+                            {{ boot.kabinen.count }} Kabinen |
+                            {{ boot.anzahl_betten_boot }} Betten
+                        </div>
+
+                        <!-- ========================= -->
+                        <!-- AKTUELLE ZUWEISUNG -->
+                        <!-- ========================= -->
+                        <div class="flex flex-wrap gap-2">
+
+                            {% for t in toern.teilnahmen.all %}
+                                {% if t.boot == boot and t.rolle == "skipper" %}
+                                    <span class="badge badge-primary">
+                                        👨‍✈️ {{ t.user.first_name }} {{ t.user.last_name }}
+                                    </span>
+                                {% endif %}
+
+                                {% if t.boot == boot and t.rolle == "coskipper" %}
+                                    <span class="badge badge-secondary">
+                                        🧭 {{ t.user.first_name }} {{ t.user.last_name }}
+                                    </span>
+                                {% endif %}
+                            {% endfor %}
 
                         </div>
 
+                        <!-- ========================= -->
+                        <!-- SKIPPER ZUWEISUNG -->
+                        <!-- ========================= -->
+                        <form method="POST"
+                              action="{% url 'boot_skipper_assign' boot.id %}"
+                              class="grid grid-cols-1 md:grid-cols-2 gap-2">
+
+                            {% csrf_token %}
+
+                            <!-- Skipper -->
+                            <select name="skipper_id"
+                                    class="select select-bordered select-sm w-full">
+
+                                <option value="">-- Skipper wählen --</option>
+
+                                {% for t in toern.teilnahmen.all %}
+                                    <option value="{{ t.user.id }}"
+                                        {% if t.boot == boot and t.rolle == "skipper" %}selected{% endif %}>
+                                        {{ t.user.first_name }} {{ t.user.last_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+
+                            <!-- Co-Skipper -->
+                            <select name="coskipper_id"
+                                    class="select select-bordered select-sm w-full">
+
+                                <option value="">-- Co-Skipper wählen --</option>
+
+                                {% for t in toern.teilnahmen.all %}
+                                    <option value="{{ t.user.id }}"
+                                        {% if t.boot == boot and t.rolle == "coskipper" %}selected{% endif %}>
+                                        {{ t.user.first_name }} {{ t.user.last_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+
+                            <button class="btn btn-primary btn-sm col-span-full">
+                                💾 Skipper speichern
+                            </button>
+
+                        </form>
+
+                    </div>
                     {% empty %}
                         <p class="text-sm opacity-60">Noch keine Boote</p>
                     {% endfor %}
 
                 </div>
-                <div class="flex justify-between items-center mt-3">
-                    <div class="flex flex-col gap-2 mt-3">
+
+                <!-- ========================= -->
+                <!-- STATUS -->
+                <!-- ========================= -->
+                <div class="flex justify-between items-center mt-4">
+
+                    <div class="flex flex-col gap-2">
+
                         <div class="badge badge-outline">
                             {{ toern.get_status_display }}
                         </div>
+
                         <form method="post" action="{% url 'toern_status_update' toern.id %}">
                             {% csrf_token %}
 
                             <div class="flex gap-2 flex-wrap">
 
-                            {% if toern.status == "DRAFT" %}
-                                <button name="status" value="ANMELDUNG_OFFEN" class="btn btn-xs btn-success">
-                                Veröffentlichen
-                                </button>
-                            {% endif %}
+                                {% if toern.status == "DRAFT" %}
+                                    <button name="status" value="ANMELDUNG_OFFEN"
+                                            class="btn btn-xs btn-success">
+                                        Veröffentlichen
+                                    </button>
+                                {% endif %}
 
-                            {% if toern.status == "ANMELDUNG_OFFEN" %}
-                                <button name="status" value="ANMELDUNG_GESCHLOSSEN" class="btn btn-xs btn-warning">
-                                Anmeldung schließen
-                                </button>
-                            {% endif %}
+                                {% if toern.status == "ANMELDUNG_OFFEN" %}
+                                    <button name="status" value="ANMELDUNG_GESCHLOSSEN"
+                                            class="btn btn-xs btn-warning">
+                                        Anmeldung schließen
+                                    </button>
+                                {% endif %}
 
-                            {% if toern.status != "DRAFT" %}
-                                <button name="status" value="DRAFT" class="btn btn-xs">
-                                Zurück zu Entwurf
-                                </button>
-                            {% endif %}
+                                {% if toern.status != "DRAFT" %}
+                                    <button name="status" value="DRAFT"
+                                            class="btn btn-xs">
+                                        Entwurf
+                                    </button>
+                                {% endif %}
 
                             </div>
                         </form>
+
                     </div>
 
-                    <a href="{% url 'toern_detail' toern.id %}" class="btn btn-sm btn-outline">
+                    <a href="{% url 'toern_detail' toern.id %}"
+                       class="btn btn-sm btn-outline">
                         Details
                     </a>
-                </div>
-            </div>
 
+                </div>
+
+            </div>
         </div>
 
         {% empty %}

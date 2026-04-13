@@ -1,8 +1,10 @@
 from django.db import models
+
 from django.conf import settings
 from boote.models import Boot, Kabine
 from django.db.models import Sum
 from django.utils import timezone
+
 import os
 
 from utils.image_optimizer import optimize_image
@@ -100,7 +102,7 @@ class Toern(models.Model):
 class Teilnahme(models.Model):
     ROLE_CHOICES = [
         ("skipper", "Skipper"),
-        ("co_skp", "Co-Skipper"),
+        ("coskipper", "Co-Skipper"),
         ("crew", "Crew"),
     ]
 
@@ -141,3 +143,68 @@ class Teilnahme(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.toern.titel}"
+
+class KabinenWunsch(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("accepted", "Accepted"),
+        ("rejected", "Rejected"),
+    ]
+
+    toern = models.ForeignKey("Toern", on_delete=models.CASCADE)
+
+    from_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="kabinen_anfragen_gesendet"
+    )
+
+    to_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="kabinen_anfragen_erhalten"
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default="pending"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("toern", "from_user", "to_user")
+
+    def __str__(self):
+        return f"{self.from_user} → {self.to_user} ({self.status})"
+    
+class CrewPraeferenz(models.Model):
+    PRAEF_CHOICES = [
+        ("exclude", "Ausschluss"),
+        ("avoid", "Wenn möglich vermeiden"),
+    ]
+
+    toern = models.ForeignKey("Toern", on_delete=models.CASCADE)
+
+    from_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="praeferenzen_gesendet"
+    )
+
+    to_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="praeferenzen_erhalten"
+    )
+
+    typ = models.CharField(max_length=10, choices=PRAEF_CHOICES)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("toern", "from_user", "to_user")
+
+    def __str__(self):
+        return f"{self.from_user} -> {self.to_user} ({self.typ})"

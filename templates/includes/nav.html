@@ -90,7 +90,7 @@
           </li>
         {% endif %}
 
-        {% if user.is_anbieter or user.is_staff %}
+        {% if user.is_authenticated %}
           <li>
             <a href="{% url 'crew_overview' %}">
               Crewbereich

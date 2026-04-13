@@ -190,7 +190,21 @@
 
     <!-- Buttons -->
     <div class="flex gap-4 mt-6">
-        <a href="{% url 'toern_anmeldung' pk=toern.pk %}" class="btn btn-primary">Anmelden</a>
+        {% if user_teilnahme %}
+
+            <a href="{% url 'crew_dashboard' toern.pk %}" 
+            class="btn btn-success">
+                Zum Crew Dashboard
+            </a>
+
+        {% else %}
+
+            <a href="{% url 'toern_anmeldung' pk=toern.pk %}" 
+            class="btn btn-primary">
+                Anmelden
+            </a>
+
+        {% endif %}
         <a href="{% url 'index' %}" class="btn btn-outline">Zurück zur Übersicht</a>
     </div>
     {% if user_ist_teilnehmer %}

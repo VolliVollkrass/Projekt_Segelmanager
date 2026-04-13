@@ -49,9 +49,7 @@
 
             <div class="flex justify-between items-center">
                 <h2 class="card-title">Crew</h2>
-
-                <!-- später Toggle -->
-                <div class="badge badge-outline">Alle Crewmitglieder</div>
+                <div class="badge badge-outline">Status</div>
             </div>
 
             <!-- Rollen -->
@@ -59,27 +57,49 @@
                 {% for t in teilnahmen %}
                     {% if t.rolle == "skipper" %}
                         <span class="badge badge-primary">
-                            Skipper: {{ t.user.first_name }} {{ t.user.last_name }}
+                            Skipper: {{ t.user.first_name }}
                         </span>
-                    {% endif %}
-                    {% if t.rolle == "coskipper" %}
+                    {% elif t.rolle == "coskipper" %}
                         <span class="badge badge-secondary">
-                            Co-Skipper: {{ t.user.first_name }} {{ t.user.last_name }}
+                            Co-Skipper: {{ t.user.first_name }}
                         </span>
                     {% endif %}
                 {% endfor %}
             </div>
 
-            <!-- Liste -->
+            <!-- Crew Liste -->
             <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
                 {% for t in teilnahmen %}
-                    <div class="p-3 rounded-xl border bg-base-200">
-                        <p class="font-medium">
-                            {{ t.user.first_name }} {{ t.user.last_name }}
-                        </p>
-                        <p class="text-xs text-base-content/60">
-                            {{ t.user.email }}
-                        </p>
+                    <div class="p-4 rounded-xl border bg-base-200 flex justify-between items-center">
+
+                        <div>
+                            <p class="font-medium">
+                                {% if t.user == request.user %}
+                                    Du ({{ t.user.first_name }})
+                                {% else %}
+                                    {{ t.user.first_name }} {{ t.user.last_name }}
+                                {% endif %}
+                            </p>
+                            <p class="text-xs text-base-content/60">
+                                {{ t.user.email }}
+                            </p>
+                        </div>
+
+                        <!-- STATUS -->
+                        <div class="text-right">
+
+                            {% if t.user.id in vergebene_user_ids %}
+                                <span class="badge badge-error">vergeben</span>
+
+                            {% elif t.user.id in pending_user_ids %}
+                                <span class="badge badge-warning">angefragt</span>
+
+                            {% else %}
+                                <span class="badge badge-success">frei</span>
+                            {% endif %}
+
+                        </div>
+
                     </div>
                 {% endfor %}
             </div>
@@ -87,40 +107,154 @@
         </div>
     </div>
 
-    <!-- KABINENWUNSCH -->
+    <!-- CREW PRÄFERENZEN -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+
+            <h2 class="card-title">Mit wem möchtest du NICHT auf ein Boot?</h2>
+            <p class="text-sm text-base-content/60">
+                Deine Angaben sind vertraulich und helfen dem Skipper bei der Planung.
+            </p>
+
+            <form method="POST" action="{% url 'praeferenzen_speichern' toern.id %}">
+                {% csrf_token %}
+
+                <div class="grid md:grid-cols-2 gap-6 mt-4">
+
+                    <!-- ❌ AUSSCHLUSS -->
+                    <div class="bg-error/10 p-4 rounded-xl">
+                        <h3 class="font-semibold text-error mb-3">
+                            ❌ Auf keinen Fall
+                        </h3>
+
+                        {% for t in teilnahmen_ohne_mich %}
+                            <label class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition
+                                {% if t.user.id in exclude_ids %}bg-error/20{% endif %}">
+
+                                <input type="checkbox"
+                                    name="exclude"
+                                    value="{{ t.user.id }}"
+                                    class="checkbox checkbox-error"
+                                    {% if t.user.id in exclude_ids %}checked{% endif %}>
+
+                                <span class="font-medium">
+                                    {{ t.user.first_name }} {{ t.user.last_name }}
+                                </span>
+
+                            </label>
+                        {% endfor %}
+                    </div>
+
+                    <!-- ⚠️ AVOID -->
+                    <div class="bg-warning/10 p-4 rounded-xl">
+                        <h3 class="font-semibold text-warning mb-3">
+                            ⚠️ Wenn möglich vermeiden
+                        </h3>
+
+                        {% for t in teilnahmen_ohne_mich %}
+                            <label class="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition
+                                {% if t.user.id in avoid_ids %}bg-warning/20{% endif %}">
+
+                                <input type="checkbox"
+                                    name="avoid"
+                                    value="{{ t.user.id }}"
+                                    class="checkbox checkbox-warning"
+                                    {% if t.user.id in avoid_ids %}checked{% endif %}>
+
+                                <span class="font-medium">
+                                    {{ t.user.first_name }} {{ t.user.last_name }}
+                                </span>
+
+                            </label>
+                        {% endfor %}
+                    </div>
+
+                </div>
+
+                <div class="mt-4 flex justify-end">
+                    <button class="btn btn-primary">
+                        Präferenzen speichern
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+    <!-- KABINEN SYSTEM -->
     <div class="grid md:grid-cols-2 gap-6">
 
         <div class="card bg-base-100 shadow">
             <div class="card-body">
                 <h2 class="card-title">Kabinenpartner</h2>
-                <p class="text-sm text-base-content/60">
-                    Mit wem möchtest du in eine Kabine?
-                </p>
 
-                <select class="select select-bordered w-full mt-3">
-                    <option>Bitte wählen</option>
-                    {% for t in teilnahmen %}
-                        <option>{{ t.user.first_name }} {{ t.user.last_name }}</option>
-                    {% endfor %}
-                </select>
+                {% if eigener_partner %}
+                    <div class="alert alert-success">
+                        Du bist mit <strong>{{ eigener_partner.first_name }} {{ eigener_partner.last_name }}</strong> in einer Kabine
+                    </div>
+
+                {% elif eigene_anfrage %}
+                    <div class="alert alert-info">
+                        Anfrage gesendet an {{ eigene_anfrage.to_user.first_name }} {{ eigene_anfrage.to_user.last_name }}
+                    </div>
+
+                {% else %}
+                    <form method="POST" action="{% url 'kabinenpartner_anfragen' toern.id %}">
+                        {% csrf_token %}
+
+                        <select name="partner_id" class="select select-bordered w-full">
+                            <option value="">Bitte wählen</option>
+
+                            {% for t in teilnahmen_ohne_mich %}
+                                {% if t.user.id in vergebene_user_ids %}
+                                    <option disabled>
+                                        {{ t.user.first_name }} (vergeben)
+                                    </option>
+                                {% else %}
+                                    <option value="{{ t.user.id }}">
+                                        {{ t.user.first_name }} {{ t.user.last_name }}
+                                    </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+
+                        <button class="btn btn-primary w-full mt-3">
+                            Anfrage senden
+                        </button>
+                    </form>
+                {% endif %}
             </div>
         </div>
 
+        <!-- ANFRAGEN -->
         <div class="card bg-base-100 shadow">
             <div class="card-body">
-                <h2 class="card-title">Lieber nicht</h2>
-                <p class="text-sm text-base-content/60">
-                    Wen möchtest du vermeiden?
-                </p>
+                <h2 class="card-title">Anfragen</h2>
 
-                <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
-                    {% for t in teilnahmen %}
-                        <label class="flex items-center gap-2">
-                            <input type="checkbox" class="checkbox checkbox-sm">
-                            {{ t.user.first_name }} {{ t.user.last_name }}
-                        </label>
+                {% if anfragen %}
+                    {% for a in anfragen %}
+                        <div class="flex justify-between items-center border p-3 rounded-lg mb-2">
+                            <span>{{ a.from_user.first_name }} {{ a.from_user.last_name }} möchte mit dir in eine Kabine</span>
+
+                            <div class="flex gap-2">
+                                <form method="POST" action="{% url 'kabinenpartner_antwort' a.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="accept">
+                                    <button class="btn btn-success btn-sm">✓</button>
+                                </form>
+
+                                <form method="POST" action="{% url 'kabinenpartner_antwort' a.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action" value="reject">
+                                    <button class="btn btn-error btn-sm">✕</button>
+                                </form>
+                            </div>
+                        </div>
                     {% endfor %}
-                </div>
+                {% else %}
+                    <p class="text-sm text-base-content/60">Keine offenen Anfragen</p>
+                {% endif %}
             </div>
         </div>
 
@@ -129,72 +263,16 @@
     <!-- FINANZEN -->
     <div class="card bg-base-100 shadow">
         <div class="card-body">
+            <h2 class="card-title">Finanzen</h2>
 
-            <div class="flex justify-between items-center">
-                <h2 class="card-title">Finanzen</h2>
-                <button class="btn btn-sm btn-primary">
-                    + Ausgabe hinzufügen
-                </button>
-            </div>
-
-            <!-- Übersicht -->
-            <div class="stats stats-vertical md:stats-horizontal shadow mt-4">
-
+            <div class="stats stats-horizontal mt-4">
                 <div class="stat">
-                    <div class="stat-title">Gesamtausgaben</div>
+                    <div class="stat-title">Gesamt</div>
                     <div class="stat-value">200€</div>
                 </div>
-
                 <div class="stat">
                     <div class="stat-title">Dein Saldo</div>
                     <div class="stat-value text-error">-35€</div>
-                </div>
-
-            </div>
-
-            <!-- Schulden -->
-            <div class="mt-4 space-y-2">
-                <div class="alert">
-                    <span>Du schuldest Max 20€</span>
-                </div>
-                <div class="alert">
-                    <span>Lisa schuldet dir 10€</span>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-    <!-- KOMMUNIKATION -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title">Kommunikation</h2>
-
-            <textarea class="textarea textarea-bordered w-full"
-                placeholder="Packliste, Einkauf, Infos..."></textarea>
-
-            <div class="space-y-2 mt-4">
-                <div class="chat chat-start">
-                    <div class="chat-bubble">Ich bringe Bier 🍻</div>
-                </div>
-                <div class="chat chat-start">
-                    <div class="chat-bubble">Bitte Regenjacke mitnehmen!</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- LOGBUCH -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title">Logbuch</h2>
-
-            <div class="space-y-2">
-                <div class="alert">
-                    Tag 1 – perfekter Wind!
-                </div>
-                <div class="alert">
-                    Tag 2 – alle nass 😄
                 </div>
             </div>
         </div>

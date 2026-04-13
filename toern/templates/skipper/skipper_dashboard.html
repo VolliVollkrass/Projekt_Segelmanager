@@ -1,0 +1,597 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-7xl mx-auto p-6 space-y-6">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold">{{ toern.titel }}</h1>
+            <p class="text-sm opacity-60">Skipper Dashboard</p>
+        </div>
+
+        <button class="btn btn-primary" onclick="document.getElementById('autoModal').showModal()">
+            ⚡ Auto-Zuteilung
+        </button>
+
+        <form method="POST" action="{% url 'reset_zuteilung' toern.id %}">
+            {% csrf_token %}
+            <button class="btn btn-error btn-outline">
+                🔄 Zuteilung zurücksetzen
+            </button>
+        </form>
+
+        <a href="{% url 'crew_dashboard' toern.id %}" class="btn btn-outline">
+            Crew Ansicht
+        </a>
+    </div>
+
+    <!-- ========================= -->
+    <!-- KABINENPAARE -->
+    <!-- ========================= -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Kabinenpaare</h2>
+
+            {% if kabinenpaare %}
+                <div class="grid md:grid-cols-2 gap-3 mt-3">
+                    {% for p in kabinenpaare %}
+                        <div class="alert alert-success">
+                            👥 {{ p.user1.first_name }} {{ p.user1.last_name }}
+                            +
+                            {{ p.user2.first_name }} {{ p.user2.last_name }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-sm opacity-60">Keine bestätigten Kabinenpaare</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- KONFLIKTE -->
+    <!-- ========================= -->
+    <div class="grid md:grid-cols-2 gap-6">
+
+        <div class="card bg-error/10 shadow">
+            <div class="card-body">
+                <h2 class="card-title text-error">❌ Nicht zusammen</h2>
+
+                {% for k in harte_konflikte %}
+                    <div class="alert alert-error py-2">
+                        {{ k.von.first_name }} {{ k.von.last_name }}
+                        ❌
+                        {{ k.zu.first_name }} {{ k.zu.last_name }}
+                    </div>
+                {% empty %}
+                    <p class="text-sm opacity-60">Keine Konflikte</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="card bg-warning/10 shadow">
+            <div class="card-body">
+                <h2 class="card-title text-warning">⚠️ Vermeiden</h2>
+
+                {% for k in kritische_konflikte %}
+                    <div class="alert alert-warning py-2">
+                        {{ k.von.first_name }} {{ k.von.last_name }}
+                        ⚠️
+                        {{ k.zu.first_name }} {{ k.zu.last_name }}
+                    </div>
+                {% empty %}
+                    <p class="text-sm opacity-60">Keine kritischen Fälle</p>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================= -->
+    <!-- BOOT ZUWEISUNG -->
+    <!-- ========================= -->
+    <div class="grid lg:grid-cols-2 gap-6">
+
+        {% for boot in boots_data %}
+        <div class="card bg-base-100 shadow boot-zone"
+             data-boot-id="{{ boot.boot.id }}">
+
+            <div class="card-body">
+                <h2 class="card-title">{{ boot.boot.name }}</h2>
+
+                {% for k in boot.kabinen %}
+                <div class="bg-base-200 p-4 rounded-xl mb-4 dropzone"
+                     data-kabine-id="{{ k.kabine.id }}">
+
+                    <h3 class="font-semibold mb-3">
+                        Kabine {{ k.kabine.name }}
+                    </h3>
+
+                    <div class="space-y-2 crew-container">
+
+                        {% for item in k.crew %}
+                        <div class="bg-base-100 p-3 rounded-lg border cursor-move crew-item"
+                             draggable="true"
+                             data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+
+                            <div class="flex items-center gap-3">
+
+                                <!-- Avatar -->
+                                <div class="avatar placeholder">
+                                    <div class="bg-neutral text-neutral-content rounded-full w-10">
+                                        <span>
+                                            {{ item.users.0.first_name|slice:":1" }}{{ item.users.0.last_name|slice:":1" }}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Namen -->
+                                <div>
+                                    {% for u in item.users %}
+                                        <div class="font-medium">
+                                            {{ u.first_name }} {{ u.last_name }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                            </div>
+
+                        </div>
+                        {% endfor %}
+
+                    </div>
+
+                </div>
+                {% endfor %}
+
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+
+    <!-- ========================= -->
+    <!-- UNASSIGNED -->
+    <!-- ========================= -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+            <h2 class="card-title">Nicht zugewiesen</h2>
+
+            <div class="dropzone" data-kabine-id="">
+                <div class="crew-container grid md:grid-cols-3 gap-3">
+
+                    {% for item in unassigned %}
+                    <div class="bg-base-200 p-3 rounded-lg border cursor-move crew-item"
+                         draggable="true"
+                         data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+
+                        {% for u in item.users %}
+                            <div class="font-medium">
+                                {{ u.first_name }} {{ u.last_name }}
+                            </div>
+                        {% endfor %}
+
+                    </div>
+                    {% endfor %}
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<dialog id="autoModal" class="modal">
+    <div class="modal-box max-w-3xl p-0 overflow-hidden">
+
+        <!-- HEADER -->
+        <div class="p-6 border-b bg-base-200">
+            <h3 class="text-xl font-bold flex items-center gap-2">
+                ⚡ Auto-Zuteilung
+            </h3>
+            <p class="text-sm opacity-60 mt-1">
+                Lege fest, wie deine Crew optimal auf die Boote verteilt werden soll
+            </p>
+        </div>
+
+        <!-- CONTENT -->
+        <form id="autoForm" class="p-6 space-y-8">
+
+            <!-- ALTER -->
+            <div>
+                <h4 class="font-semibold mb-3 flex items-center gap-2">
+                    👥 Alter
+                </h4>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300 transition">
+                        <input type="radio" name="age_mode" value="similar" class="hidden peer" checked>
+                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
+                            <p class="font-medium">Ähnlich</p>
+                            <p class="text-xs opacity-60">Gruppen im gleichen Alter</p>
+                        </div>
+                    </label>
+
+                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300 transition">
+                        <input type="radio" name="age_mode" value="mixed" class="hidden peer">
+                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
+                            <p class="font-medium">Durchmischen</p>
+                            <p class="text-xs opacity-60">Jung & Alt kombinieren</p>
+                        </div>
+                    </label>
+
+                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300 transition">
+                        <input type="radio" name="age_mode" value="ignore" class="hidden peer">
+                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
+                            <p class="font-medium">Egal</p>
+                            <p class="text-xs opacity-60">Keine Berücksichtigung</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- ERFAHRUNG -->
+            <div>
+                <h4 class="font-semibold mb-3 flex items-center gap-2">
+                    ⚓ Erfahrung
+                </h4>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                        <input type="radio" name="experience_mode" value="mixed" class="hidden peer" checked>
+                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
+                            <p class="font-medium">Durchmischen</p>
+                            <p class="text-xs opacity-60">Anfänger + Profis</p>
+                        </div>
+                    </label>
+
+                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                        <input type="radio" name="experience_mode" value="separate" class="hidden peer">
+                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
+                            <p class="font-medium">Trennen</p>
+                            <p class="text-xs opacity-60">Level getrennt halten</p>
+                        </div>
+                    </label>
+
+                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                        <input type="radio" name="experience_mode" value="ignore" class="hidden peer">
+                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
+                            <p class="font-medium">Egal</p>
+                            <p class="text-xs opacity-60">Keine Rolle</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- GESCHLECHT -->
+            <div>
+                <h4 class="font-semibold mb-3 flex items-center gap-2">
+                    🚻 Geschlecht (Kabine)
+                </h4>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                        <input type="radio" name="gender_mode" value="same" class="hidden peer" checked>
+                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
+                            <p class="font-medium">Trennen</p>
+                            <p class="text-xs opacity-60">Gleiches Geschlecht</p>
+                        </div>
+                    </label>
+
+                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                        <input type="radio" name="gender_mode" value="mixed" class="hidden peer">
+                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
+                            <p class="font-medium">Mischen</p>
+                            <p class="text-xs opacity-60">Gemischt möglich</p>
+                        </div>
+                    </label>
+
+                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                        <input type="radio" name="gender_mode" value="ignore" class="hidden peer">
+                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
+                            <p class="font-medium">Egal</p>
+                            <p class="text-xs opacity-60">Keine Einschränkung</p>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <!-- KONFLIKTE -->
+            <div>
+                <h4 class="font-semibold mb-3 flex items-center gap-2">
+                    ⚠️ Konflikte
+                </h4>
+
+                <div class="flex gap-4">
+                    <label class="label cursor-pointer">
+                        <input type="radio" name="avoid_mode" value="strict" class="radio" checked>
+                        <span class="ml-2">Streng vermeiden</span>
+                    </label>
+
+                    <label class="label cursor-pointer">
+                        <input type="radio" name="avoid_mode" value="soft" class="radio">
+                        <span class="ml-2">Locker behandeln</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- BALANCE -->
+            <div class="bg-base-200 p-4 rounded-xl">
+                <label class="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" name="balance" class="checkbox checkbox-primary" checked>
+                    <div>
+                        <p class="font-medium">Boote gleichmäßig füllen</p>
+                        <p class="text-xs opacity-60">Verteilt Crew fair auf alle Boote</p>
+                    </div>
+                </label>
+            </div>
+
+        </form>
+
+        <!-- FOOTER -->
+        <div class="p-6 border-t flex justify-between items-center">
+
+            <button class="btn btn-ghost" onclick="autoModal.close()">
+                Abbrechen
+            </button>
+
+            <button class="btn btn-primary px-6" onclick="submitAutoAssign()">
+                🚀 Zuteilung berechnen
+            </button>
+
+        </div>
+
+    </div>
+</dialog>
+<!-- ========================= -->
+<!-- KONFLIKT DATEN -->
+<!-- ========================= -->
+<script>
+const excludeMap = {
+    {% for t in teilnahmen %}
+        "{{ t.user.id }}": [{% for u in t.exclude_list %}"{{ u.id }}",{% endfor %}],
+    {% endfor %}
+};
+
+const avoidMap = {
+    {% for t in teilnahmen %}
+        "{{ t.user.id }}": [{% for u in t.avoid_list %}"{{ u.id }}",{% endfor %}],
+    {% endfor %}
+};
+</script>
+
+<!-- ========================= -->
+<!-- DRAG & DROP + LOGIK -->
+<!-- ========================= -->
+<script>
+
+// =====================
+// 🔐 CSRF
+// =====================
+function getCSRFToken() {
+    return document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrftoken='))
+        ?.split('=')[1];
+}
+
+// =====================
+// 🎯 DRAG STATE
+// =====================
+let draggedItem = null;
+let originContainer = null;
+
+// =====================
+// 🖱 DRAG EVENTS
+// =====================
+document.addEventListener("dragstart", e => {
+    const target = e.target.closest('.crew-item');
+    if (!target) return;
+
+    draggedItem = target;
+    originContainer = target.parentElement;
+
+    target.classList.add("opacity-50");
+});
+
+document.addEventListener("dragend", () => {
+    if (draggedItem) {
+        draggedItem.classList.remove("opacity-50");
+        draggedItem = null;
+        originContainer = null;
+    }
+});
+
+// =====================
+// 🔥 KONFLIKT CHECK (BOOT LEVEL)
+// =====================
+function checkConflictsForBoot(bootZone) {
+
+    const items = bootZone.querySelectorAll('.crew-item');
+
+    const statusMap = new Map();
+
+    // Reset
+    items.forEach(i => {
+        statusMap.set(i, "none");
+        i.classList.remove(
+            "border-error","bg-error/20",
+            "border-warning","bg-warning/20"
+        );
+    });
+
+    // Compare
+    for (let i = 0; i < items.length; i++) {
+        for (let j = i + 1; j < items.length; j++) {
+
+            const itemA = items[i];
+            const itemB = items[j];
+
+            const idsA = itemA.dataset.ids.split(",");
+            const idsB = itemB.dataset.ids.split(",");
+
+            for (let a of idsA) {
+                for (let b of idsB) {
+
+                    if (excludeMap[a]?.includes(b) || excludeMap[b]?.includes(a)) {
+                        statusMap.set(itemA, "exclude");
+                        statusMap.set(itemB, "exclude");
+                    }
+                    else if (avoidMap[a]?.includes(b) || avoidMap[b]?.includes(a)) {
+                        if (statusMap.get(itemA) !== "exclude") {
+                            statusMap.set(itemA, "avoid");
+                        }
+                        if (statusMap.get(itemB) !== "exclude") {
+                            statusMap.set(itemB, "avoid");
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+
+    // Apply Styles
+    statusMap.forEach((status, item) => {
+        if (status === "exclude") {
+            item.classList.add("border-error","bg-error/20");
+        } else if (status === "avoid") {
+            item.classList.add("border-warning","bg-warning/20");
+        }
+    });
+}
+
+// =====================
+// 📦 SAVE FUNCTION (NEU & ROBUST)
+// =====================
+function saveAssignment(item, zone) {
+
+    const userIds = item.dataset.ids;
+    const kabineId = zone.dataset.kabineId;
+
+    return fetch("{% url 'kabine_update' toern.id %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify({
+            user_ids: userIds,
+            kabine_id: kabineId
+        })
+    })
+    .then(res => res.json());
+}
+
+// =====================
+// 📥 DROP LOGIC
+// =====================
+document.querySelectorAll('.dropzone').forEach(zone => {
+
+    zone.addEventListener('dragover', e => {
+        e.preventDefault();
+        zone.classList.add('ring','ring-primary');
+    });
+
+    zone.addEventListener('dragleave', () => {
+        zone.classList.remove('ring','ring-primary');
+    });
+
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('ring','ring-primary');
+
+        if (!draggedItem) return;
+
+        const container = zone.querySelector('.crew-container');
+        if (!container) return;
+
+        // =====================
+        // 🟢 OPTIMISTISCH UI UPDATE
+        // =====================
+        container.appendChild(draggedItem);
+
+        const bootZone = zone.closest('.boot-zone');
+        if (bootZone) checkConflictsForBoot(bootZone);
+
+        // =====================
+        // 💾 SAVE
+        // =====================
+        saveAssignment(draggedItem, zone)
+            .then(data => {
+
+                if (data.status !== "ok") {
+                    throw new Error(data.message || "Save failed");
+                }
+
+            })
+            .catch(err => {
+
+                console.error("❌ SAVE ERROR:", err);
+
+                // 🔥 ROLLBACK
+                if (originContainer) {
+                    originContainer.appendChild(draggedItem);
+
+                    const originBoot = originContainer.closest('.boot-zone');
+                    if (originBoot) checkConflictsForBoot(originBoot);
+                }
+
+                alert("Speichern fehlgeschlagen!");
+            });
+
+    });
+
+});
+
+// =====================
+// 🚀 INITIAL CHECK
+// =====================
+document.querySelectorAll('.boot-zone').forEach(boot => {
+    checkConflictsForBoot(boot);
+});
+
+// =====================
+// 🤖 AUTO ASSIGN
+// =====================
+function submitAutoAssign() {
+
+    const form = document.getElementById("autoForm");
+    const formData = new FormData(form);
+
+    const config = {
+        age_mode: formData.get("age_mode"),
+        experience_mode: formData.get("experience_mode"),
+        gender_mode: formData.get("gender_mode"),
+        avoid_mode: formData.get("avoid_mode"),
+        balance: formData.get("balance") ? true : false
+    };
+
+    fetch("{% url 'auto_assign' toern.id %}", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCSRFToken()
+        },
+        body: JSON.stringify(config)
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        if (data.status === "ok") {
+            location.reload();
+        } else {
+            alert("Fehler: " + data.message);
+        }
+
+    })
+    .catch(err => {
+        console.error("❌ AUTO ASSIGN ERROR:", err);
+        alert("Serverfehler");
+    });
+}
+
+</script>
+{% endblock %}
