@@ -100,6 +100,20 @@
 
                         <div class="form-control w-full">
                             <label class="label">
+                                <span class="label-text">Geschlecht</span>
+                            </label>
+
+                            {{ form.geschlecht }}
+
+                            {% if form.geschlecht.errors %}
+                                <p class="text-error text-sm mt-1">
+                                    {{ form.geschlecht.errors.0 }}
+                                </p>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-control w-full">
+                            <label class="label">
                                 <span class="label-text">Vorname</span>
                             </label>
                             <input 
@@ -166,6 +180,18 @@
                         <p class="text-sm opacity-60">
                             Angemeldet als {{ user.email }}
                         </p>
+                        <div class="form-control w-full">
+                            <label class="label">
+                                <span class="label-text">Geschlecht</span>
+                            </label>
+
+                            <select name="geschlecht" class="select select-bordered w-full">
+                                <option value="m" {% if user.geschlecht == "m" %}selected{% endif %}>Männlich</option>
+                                <option value="w" {% if user.geschlecht == "w" %}selected{% endif %}>Weiblich</option>
+                                <option value="d" {% if user.geschlecht == "d" %}selected{% endif %}>Divers</option>
+                            </select>
+                        </div>
+
                         <div class="form-control w-full">
                             <label class="label">
                                 <span class="label-text">Vorname</span>

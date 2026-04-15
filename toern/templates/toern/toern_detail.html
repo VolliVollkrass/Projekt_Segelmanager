@@ -192,27 +192,25 @@
     <div class="flex gap-4 mt-6">
         {% if user_teilnahme %}
 
-            <a href="{% url 'crew_dashboard' toern.pk %}" 
-            class="btn btn-success">
-                Zum Crew Dashboard
-            </a>
+            {% if user_teilnahme.status == "warteliste" %}
+                <button class="btn btn-warning w-full" disabled>
+                    Warteliste
+                </button>
+            {% else %}
+                <a href="{% url 'crew_dashboard' toern.pk %}" 
+                class="btn btn-success w-full">
+                    Zum Crew Dashboard
+                </a>
+            {% endif %}
 
         {% else %}
 
             <a href="{% url 'toern_anmeldung' pk=toern.pk %}" 
-            class="btn btn-primary">
+            class="btn btn-primary w-full">
                 Anmelden
             </a>
 
         {% endif %}
-        <a href="{% url 'index' %}" class="btn btn-outline">Zurück zur Übersicht</a>
-    </div>
-    {% if user_ist_teilnehmer %}
-        <a href="{% url 'crew_dashboard' toern.id %}"
-        class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-            Zum Crewbereich
-        </a>
-    {% endif %}
 
 </div>
 {% endblock %}

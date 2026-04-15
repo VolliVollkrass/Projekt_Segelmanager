@@ -84,6 +84,9 @@ def toern_anmeldung(request, pk):
             # =========================
             if request.user.is_authenticated:
                 user = request.user
+                if not user.geschlecht:
+                    user.geschlecht = form.cleaned_data.get("geschlecht")
+
                 if not user.geburtsdatum:
                     user.geburtsdatum = form.cleaned_data.get("geburtsdatum")
                     user.save()
@@ -96,6 +99,7 @@ def toern_anmeldung(request, pk):
                         "username": email,
                         "first_name": request.POST.get("first_name"),
                         "last_name": request.POST.get("last_name"),
+                        "geschlecht": form.cleaned_data.get("geschlecht"),
                         "geburtsdatum": form.cleaned_data.get("geburtsdatum"),
                     }
                 )
@@ -130,10 +134,21 @@ def toern_anmeldung(request, pk):
             teilnahme.user = user
             teilnahme.toern = toern
             teilnahme.rolle = "crew"
+
+            # =========================
+            # 🆕 WARTELISTE LOGIK
+            # =========================
+            if toern.freie_plaetze > 0:
+                teilnahme.status = "angemeldet"
+                messages.success(request, "Erfolgreich angemeldet! 🎉")
+            else:
+                teilnahme.status = "warteliste"
+                messages.warning(request, "Der Törn ist aktuell voll – du stehst auf der Warteliste.")
+
             teilnahme.save()
 
-            messages.success(request, "Erfolgreich angemeldet!")
-            return redirect("toern_detail", pk=toern.pk)
+            #messages.success(request, "Erfolgreich angemeldet!")  Ich glaube das wird nicht mehr benötigt, da die Meldungen jetzt direkt in der Logik oben gesetzt werden. 
+            #return redirect("toern_detail", pk=toern.pk)
 
     else:
         form = TeilnahmeForm()
@@ -260,6 +275,10 @@ def crew_dashboard(request, toern_id):
     if not teilnahme:
         return render(request, "403.html")
 
+    if teilnahme.status == "warteliste":
+        messages.warning(request, "Du bist aktuell auf der Warteliste.")
+        return redirect("toern_detail", pk=toern.id)
+
     # =========================
     # 2. Rollen
     # =========================
@@ -270,7 +289,8 @@ def crew_dashboard(request, toern_id):
     # 3. Crew
     # =========================
     teilnahmen = Teilnahme.objects.filter(
-        toern=toern
+        toern=toern,
+        status__in=["angemeldet", "bestaetigt"]
     ).select_related("user")
 
     teilnahmen_ohne_mich = teilnahmen.exclude(user=request.user)
@@ -578,6 +598,8 @@ def skipper_dashboard(request, toern_id):
         toern=toern
     ).select_related("user", "boot", "kabine")
 
+    warteliste = teilnahmen.filter(status="warteliste")
+
     boote = toern.boote.prefetch_related("kabinen")
 
     # =========================
@@ -731,6 +753,7 @@ def skipper_dashboard(request, toern_id):
         "harte_konflikte": harte_konflikte,
         "kritische_konflikte": kritische_konflikte,
         "teilnahmen": teilnahmen,
+        "warteliste": warteliste,
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)
@@ -920,8 +943,10 @@ def auto_assign(request, toern_id):
     balance = data.get("balance", True)
 
     teilnahmen = list(
-        Teilnahme.objects.filter(toern=toern)
-        .select_related("user", "boot", "kabine")
+        Teilnahme.objects.filter(
+            toern=toern,
+            status__in=["angemeldet", "bestaetigt"]
+        ).select_related("user", "boot", "kabine")
     )
 
     boote = list(toern.boote.prefetch_related("kabinen"))
@@ -980,17 +1005,20 @@ def auto_assign(request, toern_id):
     # 4. SKIPPER FIXIEREN
     # =========================
     for g in groups:
-        for u in g["users"]:
-            t = next(x for x in teilnahmen if x.user.id == u.id)
 
-            if t.rolle in ["skipper", "coskipper"] and t.boot:
+        # 👉 prüfe nur EINEN user der gruppe
+        u = g["users"][0]
 
-                state = boot_state[t.boot.id]
+        t = next(x for x in teilnahmen if x.user.id == u.id)
 
-                state["groups"].append(g)
-                state["used"] += g["size"]
+        if t.rolle in ["skipper", "coskipper"] and t.boot:
 
-                g["fixed"] = True
+            state = boot_state[t.boot.id]
+
+            state["groups"].append(g)
+            state["used"] += g["size"]
+
+            g["fixed"] = True
 
     # =========================
     # 5. REST GRUPPEN
@@ -1045,9 +1073,9 @@ def auto_assign(request, toern_id):
         # =========================
         # 🔁 VERGLEICHE
         # =========================
-        for g2 in boot_groups:
+        for other_group in boot_groups:
             for u1 in group["users"]:
-                for u2 in g2["users"]:
+                for u2 in other_group["users"]:
 
                     key = tuple(sorted([u1.id, u2.id]))
 
@@ -1097,15 +1125,15 @@ def auto_assign(request, toern_id):
                     # =========================
                     if data.get("gender_mode") != "ignore":
 
-                        g1 = u1.geschlecht
-                        g2 = u2.geschlecht
+                        gender1 = u1.geschlecht
+                        gender2 = u2.geschlecht
 
                         if data.get("gender_mode") == "same":
-                            if g1 != g2:
+                            if gender1 != gender2:
                                 s += 5
 
                         elif data.get("gender_mode") == "mixed":
-                            if g1 == g2:
+                            if gender1 == gender2:
                                 s += 2
 
         return s
@@ -1202,3 +1230,47 @@ def auto_assign(request, toern_id):
         "status": "ok",
         "unassigned": [u.id for u in unassigned]
     })
+
+@login_required
+@require_POST
+def warteliste_bestaetigen(request, teilnahme_id):
+    teilnahme = get_object_or_404(Teilnahme, id=teilnahme_id)
+
+    # Rechte prüfen
+    skipper = Teilnahme.objects.filter(
+        user=request.user,
+        toern=teilnahme.toern
+    ).first()
+
+    if not skipper or skipper.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    # Platz prüfen
+    if teilnahme.toern.freie_plaetze > 0:
+        teilnahme.status = "angemeldet"
+        teilnahme.save()
+        messages.success(request, "Teilnehmer bestätigt!")
+    else:
+        messages.error(request, "Kein freier Platz mehr!")
+
+    return redirect("skipper_dashboard", toern_id=teilnahme.toern.id)
+
+@login_required
+@require_POST
+def warteliste_ablehnen(request, teilnahme_id):
+    teilnahme = get_object_or_404(Teilnahme, id=teilnahme_id)
+
+    skipper = Teilnahme.objects.filter(
+        user=request.user,
+        toern=teilnahme.toern
+    ).first()
+
+    if not skipper or skipper.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    teilnahme.status = "abgelehnt"
+    teilnahme.save()
+
+    messages.info(request, "Teilnehmer abgelehnt")
+
+    return redirect("skipper_dashboard", toern_id=teilnahme.toern.id)

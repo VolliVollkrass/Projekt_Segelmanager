@@ -18,4 +18,6 @@ urlpatterns = [
     path("toern/<int:toern_id>/auto-assign/", auto_assign, name="auto_assign"),
     path("boot/<int:boot_id>/assign-skipper/", boot_skipper_assign, name="boot_skipper_assign"),
     path("toern/<int:toern_id>/reset/", reset_zuteilung, name="reset_zuteilung"),
+    path("warteliste/bestaetigen/<int:teilnahme_id>/", warteliste_bestaetigen, name="warteliste_bestaetigen"),
+    path("warteliste/ablehnen/<int:teilnahme_id>/", warteliste_ablehnen, name="warteliste_ablehnen"),
 ]

@@ -110,6 +110,18 @@ class TeilnahmeForm(forms.ModelForm):
         })
     )
 
+    geschlecht = forms.ChoiceField(
+        choices=[
+            ("m", "Männlich"),
+            ("w", "Weiblich"),
+            ("d", "Divers"),
+        ],
+        required=True,
+        widget=forms.Select(attrs={
+            "class": "select select-bordered w-full"
+        })
+    )
+
     gesegelte_meilen = forms.IntegerField(
         required=False,
         widget=forms.NumberInput(attrs={
