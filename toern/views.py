@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from django.utils.timezone import now
 import json
 from django.http import JsonResponse
+from datetime import date
 
 
 User = get_user_model()
@@ -1014,20 +1015,98 @@ def auto_assign(request, toern_id):
         else:
             avoid.add(key)
 
+    teilnahme_map = {
+        t.user.id: t
+        for t in teilnahmen
+    }
+
+    
+
     def score(group, boot_groups):
         s = 0
 
+        # =========================
+        # 🔧 HELPER
+        # =========================
+        def get_age(user):
+            if user.geburtsdatum:
+                today = date.today()
+                return (
+                    today.year
+                    - user.geburtsdatum.year
+                    - ((today.month, today.day) < (user.geburtsdatum.month, user.geburtsdatum.day))
+                )
+            return None
+
+        def get_exp(user):
+            t = teilnahme_map.get(user.id)
+            return int(t.seglerische_erfahrung) if t else 1
+
+        # =========================
+        # 🔁 VERGLEICHE
+        # =========================
         for g2 in boot_groups:
             for u1 in group["users"]:
                 for u2 in g2["users"]:
 
                     key = tuple(sorted([u1.id, u2.id]))
 
+                    # ❌ HARD BLOCK
                     if key in exclude:
                         return None
 
+                    # ⚠️ AVOID
                     if key in avoid:
                         s += 20 if avoid_mode == "strict" else 5
+
+                    # =========================
+                    # 👥 ALTER
+                    # =========================
+                    if data.get("age_mode") != "ignore":
+
+                        a1 = get_age(u1)
+                        a2 = get_age(u2)
+
+                        if a1 is not None and a2 is not None:
+                            diff = abs(a1 - a2)
+
+                            if data.get("age_mode") == "similar":
+                                s += diff * 0.5
+
+                            elif data.get("age_mode") == "mixed":
+                                s -= diff * 0.3
+
+                    # =========================
+                    # ⚓ ERFAHRUNG
+                    # =========================
+                    if data.get("experience_mode") != "ignore":
+
+                        e1 = get_exp(u1)
+                        e2 = get_exp(u2)
+
+                        diff = abs(e1 - e2)
+
+                        if data.get("experience_mode") == "separate":
+                            s += diff * 3
+
+                        elif data.get("experience_mode") == "mixed":
+                            s -= diff * 2
+
+                    # =========================
+                    # 🚻 GESCHLECHT
+                    # =========================
+                    if data.get("gender_mode") != "ignore":
+
+                        g1 = u1.geschlecht
+                        g2 = u2.geschlecht
+
+                        if data.get("gender_mode") == "same":
+                            if g1 != g2:
+                                s += 5
+
+                        elif data.get("gender_mode") == "mixed":
+                            if g1 == g2:
+                                s += 2
 
         return s
 

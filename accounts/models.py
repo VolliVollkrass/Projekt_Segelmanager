@@ -94,8 +94,8 @@ class User(AbstractUser):
 
             optimized = optimize_image(self.profilbild)
 
-            # 👉 EXT sauber extrahieren
-            ext = self.profilbild.name.split('.')[-1]
+            # 👉 EXT sauber extrahieren.  self.profilbild.name.split('.')[-1]
+            ext = "jpg"  # Wir speichern immer als JPG, also feste Extension
 
             self.profilbild.save(
                 f"{self.profilbild_uuid}.{ext}",
@@ -164,7 +164,7 @@ class Lizenz(models.Model):
             optimized = optimize_image(self.dokument_vorne)
 
             self.dokument_vorne.save(
-                self.dokument_vorne.name,
+                os.path.splitext(self.dokument_vorne.name)[0] + ".jpg",
                 optimized,
                 save=False
             )
@@ -173,7 +173,7 @@ class Lizenz(models.Model):
             optimized = optimize_image(self.dokument_hinten)
 
             self.dokument_hinten.save(
-                self.dokument_hinten.name,
+                os.path.splitext(self.dokument_hinten.name)[0] + ".jpg",
                 optimized,
                 save=False
             )

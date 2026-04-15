@@ -185,11 +185,19 @@
                         </form>
 
                     </div>
+                    <div class="flex gap-2">
 
-                    <a href="{% url 'toern_detail' toern.id %}"
-                       class="btn btn-sm btn-outline">
-                        Details
-                    </a>
+                        <a href="{% url 'skipper_dashboard' toern.id %}"
+                        class="btn btn-sm btn-outline">
+                            Skipper Dashboard
+                        </a>
+
+                        <a href="{% url 'toern_detail' toern.id %}"
+                        class="btn btn-sm btn-outline">
+                            Details
+                        </a>
+
+                    </div>
 
                 </div>
 

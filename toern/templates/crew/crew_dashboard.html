@@ -12,6 +12,12 @@
             <h1 class="text-3xl font-bold mt-1">{{ toern.titel }}</h1>
         </div>
 
+        {% if is_skipper %}
+            <a href="{% url 'skipper_dashboard' toern.id %}" class="btn btn-secondary">
+                Skipper Aktion
+            </a>
+        {% endif %}
+
         <button class="btn btn-primary">
             Daten vervollständigen
         </button>
