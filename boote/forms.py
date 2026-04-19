@@ -51,12 +51,12 @@ class BootForm(forms.ModelForm):
 
             "laenge": forms.NumberInput(attrs={
                 "class": "input input-bordered w-full",
-                "step": "0.1"
+                "step": "0.01"
             }),
 
             "tiefe": forms.NumberInput(attrs={
                 "class": "input input-bordered w-full",
-                "step": "0.1"
+                "step": "0.01"
             }),
 
             "preis": forms.NumberInput(attrs={
