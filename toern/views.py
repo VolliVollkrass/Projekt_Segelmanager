@@ -1317,7 +1317,7 @@ def teilnahme_daten_edit(request, toern_id):
             user.geburtsdatum = form.cleaned_data.get("geburtsdatum")
             user.geburtsort = form.cleaned_data.get("geburtsort")
             user.nationalitaet = form.cleaned_data.get("nationalitaet")
-            user.indentifikationstyp = form.cleaned_data.get("indentifikationstyp")
+            user.identifikationstyp = form.cleaned_data.get("identifikationstyp")
             user.passnummer = form.cleaned_data.get("passnummer")
             user.strasse = form.cleaned_data.get("strasse")
             user.plz = form.cleaned_data.get("plz")
@@ -1337,6 +1337,11 @@ def teilnahme_daten_edit(request, toern_id):
             "geburtsdatum": user.geburtsdatum.strftime("%Y-%m-%d") if user.geburtsdatum else "",
             "geburtsort": user.geburtsort,
             "nationalitaet": user.nationalitaet,
+
+            # 👉 HIER FEHLTE ES
+            "identifikationstyp": user.identifikationstyp,
+            "passnummer": user.passnummer,
+
             "strasse": user.strasse,
             "plz": user.plz,
             "ort": user.ort,
