@@ -176,12 +176,39 @@
                                 </div>
 
                                 <!-- Namen -->
-                                <div>
+                                <div class="w-full space-y-1">
+
                                     {% for u in item.users %}
-                                        <div class="font-medium">
-                                            {{ u.first_name }} {{ u.last_name }}
+                                        <div>
+
+                                            <!-- Name + Prozent -->
+                                            <div class="flex justify-between text-sm">
+                                                <span class="font-medium">
+                                                    {{ u.first_name }} {{ u.last_name }}
+                                                </span>
+                                                <span class="opacity-60">
+                                                    {{ u.fortschritt|default:0 }}%
+                                                </span>
+                                            </div>
+
+                                            <!-- Progressbar -->
+                                            <progress 
+                                                class="progress w-full h-2
+                                                    {% if u.fortschritt < 40 %}
+                                                        progress-error
+                                                    {% elif u.fortschritt < 80 %}
+                                                        progress-warning
+                                                    {% else %}
+                                                        progress-success
+                                                    {% endif %}
+                                                "
+                                                value="{{ u.fortschritt|default:0 }}"
+                                                max="100">
+                                            </progress>
+
                                         </div>
                                     {% endfor %}
+
                                 </div>
 
                             </div>

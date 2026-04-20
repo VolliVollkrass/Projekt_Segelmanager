@@ -36,6 +36,16 @@
 
                 <p>{{ toern.revier }}</p>
 
+                {% url 'toern_detail' toern.id as detail_url %}
+                <a 
+                href="mailto:
+                ?subject=Einladung zum Törn: {{ toern.titel|urlencode }}
+                &body=Hallo,%0D%0A%0D%0Aich möchte dich herzlich zu folgendem Segeltörn einladen:%0D%0A%0D%0A{{ toern.titel|urlencode }}%0D%0ARevier: {{ toern.revier|urlencode }}%0D%0AStart: {{ toern.startdatum|date:'d.m.Y'|urlencode }}%0D%0A%0D%0AHier findest du alle Details:%0D%0A{{ request.scheme }}://{{ request.get_host }}{{ detail_url }}%0D%0A%0D%0AViele Grüße"
+                class="btn btn-outline"
+                >
+                    Einladung senden 📧
+                </a>
+
                 <!-- ========================= -->
                 <!-- BOOTE -->
                 <!-- ========================= -->

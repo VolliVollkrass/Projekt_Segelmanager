@@ -1,12 +1,13 @@
 from django.shortcuts import render, get_object_or_404, redirect
 
 from boote.models import Boot, Kabine
+from utils.profil_fortschritt import teilnahme_fortschritt
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from utils.permissions import anbieter_required, is_owner
 from django.core.exceptions import PermissionDenied
-from .forms import ToernForm, TeilnahmeForm
+from .forms import TeilnahmeDetailForm, ToernForm, TeilnahmeForm
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
@@ -380,6 +381,7 @@ def crew_dashboard(request, toern_id):
         "toern": toern,
         "teilnahmen": teilnahmen,
         "teilnahmen_ohne_mich": teilnahmen_ohne_mich,
+        "profil_progress": teilnahme_fortschritt(teilnahme),
 
         "is_skipper": is_skipper,
         "is_coskipper": is_coskipper,
@@ -598,6 +600,13 @@ def skipper_dashboard(request, toern_id):
         toern=toern
     ).select_related("user", "boot", "kabine")
 
+    # Fortschritt berechnen
+    teilnahme_map = {}
+
+    for t in teilnahmen:
+        t.fortschritt = teilnahme_fortschritt(t)
+        teilnahme_map[t.user.id] = t
+
     warteliste = teilnahmen.filter(status="warteliste")
 
     boote = toern.boote.prefetch_related("kabinen")
@@ -625,6 +634,10 @@ def skipper_dashboard(request, toern_id):
     # 👉 Partner direkt an Teilnahme hängen
     for t in teilnahmen:
         t.partner = pair_lookup.get(t.user.id)
+
+    # 👉 Fortschritt auf User spiegeln
+    for t in teilnahmen:
+        t.user.fortschritt = t.fortschritt
 
     # =========================
     # 4. Präferenzen
@@ -1274,3 +1287,64 @@ def warteliste_ablehnen(request, teilnahme_id):
     messages.info(request, "Teilnehmer abgelehnt")
 
     return redirect("skipper_dashboard", toern_id=teilnahme.toern.id)
+
+
+# toern/views.py
+
+@login_required
+def teilnahme_daten_edit(request, toern_id):
+
+    toern = get_object_or_404(Toern, id=toern_id)
+
+    teilnahme = get_object_or_404(
+        Teilnahme,
+        user=request.user,
+        toern=toern
+    )
+
+    user = request.user
+
+    if request.method == "POST":
+        form = TeilnahmeDetailForm(request.POST, instance=teilnahme)
+
+        if form.is_valid():
+
+            # 👉 TEILNAHME speichern
+            teilnahme = form.save()
+
+            # 👉 USER speichern
+            user.telefonnummer = form.cleaned_data.get("telefonnummer")
+            user.geburtsdatum = form.cleaned_data.get("geburtsdatum")
+            user.geburtsort = form.cleaned_data.get("geburtsort")
+            user.nationalitaet = form.cleaned_data.get("nationalitaet")
+            user.indentifikationstyp = form.cleaned_data.get("indentifikationstyp")
+            user.passnummer = form.cleaned_data.get("passnummer")
+            user.strasse = form.cleaned_data.get("strasse")
+            user.plz = form.cleaned_data.get("plz")
+            user.ort = form.cleaned_data.get("ort")
+
+            user.save()
+
+            messages.success(request, "Daten gespeichert")
+            return redirect("crew_dashboard", toern_id=toern.id)
+
+    else:
+        form = TeilnahmeDetailForm(instance=teilnahme)
+
+        # 🔥 Prefill USER Daten
+        form.initial.update({
+            "telefonnummer": user.telefonnummer,
+            "geburtsdatum": user.geburtsdatum.strftime("%Y-%m-%d") if user.geburtsdatum else "",
+            "geburtsort": user.geburtsort,
+            "nationalitaet": user.nationalitaet,
+            "strasse": user.strasse,
+            "plz": user.plz,
+            "ort": user.ort,
+        })
+
+    return render(request, "crew/crew_teilnahme_daten.html", {
+        "form": form,
+        "toern": toern,
+        "user": user
+    })
+

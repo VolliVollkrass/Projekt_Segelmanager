@@ -122,6 +122,15 @@ class Teilnahme(models.Model):
         ("5", "Skipper*in"),
     ]
 
+    GROESSE_CHOICES = [
+        ("XS", "XS"),
+        ("S", "S"),
+        ("M", "M"),
+        ("L", "L"),
+        ("XL", "XL"),
+        ("XXL", "XXL"),
+    ]
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="teilnahmen")
     toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="teilnahmen")
     rolle = models.CharField(max_length=20, choices=ROLE_CHOICES)
@@ -134,6 +143,12 @@ class Teilnahme(models.Model):
     seglerische_erfahrung = models.CharField(max_length=30, choices=SEGELERFAHRUNG_CHOICES, default="1")
     notizen = models.TextField(blank=True)  # private Notizen für Skipper/Admin
     teilnahmebedingungen_akzeptiert = models.BooleanField(default=False)
+    notfallkontakt_name = models.CharField(max_length=100, blank=True)
+    notfallkontakt_telefon = models.CharField(max_length=20, blank=True)
+    notfallkontakt_email = models.EmailField(blank=True)
+    essgewohnheiten = models.TextField(blank=True)
+    allergien = models.TextField(blank=True)
+    tshirt_groesse = models.CharField(max_length=5, choices=GROESSE_CHOICES, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

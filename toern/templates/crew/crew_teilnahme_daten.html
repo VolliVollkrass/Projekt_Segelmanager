@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="max-w-3xl mx-auto px-4 py-8 space-y-6">
+
+    <!-- HEADER -->
+    <div>
+        <a href="{% url 'crew_dashboard' toern.id %}" class="link link-hover text-sm text-base-content/60">
+            ← Zurück zum Törn
+        </a>
+        <h1 class="text-3xl font-bold mt-1">
+            Deine Crewdaten
+        </h1>
+        <p class="text-sm text-base-content/60">
+            Diese Daten werden für die Crewliste benötigt.
+        </p>
+    </div>
+
+    <!-- FORM CARD -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+
+            <form method="POST" class="space-y-8">
+                {% csrf_token %}
+
+                <!-- 👤 FIXE DATEN -->
+                <div>
+                    <h2 class="card-title mb-4">Persönliche Daten</h2>
+
+                    <div class="grid md:grid-cols-2 gap-4 text-sm mb-4">
+
+                        <div>
+                            <p class="text-base-content/60">Vorname</p>
+                            <p class="font-medium">{{ user.first_name }}</p>
+                        </div>
+
+                        <div>
+                            <p class="text-base-content/60">Nachname</p>
+                            <p class="font-medium">{{ user.last_name }}</p>
+                        </div>
+
+                        <div>
+                            <p class="text-base-content/60">E-Mail</p>
+                            <p class="font-medium">{{ user.email }}</p>
+                        </div>
+
+                        <div>
+                            <p class="text-base-content/60">Geschlecht</p>
+                            <p class="font-medium">
+                                {% if user.geschlecht == "m" %}Männlich
+                                {% elif user.geschlecht == "w" %}Weiblich
+                                {% else %}Divers
+                                {% endif %}
+                            </p>
+                        </div>
+
+                    </div>
+
+                    <!-- ✏️ EDITIERBAR -->
+                    <div class="grid md:grid-cols-2 gap-4">
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Telefon</span></label>
+                            {{ form.telefonnummer }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Geburtsdatum</span></label>
+                            {{ form.geburtsdatum }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Geburtsort</span></label>
+                            {{ form.geburtsort }}
+                        </div>
+                        
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Identifikation</span>
+                            </label>
+                            {{ form.identifikationstyp }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Dokumentnummer</span>
+                            </label>
+                            {{ form.passnummer }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Nationalität</span></label>
+                            {{ form.nationalitaet }}
+                        </div>
+
+                        <div class="form-control md:col-span-2">
+                            <label class="label"><span class="label-text">Straße</span></label>
+                            {{ form.strasse }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">PLZ</span></label>
+                            {{ form.plz }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Ort</span></label>
+                            {{ form.ort }}
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ⚓ SEGELERFAHRUNG -->
+                <div>
+                    <h2 class="card-title mb-4">Segelerfahrung</h2>
+
+                    <div class="form-control">
+                        <label class="label">
+                            <span class="label-text">Dein Erfahrungslevel</span>
+                        </label>
+                        {{ form.seglerische_erfahrung }}
+                    </div>
+                </div>
+
+                <!-- 🆘 NOTFALL -->
+                <div>
+                    <h2 class="card-title mb-4">Notfallkontakt</h2>
+
+                    <div class="grid md:grid-cols-2 gap-4">
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Name</span></label>
+                            {{ form.notfallkontakt_name }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Telefon</span></label>
+                            {{ form.notfallkontakt_telefon }}
+                        </div>
+
+                        <div class="form-control md:col-span-2">
+                            <label class="label"><span class="label-text">E-Mail</span></label>
+                            {{ form.notfallkontakt_email }}
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- 🍽️ INFOS -->
+                <div>
+                    <h2 class="card-title mb-4">Weitere Informationen</h2>
+
+                    <div class="space-y-4">
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Allergien</span></label>
+                            {{ form.allergien }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Essgewohnheiten</span></label>
+                            {{ form.essgewohnheiten }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">T-Shirt Größe</span></label>
+                            {{ form.tshirt_groesse }}
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- BUTTON -->
+                <div class="flex justify-end pt-4 border-t">
+                    <button class="btn btn-primary">
+                        Speichern
+                    </button>
+                </div>
+
+            </form>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

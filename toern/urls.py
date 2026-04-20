@@ -20,4 +20,5 @@ urlpatterns = [
     path("toern/<int:toern_id>/reset/", reset_zuteilung, name="reset_zuteilung"),
     path("warteliste/bestaetigen/<int:teilnahme_id>/", warteliste_bestaetigen, name="warteliste_bestaetigen"),
     path("warteliste/ablehnen/<int:teilnahme_id>/", warteliste_ablehnen, name="warteliste_ablehnen"),
+    path("<int:toern_id>/daten/", teilnahme_daten_edit, name="teilnahme_daten_edit"),
 ]

@@ -183,3 +183,92 @@ class TeilnahmeForm(forms.ModelForm):
                 raise forms.ValidationError("Passwörter stimmen nicht überein.")
 
         return cleaned_data
+
+
+class TeilnahmeDetailForm(forms.ModelForm):
+
+    # 👤 USER FELDER
+    telefonnummer = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
+    geburtsdatum = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={
+            "type": "date",
+            "class": "input input-bordered w-full"
+        })
+    )
+
+    geburtsort = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
+    nationalitaet = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
+    identifikationstyp = forms.ChoiceField(
+        choices=[
+            ("pers", "Personalausweis"),
+            ("reise", "Reisepass"),
+        ],
+        required=False,
+        widget=forms.Select(attrs={
+            "class": "select select-bordered w-full"
+        })
+    )
+
+    passnummer = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": "input input-bordered w-full"
+        })
+    )
+
+    strasse = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
+    plz = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
+    ort = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
+    class Meta:
+        model = Teilnahme
+        fields = [
+            "seglerische_erfahrung",
+            "notfallkontakt_name",
+            "notfallkontakt_telefon",
+            "notfallkontakt_email",
+            "allergien",
+            "essgewohnheiten",
+            "tshirt_groesse",
+        ]
+
+        widgets = {
+            "seglerische_erfahrung": forms.Select(attrs={"class": "select select-bordered w-full"}),
+
+            "notfallkontakt_name": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
+            "notfallkontakt_telefon": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
+            "notfallkontakt_email": forms.EmailInput(attrs={"class": "input input-bordered w-full"}),
+
+            "allergien": forms.Textarea(attrs={
+                "class": "textarea textarea-bordered w-full",
+                "rows": 3
+            }),
+
+            "essgewohnheiten": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
+
+            "tshirt_groesse": forms.Select(attrs={"class": "select select-bordered w-full"}),
+        }
