@@ -1,7 +1,10 @@
 from django.shortcuts import render, get_object_or_404, redirect
 
 from boote.models import Boot, Kabine
+from logistik.models import Einkaufspunkt, Gegenstand, Mitbringer, PersönlicherGegenstand
 from utils.profil_fortschritt import teilnahme_fortschritt
+from utils.boot_access_allowed import is_boot_access_allowed
+from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
@@ -279,7 +282,8 @@ def crew_dashboard(request, toern_id):
     if teilnahme.status == "warteliste":
         messages.warning(request, "Du bist aktuell auf der Warteliste.")
         return redirect("toern_detail", pk=toern.id)
-
+    
+    boot_access = is_boot_access_allowed(teilnahme)
     # =========================
     # 2. Rollen
     # =========================
@@ -394,6 +398,7 @@ def crew_dashboard(request, toern_id):
         "pending_user_ids": pending_user_ids,
         "pending_map": pending_map,
         "eigener_partner": eigener_partner,
+        "boot_access": boot_access,
 
         # Präferenzen
         "exclude_ids": exclude_ids,
@@ -767,6 +772,7 @@ def skipper_dashboard(request, toern_id):
         "kritische_konflikte": kritische_konflikte,
         "teilnahmen": teilnahmen,
         "warteliste": warteliste,
+        "teilnahme_map": teilnahme_map,
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)
@@ -785,7 +791,7 @@ def kabine_update(request, toern_id):
             toern=toern
         ).first()
 
-        if not teilnahme or teilnahme.rolle not in ["skipper", "co_skp"]:
+        if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
             raise PermissionDenied
 
         # =========================
@@ -1353,3 +1359,408 @@ def teilnahme_daten_edit(request, toern_id):
         "user": user
     })
 
+@login_required
+@require_POST
+def zuteilung_fixieren(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=toern
+    ).first()
+
+    # 🔐 Rechte: Skipper + Co-Skipper
+    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    # ✅ Status setzen
+    toern.status = "ZUTEILUNG_FIXIERT"
+    toern.save()
+
+    # 🔥 AUTO CONFIRM
+    Teilnahme.objects.filter(
+        toern=toern,
+        boot__isnull=False
+    ).update(status="bestaetigt")
+
+    messages.success(request, "Zuteilung wurde abgeschlossen. Crew hat jetzt Zugriff auf ihr Boot.")
+
+    return redirect("skipper_dashboard", toern_id=toern.id)
+
+@login_required
+@require_POST
+def teilnehmer_bestaetigen(request, teilnahme_id):
+    teilnahme = get_object_or_404(Teilnahme, id=teilnahme_id)
+
+    skipper = Teilnahme.objects.filter(
+        user=request.user,
+        toern=teilnahme.toern
+    ).first()
+
+    if not skipper or skipper.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    teilnahme.status = "bestaetigt"
+    teilnahme.save()
+
+    messages.success(request, "Teilnehmer bestätigt")
+
+    return redirect("skipper_dashboard", toern_id=teilnahme.toern.id)
+
+@login_required
+@require_POST
+def teilnehmer_ablehnen(request, teilnahme_id):
+    teilnahme = get_object_or_404(Teilnahme, id=teilnahme_id)
+
+    skipper = Teilnahme.objects.filter(
+        user=request.user,
+        toern=teilnahme.toern
+    ).first()
+
+    if not skipper or skipper.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    teilnahme.status = "abgelehnt"
+    teilnahme.boot = None
+    teilnahme.kabine = None
+    teilnahme.save()
+
+    messages.info(request, "Teilnehmer abgelehnt")
+
+    return redirect("skipper_dashboard", toern_id=teilnahme.toern.id)
+
+@login_required
+def boot_dashboard(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=toern
+    ).select_related("boot").first()
+
+    if not teilnahme:
+        raise PermissionDenied
+
+    # 🔥 Basis-Packliste nur einmal erstellen
+    if not teilnahme.persoenliche_packliste.exists():
+        PersönlicherGegenstand.objects.bulk_create([
+            PersönlicherGegenstand(
+                participation=teilnahme,
+                name=name,
+                menge=menge
+            )
+            for name, menge in BASIS_PACKLISTE
+        ])
+
+    # 🔐 Zugriff
+    if not (
+        teilnahme.status == "bestaetigt"
+        and teilnahme.boot
+        and toern.status == "ZUTEILUNG_FIXIERT"
+    ):
+        raise PermissionDenied
+
+    boot = teilnahme.boot
+
+    # 🔥 Standardliste erstellen, wenn leer
+    if not Gegenstand.objects.filter(boot=boot, toern=toern).exists():
+
+        Gegenstand.objects.bulk_create([
+            Gegenstand(
+                boot=boot,
+                toern=toern,
+                name=name,
+                menge=menge
+            )
+            for name, menge in BOOT_STANDARD_LISTE
+        ])
+
+    # 👥 Crew
+    kabinen = boot.kabinen.all()
+
+    kabinen_data = []
+
+    for kabine in kabinen:
+        crew_in_kabine = Teilnahme.objects.filter(
+            toern=toern,
+            boot=boot,
+            kabine=kabine,
+            status="bestaetigt"
+        ).select_related("user")
+
+        kabinen_data.append({
+            "kabine": kabine,
+            "crew": crew_in_kabine
+        })
+
+    packitems = teilnahme.persoenliche_packliste.all()
+
+    total_items = packitems.count()
+    done_items = packitems.filter(erledigt=True).count()
+
+    progress = int((done_items / total_items) * 100) if total_items > 0 else 0
+    
+        # 🎒 Packliste (WICHTIG angepasst)
+    gegenstaende = Gegenstand.objects.filter(
+        boot=boot,
+        toern=toern
+    ).prefetch_related("mitbringer__participation__user").order_by("name")
+
+    # 🛒 Einkauf
+    einkaufsliste = Einkaufspunkt.objects.filter(
+        boot=boot,
+        toern=toern
+    ).select_related("verantwortlich__user")
+
+    for g in gegenstaende:
+        total = sum(m.menge for m in g.mitbringer.all())
+        g.vergeben = total
+        g.offen = max(g.menge - total, 0)
+
+    gegenstaende = sorted(gegenstaende, key=lambda g: g.offen == 0)
+
+    context = {
+        "toern": toern,
+        "boot": boot,
+        "kabinen_data": kabinen_data,
+        "gegenstaende": gegenstaende,
+        "einkaufsliste": einkaufsliste,
+        "teilnahme": teilnahme,
+        "progress": progress,
+        "done_items": done_items,
+        "total_items": total_items,
+    }
+
+    return render(request, "boot/boot_dashboard.html", context)
+
+@login_required
+@require_POST
+def take_gegenstand(request, gegenstand_id):
+
+    gegenstand = get_object_or_404(Gegenstand, id=gegenstand_id)
+
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=gegenstand.toern
+    ).first()
+
+    if not teilnahme:
+        raise PermissionDenied
+
+    menge = int(request.POST.get("menge", 1))
+
+    # 🔥 bereits vergebene Menge
+    total = sum(m.menge for m in gegenstand.mitbringer.all())
+    offen = gegenstand.menge - total
+
+    if offen <= 0:
+        return JsonResponse({"error": "Schon vollständig verteilt"}, status=400)
+
+    if menge > offen:
+        menge = offen
+
+    # 🔁 existiert schon?
+    existing = Mitbringer.objects.filter(
+        gegenstand=gegenstand,
+        participation=teilnahme
+    ).first()
+
+    if existing:
+        existing.menge += menge
+        existing.save()
+    else:
+        Mitbringer.objects.create(
+            gegenstand=gegenstand,
+            participation=teilnahme,
+            menge=menge
+        )
+
+    # 🔥 persönliche Liste sauber updaten
+    item, created = PersönlicherGegenstand.objects.get_or_create(
+        participation=teilnahme,
+        name=gegenstand.name,
+        defaults={
+            "menge": menge,
+            "ist_vom_boot": True
+        }
+    )
+
+    if not created:
+        item.menge += menge
+        item.ist_vom_boot = True
+        item.save()
+
+    return JsonResponse({"status": "ok"})
+
+@login_required
+@require_POST
+def toggle_packitem(request, item_id):
+    item = get_object_or_404(PersönlicherGegenstand, id=item_id)
+
+    if item.participation.user != request.user:
+        raise PermissionDenied
+
+    item.erledigt = not item.erledigt
+    item.save()
+
+    return JsonResponse({
+        "status": "ok",
+        "done": item.erledigt
+    })
+
+@login_required
+@require_POST
+def delete_packitem(request, item_id):
+    item = get_object_or_404(PersönlicherGegenstand, id=item_id)
+
+    if item.participation.user != request.user:
+        raise PermissionDenied
+
+    item.delete()
+
+    return JsonResponse({"status": "ok"})
+
+@login_required
+@require_POST
+def add_packitem(request, toern_id):
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern_id=toern_id
+    ).first()
+
+    if not teilnahme:
+        raise PermissionDenied
+
+    name = request.POST.get("name")
+    menge = request.POST.get("menge") or 1
+
+    PersönlicherGegenstand.objects.create(
+        participation=teilnahme,
+        name=name,
+        menge=int(menge)
+    )
+
+    name = request.POST.get("name")
+    if not name:
+        return JsonResponse({"error": "Name fehlt"}, status=400)
+
+@login_required
+@require_POST
+def update_packitem(request, item_id):
+    item = get_object_or_404(PersönlicherGegenstand, id=item_id)
+
+    if item.participation.user != request.user:
+        raise PermissionDenied
+
+    item.name = request.POST.get("name")
+    item.menge = int(request.POST.get("menge") or 1)
+    item.save()
+
+    return JsonResponse({"status": "ok"})
+
+@login_required
+@require_POST
+def add_boot_item(request, toern_id):
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern_id=toern_id
+    ).first()
+
+    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    name = request.POST.get("name")
+    menge = int(request.POST.get("menge") or 1)
+
+    Gegenstand.objects.create(
+        boot=teilnahme.boot,
+        toern_id=toern_id,
+        name=name,
+        menge=menge
+    )
+
+    return JsonResponse({"status": "ok"})
+
+@login_required
+@require_POST
+def update_boot_item(request, item_id):
+    item = get_object_or_404(Gegenstand, id=item_id)
+
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=item.toern
+    ).first()
+
+    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    item.name = request.POST.get("name")
+    item.menge = int(request.POST.get("menge") or 1)
+    item.save()
+
+    return JsonResponse({"status": "ok"})
+
+@login_required
+@require_POST
+def delete_boot_item(request, item_id):
+    item = get_object_or_404(Gegenstand, id=item_id)
+
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=item.toern
+    ).first()
+
+    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    item.delete()
+
+    return JsonResponse({"status": "ok"})
+
+@login_required
+@require_POST
+def reduce_gegenstand(request, gegenstand_id):
+
+    gegenstand = get_object_or_404(Gegenstand, id=gegenstand_id)
+
+    teilnahme = Teilnahme.objects.filter(
+        user=request.user,
+        toern=gegenstand.toern
+    ).first()
+
+    if not teilnahme:
+        raise PermissionDenied
+
+    menge = int(request.POST.get("menge", 1))
+
+    mitbringer = Mitbringer.objects.filter(
+        gegenstand=gegenstand,
+        participation=teilnahme
+    ).first()
+
+    if not mitbringer:
+        return JsonResponse({"error": "Nicht vorhanden"}, status=400)
+
+    # 🔥 reduzieren
+    if menge >= mitbringer.menge:
+        mitbringer.delete()
+        removed = True
+    else:
+        mitbringer.menge -= menge
+        mitbringer.save()
+        removed = False
+
+    # 🔥 persönliche Liste anpassen
+    item = PersönlicherGegenstand.objects.filter(
+        participation=teilnahme,
+        name=gegenstand.name
+    ).first()
+
+    if item:
+        if removed or item.menge <= menge:
+            item.delete()
+        else:
+            item.menge -= menge
+            item.save()
+
+    return JsonResponse({"status": "ok"})

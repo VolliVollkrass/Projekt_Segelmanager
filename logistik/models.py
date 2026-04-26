@@ -28,3 +28,4 @@ class PersönlicherGegenstand(models.Model):
     name = models.CharField(max_length=200)
     menge = models.PositiveIntegerField(default=1)
     erledigt = models.BooleanField(default=False)
+    ist_vom_boot = models.BooleanField(default=False)

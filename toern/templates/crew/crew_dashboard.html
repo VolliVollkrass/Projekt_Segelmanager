@@ -59,10 +59,14 @@
             </div>
         </div>
 
-        
+        {% if boot_access %}
+            <a href="{% url 'boot_dashboard' toern.id %}" class="btn btn-primary">
+                ⛵ Zum Boot
+            </a>
+        {% endif %}
 
     </div>
-
+    
     <!-- ========================= -->
     <!-- TÖRN DETAILS -->
     <!-- ========================= -->

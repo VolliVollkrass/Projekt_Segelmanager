@@ -1,0 +1,603 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+
+<div class="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
+
+    <!-- ========================= -->
+    <!-- HEADER -->
+    <!-- ========================= -->
+    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
+
+        <div>
+            <h1 class="text-2xl md:text-3xl font-bold">
+                ⛵ {{ boot.name }}
+            </h1>
+            <p class="text-sm opacity-60">
+                {{ toern.titel }}
+            </p>
+        </div>
+
+        <div class="badge badge-outline">
+            {{ boot.anzahl_betten_boot }} Plätze
+        </div>
+
+    </div>
+
+    <!-- ========================= -->
+    <!-- SKIPPER + CREW -->
+    <!-- ========================= -->
+    <div class="grid md:grid-cols-2 gap-6">
+
+        <!-- SKIPPER -->
+        <div class="card bg-base-100 shadow">
+            <div class="card-body">
+                <h2 class="card-title">👨‍✈️ Skipper</h2>
+
+                {% for k in kabinen_data %}
+                    {% for t in k.crew %}
+                        {% if t.rolle == "skipper" or t.rolle == "coskipper" %}
+                            <div class="flex justify-between text-sm py-1">
+                                <span>{{ t.user.first_name }} {{ t.user.last_name }}</span>
+                                <span class="opacity-60">
+                                    {{ t.rolle }}
+                                </span>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endfor %}
+
+            </div>
+        </div>
+
+        <!-- CREW -->
+        <div class="card bg-base-100 shadow">
+            <div class="card-body">
+
+                <h2 class="card-title">🛏 Crew & Kabinen</h2>
+
+                <div class="space-y-4 mt-3">
+
+                    {% for k in kabinen_data %}
+                    <div class="bg-base-200 p-3 rounded-lg">
+
+                        <!-- Kabinen Titel -->
+                        <div class="font-semibold mb-2">
+                            Kabine {{ k.kabine.name }} ({{ k.kabine.betten }} Plätze)
+                        </div>
+
+                        <!-- Crew -->
+                        {% if k.crew %}
+                            <div class="space-y-2 text-sm">
+
+                                {% for t in k.crew %}
+                                
+                                <div class="flex justify-between items-center">
+
+                                    <div>
+                                        {{ t.user.first_name }} {{ t.user.last_name }}
+                                        {% if t.rolle == "skipper" %}
+                                            <span class="badge badge-primary text-xs">Skipper</span>
+                                        {% elif t.rolle == "coskipper" %}
+                                            <span class="badge badge-secondary text-xs">Co-Skipper</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="text-xs opacity-60">
+                                        {{ t.user.telefonnummer|default:"-" }}
+                                    </div>
+
+                                </div>
+                                {% endfor %}
+
+                            </div>
+                        {% else %}
+                            <div class="text-sm opacity-50">
+                                Leer
+                            </div>
+                        {% endif %}
+
+                    </div>
+                    {% endfor %}
+
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================= -->
+    <!-- MEINE PACKLISTE -->
+    <!-- ========================= -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+
+            <div class="flex justify-between items-center">
+                <h2 class="card-title">🎒 Meine Packliste</h2>
+                 <div class="flex flex-col md:flex-row gap-2 items-start md:items-center">
+
+                    <input type="text" id="new-name"
+                        placeholder="Neuer Gegenstand"
+                        class="input input-sm input-bordered">
+
+                    <input type="number" id="new-menge"
+                        value="1"
+                        min="1"
+                        class="input input-sm input-bordered w-20">
+
+                    <button onclick="addItem()"
+                            class="btn btn-sm btn-primary">
+                        + Hinzufügen
+                    </button>
+
+                </div>
+            </div>
+            <p class="text-sm opacity-60">
+                Hier kannst du deine persönliche Packliste verwalten. Füge eigene Gegenstände hinzu, markiere erledigte Items oder gib an, welche Gegenstände du mitbringst. Achtung: Bitte packe lieber zu wenig als zu viel - der Platz auf dem Boot ist begrenzt! Packe alles in eine Tasche, da hartschalen Koffern auf dem Boot nicht verstaut werden können.
+            </p>
+            <div class="mb-3">
+
+                <div class="flex justify-between text-sm mb-1">
+                    <span>Fortschritt</span>
+                    <span id="progress-text">{{ done_items }}/{{ total_items }}</span>
+                </div>
+
+                <progress id="progress-bar"
+                        class="progress progress-success w-full"
+                        value="{{ progress }}"
+                        max="100"></progress>
+
+            </div>
+            <div class="space-y-2 mt-3">
+
+                <!-- Eigene Items -->
+                <div id="packliste" class="space-y-2 mt-3">
+
+                {% for p in teilnahme.persoenliche_packliste.all|dictsortreversed:"ist_vom_boot" %}
+
+                <div id="item-{{ p.id }}"
+                    class="flex justify-between items-center p-2 rounded
+                    {% if p.erledigt %}bg-success/10{% else %}bg-base-200{% endif %}">
+
+                    <!-- LEFT -->
+                    <div class="flex items-center gap-3 w-full">
+
+                        <!-- Checkbox -->
+                        <input type="checkbox"
+                            class="checkbox checkbox-sm"
+                            {% if p.erledigt %}checked{% endif %}
+                            onchange="toggleDone({{ p.id }})">
+
+                        <!-- NAME -->
+                        {% if p.ist_vom_boot %}
+                            <!-- 🔵 Boot Item (NICHT editierbar) -->
+                            <span class="{% if p.erledigt %}line-through text-success opacity-60{% endif %}">
+                                {{ p.name }}
+                            </span>
+                        {% else %}
+                            <!-- 🟢 Eigenes Item -->
+                            <input type="text"
+                                value="{{ p.name }}"
+                                id="name-{{ p.id }}"
+                                class="input input-xs input-bordered w-full max-w-37.5
+                                {% if p.erledigt %}line-through text-success opacity-60{% endif %}">
+                        {% endif %}
+
+                        <!-- MENGE -->
+                        {% if p.ist_vom_boot %}
+                            <span class="text-xs opacity-60">
+                                ({{ p.menge }})
+                            </span>
+                        {% else %}
+                            <input type="number"
+                                value="{{ p.menge }}"
+                                min="1"
+                                id="menge-{{ p.id }}"
+                                class="input input-xs input-bordered w-16
+                                {% if p.erledigt %}text-success opacity-60{% endif %}">
+                        {% endif %}
+
+                        <!-- BADGE -->
+                        {% if p.ist_vom_boot %}
+                            <span class="badge badge-primary text-xs">Boot</span>
+                        {% endif %}
+
+                    </div>
+
+                    <!-- ACTIONS -->
+                    {% if not p.ist_vom_boot %}
+                    <div class="flex gap-1 ml-2">
+
+                        <button onclick="updateItem({{ p.id }})"
+                                class="btn btn-xs btn-primary">
+                            💾
+                        </button>
+
+                        <button onclick="deleteItem({{ p.id }})"
+                                class="btn btn-xs btn-error">
+                            🗑
+                        </button>
+
+                    </div>
+                    {% endif %}
+
+                </div>
+
+                {% endfor %}
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- BOOT PACKLISTE -->
+    <!-- ========================= -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+
+            <h2 class="card-title">📦 Was wird benötigt?</h2>
+
+            <div class="space-y-2 mt-3">
+
+            <!-- ADD -->
+            {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
+            <div class="flex gap-2 mb-3">
+
+                <input id="boot-new-name"
+                    placeholder="Neuer Gegenstand"
+                    class="input input-sm input-bordered w-full">
+
+                <input id="boot-new-menge"
+                    type="number"
+                    value="1"
+                    min="1"
+                    class="input input-sm input-bordered w-20">
+
+                <button onclick="addBootItem()"
+                        class="btn btn-sm btn-primary">
+                    +
+                </button>
+
+            </div>
+            {% endif %}
+
+            <!-- LISTE -->
+            {% for g in gegenstaende %}
+            <div class="bg-base-200 p-3 rounded space-y-2">
+
+                <!-- HEADER -->
+                <div class="flex justify-between items-center">
+
+                    <div class="font-medium">
+                        {{ g.name }}
+                        <span class="text-xs opacity-60">
+                            ({{ g.vergeben }}/{{ g.menge }})
+                        </span>
+                    </div>
+
+                    {% if g.offen == 0 %}
+                        <span class="badge badge-success">Erledigt</span>
+                    {% endif %}
+                </div>
+
+                <!-- MITBRINGER -->
+                <div class="flex gap-1 text-xs flex-wrap">
+                    {% for m in g.mitbringer.all %}
+                        <span class="badge badge-outline">
+                            {{ m.participation.user.first_name }} ({{ m.menge }})
+                        </span>
+                    {% empty %}
+                        <span class="opacity-50">niemand</span>
+                    {% endfor %}
+                </div>
+
+                <!-- ACTION -->
+                {% if g.offen > 0 %}
+                <div class="flex gap-2 items-center">
+
+                    <input type="number"
+                        id="take-{{ g.id }}"
+                        min="1"
+                        max="{{ g.offen }}"
+                        value="1"
+                        class="input input-xs input-bordered w-16">
+
+                    <button onclick="takeItem({{ g.id }})"
+                            class="btn btn-xs btn-primary">
+                        Mitnehmen
+                    </button>
+
+                </div>
+                {% endif %}
+                {% for m in g.mitbringer.all %}
+                    {% if m.participation == teilnahme %}
+                    <div class="flex gap-2 items-center mt-1">
+
+                        <input type="number"
+                            id="reduce-{{ g.id }}"
+                            min="1"
+                            max="{{ m.menge }}"
+                            value="1"
+                            class="input input-xs input-bordered w-16">
+
+                        <button onclick="reduceItem({{ g.id }})"
+                                class="btn btn-xs btn-warning">
+                            Weniger
+                        </button>
+
+                        <button onclick="removeAll({{ g.id }})"
+                                class="btn btn-xs btn-error">
+                            Entfernen
+                        </button>
+
+                    </div>
+                    {% endif %}
+                {% endfor %}
+                <!-- EDIT (nur Skipper) -->
+                {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
+                <div class="flex gap-1">
+
+                    <input type="text"
+                        value="{{ g.name }}"
+                        id="boot-name-{{ g.id }}"
+                        class="input input-xs input-bordered w-full max-w-37.5">
+
+                    <input type="number"
+                        value="{{ g.menge }}"
+                        id="boot-menge-{{ g.id }}"
+                        class="input input-xs input-bordered w-16">
+
+                    <button onclick="updateBootItem({{ g.id }})"
+                            class="btn btn-xs btn-primary">💾</button>
+
+                    <button onclick="deleteBootItem({{ g.id }})"
+                            class="btn btn-xs btn-error">🗑</button>
+
+                </div>
+                {% endif %}
+
+            </div>
+            {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================= -->
+    <!-- BOOTSKASSE -->
+    <!-- ========================= -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body">
+
+            <div class="flex justify-between items-center">
+
+                <h2 class="card-title">💰 Bootskasse</h2>
+
+                <a href="#" class="btn btn-sm btn-primary">
+                    Zum Finanzbereich →
+                </a>
+
+            </div>
+
+            <div class="grid grid-cols-3 gap-4 mt-4 text-center">
+
+                <div>
+                    <div class="text-xs opacity-60">Gesamt</div>
+                    <div class="font-bold">0 €</div>
+                </div>
+
+                <div>
+                    <div class="text-xs opacity-60">Offen</div>
+                    <div class="font-bold">0 €</div>
+                </div>
+
+                <div>
+                    <div class="text-xs opacity-60">Pro Person</div>
+                    <div class="font-bold">0 €</div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- ========================= -->
+<!-- JS -->
+<!-- ========================= -->
+<script>
+function getCSRFToken() {
+    return document.cookie
+        .split('; ')
+        .find(row => row.startsWith('csrftoken='))
+        ?.split('=')[1];
+}
+
+function toggleDone(id) {
+
+    fetch(`/toern/packitem/${id}/toggle/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        const item = document.getElementById(`item-${id}`);
+        const nameInput = document.getElementById(`name-${id}`);
+        const mengeInput = document.getElementById(`menge-${id}`);
+
+        if (data.done) {
+
+            if (nameInput) {
+                nameInput.classList.add("line-through", "text-success", "opacity-60");
+            }
+
+            if (mengeInput) {
+                mengeInput.classList.add("text-success", "opacity-60");
+            }
+
+            item.classList.add("bg-success/10");
+
+        } else {
+
+            if (nameInput) {
+                nameInput.classList.remove("line-through", "text-success", "opacity-60");
+            }
+
+            if (mengeInput) {
+                mengeInput.classList.remove("text-success", "opacity-60");
+            }
+
+            item.classList.remove("bg-success/10");
+        }
+
+        // 🔥 DAS IST DER FIX
+        updateProgress();
+
+    })
+}
+
+function deleteItem(id) {
+    fetch(`/toern/packitem/${id}/delete/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    }).then(() => location.reload());
+}
+
+function addItem() {
+
+    const name = document.getElementById("new-name").value;
+    const menge = document.getElementById("new-menge").value;
+
+    fetch(`/toern/{{ toern.id }}/packitem/add/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `name=${name}&menge=${menge}`
+    })
+    .then(() => location.reload());
+}
+
+function updateItem(id) {
+
+    const name = document.getElementById(`name-${id}`).value;
+    const menge = document.getElementById(`menge-${id}`).value;
+
+    fetch(`/toern/packitem/${id}/update/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `name=${name}&menge=${menge}`
+    })
+}
+function addBootItem() {
+
+    const name = document.getElementById("boot-new-name").value;
+    const menge = document.getElementById("boot-new-menge").value;
+
+    fetch(`/toern/{{ toern.id }}/bootitem/add/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `name=${name}&menge=${menge}`
+    }).then(() => location.reload());
+}
+
+function updateBootItem(id) {
+
+    const name = document.getElementById(`boot-name-${id}`).value;
+    const menge = document.getElementById(`boot-menge-${id}`).value;
+
+    fetch(`/toern/bootitem/${id}/update/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `name=${name}&menge=${menge}`
+    });
+}
+
+function deleteBootItem(id) {
+
+    fetch(`/toern/bootitem/${id}/delete/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken()
+        }
+    }).then(() => location.reload());
+}
+function takeItem(id) {
+
+    const menge = document.getElementById(`take-${id}`).value;
+
+    fetch(`/toern/gegenstand/${id}/take/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `menge=${menge}`
+    })
+    .then(() => location.reload());
+}
+function reduceItem(id) {
+
+    const menge = document.getElementById(`reduce-${id}`).value;
+
+    fetch(`/toern/gegenstand/${id}/reduce/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `menge=${menge}`
+    })
+    .then(() => location.reload());
+}
+
+function removeAll(id) {
+
+    fetch(`/toern/gegenstand/${id}/reduce/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `menge=9999`
+    })
+    .then(() => location.reload());
+}
+function updateProgress() {
+
+    const checkboxes = document.querySelectorAll('#packliste input[type="checkbox"]');
+
+    const total = checkboxes.length;
+    const done = [...checkboxes].filter(cb => cb.checked).length;
+
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+
+    // UI updaten
+    document.getElementById("progress-bar").value = percent;
+    document.getElementById("progress-text").innerText = `${done}/${total}`;
+    
+}
+document.addEventListener("DOMContentLoaded", updateProgress);
+</script>
+
+{% endblock %}

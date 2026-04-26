@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
+{% load dict_tools %}
 
 <div class="max-w-7xl mx-auto p-6 space-y-6">
 
@@ -21,7 +22,12 @@
                     🔄 Reset
                 </button>
             </form>
-
+            <form method="POST" action="{% url 'zuteilung_fixieren' toern.id %}">
+                {% csrf_token %}
+                <button class="btn btn-success">
+                    ✅ Zuteilung abschließen
+                </button>
+            </form>
             <a href="{% url 'crew_dashboard' toern.id %}" class="btn btn-outline">
                 Crew
             </a>
@@ -238,14 +244,42 @@
                 <div class="crew-container grid md:grid-cols-3 gap-3">
 
                     {% for item in unassigned %}
-                    <div class="bg-base-200 p-3 rounded-lg border cursor-move crew-item"
-                         draggable="true"
-                         data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+                    <div class="bg-base-200 p-3 rounded-lg border crew-item flex flex-col gap-2">
 
                         {% for u in item.users %}
-                            <div class="font-medium">
+                        {% with t=teilnahme_map|get_item:u.id %}
+                        
+                        <div class="flex items-center justify-between">
+                            
+                            <!-- Name -->
+                            <div class="font-medium text-sm">
                                 {{ u.first_name }} {{ u.last_name }}
                             </div>
+                            <span class="badge badge-outline text-xs">
+                                {{ t.status }}
+                            </span>
+                            <!-- Actions -->
+                            <div class="flex gap-1">
+
+                                <form method="POST" action="{% url 'teilnehmer_bestaetigen' t.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-success btn-xs px-2">
+                                        ✓
+                                    </button>
+                                </form>
+
+                                <form method="POST" action="{% url 'teilnehmer_ablehnen' t.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-error btn-xs px-2">
+                                        ✕
+                                    </button>
+                                </form>
+
+                            </div>
+
+                        </div>
+
+                        {% endwith %}
                         {% endfor %}
 
                     </div>

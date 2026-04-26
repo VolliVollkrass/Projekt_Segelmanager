@@ -25,3 +25,8 @@ dist/
 
 # Static files (optional je nach Setup)
 staticfiles/
+
+# Sonstiges
+*.bak
+*.tmp
+github.txt
