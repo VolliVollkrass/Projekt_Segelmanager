@@ -20,7 +20,7 @@
 
             <div class="flex flex-wrap gap-2">
 
-                {% if is_skipper %}
+                {% if is_skipper or is_coskipper %}
                     <a href="{% url 'skipper_dashboard' toern.id %}" class="btn btn-secondary btn-sm">
                         Skipper
                     </a>
