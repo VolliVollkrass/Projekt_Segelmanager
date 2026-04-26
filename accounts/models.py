@@ -58,6 +58,7 @@ class User(AbstractUser):
     geschlecht = models.CharField(max_length=10, choices=GESCHLECHT, default="d", blank=True)
     geburtsdatum = models.DateField(null=True, blank=True)
     geburtsort = models.CharField(max_length=100, blank=True)
+    geburtsland = models.CharField(max_length=100, blank=True)
     nationalitaet = models.CharField(max_length=50, blank=True)
 
     identifikationstyp = models.CharField(max_length=100, choices=IDENTIFIKATIONSTYPEN, default="pers")
@@ -66,6 +67,7 @@ class User(AbstractUser):
     strasse = models.CharField(max_length=100, blank=True)
     plz = models.CharField(max_length=5, blank=True)
     ort = models.CharField(max_length=50, blank=True)
+    land = models.CharField(max_length=50, blank=True)
 
     telefonnummer = models.CharField(max_length=20, blank=True)
 

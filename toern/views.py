@@ -1328,6 +1328,9 @@ def teilnahme_daten_edit(request, toern_id):
             user.strasse = form.cleaned_data.get("strasse")
             user.plz = form.cleaned_data.get("plz")
             user.ort = form.cleaned_data.get("ort")
+            user.geburtsland = form.cleaned_data.get("geburtsland")
+            user.land = form.cleaned_data.get("land")
+
 
             user.save()
 
@@ -1342,6 +1345,7 @@ def teilnahme_daten_edit(request, toern_id):
             "telefonnummer": user.telefonnummer,
             "geburtsdatum": user.geburtsdatum.strftime("%Y-%m-%d") if user.geburtsdatum else "",
             "geburtsort": user.geburtsort,
+            "geburtsland": user.geburtsland,
             "nationalitaet": user.nationalitaet,
 
             # 👉 HIER FEHLTE ES
@@ -1351,6 +1355,7 @@ def teilnahme_daten_edit(request, toern_id):
             "strasse": user.strasse,
             "plz": user.plz,
             "ort": user.ort,
+            "land": user.land,
         })
 
     return render(request, "crew/crew_teilnahme_daten.html", {

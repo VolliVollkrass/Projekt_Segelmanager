@@ -206,6 +206,11 @@ class TeilnahmeDetailForm(forms.ModelForm):
         widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
     )
 
+    geburtsland = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
     nationalitaet = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
@@ -240,6 +245,11 @@ class TeilnahmeDetailForm(forms.ModelForm):
     )
 
     ort = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
+    land = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
     )
