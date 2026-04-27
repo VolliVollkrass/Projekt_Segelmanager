@@ -16,11 +16,17 @@ class Gegenstand(models.Model):
     toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="gegenstaende")
     name = models.CharField(max_length=200)
     menge = models.PositiveIntegerField(default=1)
+    
+    def __str__(self):
+        return f"{self.name} ({self.menge}) - {self.boot.name} / {self.toern.titel}"
 
 class Mitbringer(models.Model):
     gegenstand = models.ForeignKey(Gegenstand, on_delete=models.CASCADE, related_name="mitbringer")
     participation = models.ForeignKey(Teilnahme, on_delete=models.CASCADE)
     menge = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.participation.user.username} bringt {self.menge}x {self.gegenstand.name} mit"
 
 # Persönliche Packliste
 class PersönlicherGegenstand(models.Model):
@@ -29,3 +35,6 @@ class PersönlicherGegenstand(models.Model):
     menge = models.PositiveIntegerField(default=1)
     erledigt = models.BooleanField(default=False)
     ist_vom_boot = models.BooleanField(default=False)
+
+    def __str__(self):        
+        return f"Von {self.participation.user.username}: {self.name} ({self.menge})  - {'vom Boot' if self.ist_vom_boot else 'persönlich'}"

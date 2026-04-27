@@ -1769,3 +1769,208 @@ def reduce_gegenstand(request, gegenstand_id):
             item.save()
 
     return JsonResponse({"status": "ok"})
+
+
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, A4
+from django.http import HttpResponse
+from datetime import date
+from reportlab.platypus import Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+
+def crewlist_pdf(request, boot_id):
+
+    boot = Boot.objects.select_related("toern").get(id=boot_id)
+    toern = boot.toern
+
+    teilnahmen = Teilnahme.objects.filter(
+        boot=boot,
+        status__in=["angemeldet", "bestaetigt"]
+    ).select_related("user")
+
+    # =========================
+    # SORTIERUNG
+    # =========================
+    def sort_key(t):
+        if t.rolle == "skipper":
+            return (0, "")
+        elif t.rolle == "coskipper":
+            return (1, "")
+        return (2, t.user.last_name.lower())
+
+    teilnahmen = sorted(teilnahmen, key=sort_key)
+
+    # =========================
+    # RESPONSE
+    # =========================
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'inline; filename="crewlist_{boot.name}.pdf"'
+
+    doc = SimpleDocTemplate(
+        response,
+        pagesize=landscape(A4),
+        rightMargin=15,
+        leftMargin=15,
+        topMargin=15,
+        bottomMargin=15
+    )
+
+    elements = []
+    styles = getSampleStyleSheet()
+
+    small_style = styles["Normal"]
+    small_style.fontSize = 8
+    small_style.leading = 9  # Zeilenabstand
+    # =========================
+    # HEADER (wie Vorlage)
+    # =========================
+    start = toern.startdatum.strftime("%d.%m.%Y")
+    end = toern.enddatum.strftime("%d.%m.%Y")
+    header_data = [
+        
+
+        ["CREW LIST / CREWLISTE  -  {} | {} - {}".format(toern.titel, start, end), "", "", ""],
+        ["Name of Yacht", boot.name, "Home port", boot.hafen or ""],
+        ["Registration number", "", "Country of registration", ""],
+        ["Call Sign", "", "", ""],
+    ]
+
+    header_table = Table(header_data, colWidths=[120, 200, 150, 200])
+
+    header_table.setStyle(TableStyle([
+        ("GRID", (0,0), (-1,-1), 0.5, colors.black),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("SPAN", (0,0), (-1,0)),
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+    ]))
+
+    elements.append(header_table)
+    elements.append(Spacer(1, 12))
+
+    # =========================
+    # HILFSFUNKTIONEN
+    # =========================
+    def calc_age(birthdate):
+        today = date.today()
+        return (
+            today.year - birthdate.year -
+            ((today.month, today.day) < (birthdate.month, birthdate.day))
+        )
+
+    def has_birthday_in_toern(birthdate):
+        if not birthdate:
+            return False
+
+        start = toern.startdatum.date()
+        end = toern.enddatum.date()
+
+        bday_this_year = birthdate.replace(year=start.year)
+
+        return start <= bday_this_year <= end
+
+    def ident_label(code):
+        return dict(User.IDENTIFIKATIONSTYPEN).get(code, code)
+
+    def role_label(code):
+        return dict(Teilnahme.ROLE_CHOICES).get(code, code)
+
+    # =========================
+    # TABELLE
+    # =========================
+    data = [[
+        "Nr",
+        "Surname, first name",
+        "Place and date of birth",
+        "Identification",
+        "Passport number",
+        "Nationality",
+        "Address",
+        "Rank"
+    ]]
+
+    for i, t in enumerate(teilnahmen, start=1):
+        u = t.user
+
+        birth_field = ""
+
+        if u.geburtsdatum:
+            birth_str = u.geburtsdatum.strftime("%d.%m.%Y")
+            age = calc_age(u.geburtsdatum)
+
+            cake = " *" if has_birthday_in_toern(u.geburtsdatum) else ""
+
+            birth_field = f"{birth_str} ({age}){cake}"
+
+        if u.geburtsland and birth_field:
+            birth_field = f"{u.geburtsland}\n{birth_field}"
+        elif u.geburtsland:
+            birth_field = u.geburtsland
+        elif birth_field:
+            pass  # nur Datum anzeigen
+        else:
+            birth_field = ""
+
+        data.append([
+            i,
+            Paragraph(
+                f"{u.last_name}<br/>{u.first_name}",
+                small_style
+            ) if (u.last_name or u.first_name) else "",
+            Paragraph(birth_field.replace("\n", "<br/>"), small_style) if birth_field else "",
+            ident_label(u.identifikationstyp) if u.identifikationstyp else "",
+            u.passnummer or "",
+            u.nationalitaet or "",
+            Paragraph(
+                f"{u.strasse}<br/>{u.plz} {u.ort}",
+                small_style
+            ) if (u.strasse or u.plz or u.ort) else "",
+            role_label(t.rolle)
+        ])
+
+    table = Table(data, repeatRows=1, colWidths=[
+        25,   # Nr
+        120,  # Name
+        150,  # Birth
+        90,   # ID
+        90,   # Passport
+        80,   # Nation
+        140,  # Address
+        80    # Role
+    ])
+
+    table.setStyle(TableStyle([
+        ("GRID", (0,0), (-1,-1), 0.25, colors.black),
+        ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+        ("FONTNAME", (0,0), (-1,0), "Helvetica-Bold"),
+        ("FONTSIZE", (0,0), (-1,-1), 8),  # 👈 kleiner = passt sicher
+        ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+    ]))
+
+    elements.append(table)
+    elements.append(Spacer(1, 50))
+
+    signature_table = Table([
+        ["", "", ""],
+        ["Signature Skipper", "", "Signature Co-Skipper"]
+    ], colWidths=[250, 100, 250])
+
+    signature_table.setStyle(TableStyle([
+        ("LINEABOVE", (0,0), (0,0), 0.5, colors.black),
+        ("LINEABOVE", (2,0), (2,0), 0.5, colors.black),
+        ("ALIGN", (0,1), (-1,-1), "CENTER"),
+    ]))
+
+    elements.append(signature_table)
+
+    elements.append(Spacer(1, 10))
+
+    legend = Table([
+        ["* Hat Geburtstag während des Törns!"],
+    ], colWidths=[300])
+
+    elements.append(legend)
+    doc.build(elements)
+
+    return response

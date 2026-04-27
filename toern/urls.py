@@ -34,4 +34,5 @@ urlpatterns = [
     path("bootitem/<int:item_id>/update/", update_boot_item, name="update_boot_item"),
     path("bootitem/<int:item_id>/delete/", delete_boot_item, name="delete_boot_item"),
     path("gegenstand/<int:gegenstand_id>/reduce/", reduce_gegenstand, name="reduce_gegenstand"),
+    path("crewlist/<int:boot_id>/pdf/", crewlist_pdf, name="crewlist_pdf"),
 ]

@@ -154,7 +154,13 @@
 
             <div class="card-body">
                 <h2 class="card-title">{{ boot.boot.name }}</h2>
-
+                <a href="{% url 'crewlist_pdf' boot.boot.id %}" 
+                    class="btn btn-sm btn-outline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn-sm btn-outline">
+                    📄 Crewliste
+                </a>
                 {% for k in boot.kabinen %}
                 <div class="bg-base-200 p-4 rounded-xl mb-4 dropzone"
                      data-kabine-id="{{ k.kabine.id }}">
