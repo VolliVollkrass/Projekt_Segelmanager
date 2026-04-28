@@ -250,7 +250,9 @@
                 <div class="crew-container grid md:grid-cols-3 gap-3">
 
                     {% for item in unassigned %}
-                    <div class="bg-base-200 p-3 rounded-lg border crew-item flex flex-col gap-2">
+                    <div class="bg-base-200 p-3 rounded-lg border crew-item flex flex-col gap-2"
+                        draggable="true"
+                        data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
 
                         {% for u in item.users %}
                         {% with t=teilnahme_map|get_item:u.id %}
@@ -708,6 +710,46 @@ function submitAutoAssign() {
         alert("Serverfehler");
     });
 }
+let selectedItem = null;
 
+// Tap auf Item (Mobile)
+document.addEventListener("click", e => {
+
+    const item = e.target.closest(".crew-item");
+
+    if (item) {
+        selectedItem = item;
+
+        document.querySelectorAll(".crew-item").forEach(i =>
+            i.classList.remove("ring", "ring-primary")
+        );
+
+        item.classList.add("ring", "ring-primary");
+    }
+});
+
+// Tap auf Dropzone
+document.querySelectorAll('.dropzone').forEach(zone => {
+
+    zone.addEventListener('click', () => {
+
+        if (!selectedItem) return;
+
+        const container = zone.querySelector('.crew-container');
+        if (!container) return;
+
+        container.appendChild(selectedItem);
+
+        const bootZone = zone.closest('.boot-zone');
+        if (bootZone) checkConflictsForBoot(bootZone);
+
+        saveAssignment(selectedItem, zone)
+            .catch(() => alert("Speichern fehlgeschlagen"));
+
+        selectedItem.classList.remove("ring", "ring-primary");
+        selectedItem = null;
+    });
+
+});
 </script>
 {% endblock %}

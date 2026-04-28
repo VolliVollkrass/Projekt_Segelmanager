@@ -1,6 +1,9 @@
+import os
+
 from django.shortcuts import render, get_object_or_404, redirect
 
 from boote.models import Boot, Kabine
+from config import settings
 from logistik.models import Einkaufspunkt, Gegenstand, Mitbringer, PersönlicherGegenstand
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
@@ -640,9 +643,16 @@ def skipper_dashboard(request, toern_id):
     for t in teilnahmen:
         t.partner = pair_lookup.get(t.user.id)
 
-    # 👉 Fortschritt auf User spiegeln
+    # 👉 Fortschritt sauber zentral setzen
     for t in teilnahmen:
         t.user.fortschritt = t.fortschritt
+
+    # 🔥 Partner absichern
+    for t in teilnahmen:
+        if t.partner:
+            partner_t = teilnahme_map.get(t.partner.id)
+            if partner_t:
+                t.partner.fortschritt = partner_t.fortschritt
 
     # =========================
     # 4. Präferenzen
@@ -708,6 +718,12 @@ def skipper_dashboard(request, toern_id):
                     continue
 
                 if t.partner:
+                    partner_t = teilnahme_map.get(t.partner.id)
+
+                    # 🔥 Fortschritt sicher setzen
+                    t.user.fortschritt = t.fortschritt
+                    t.partner.fortschritt = partner_t.fortschritt if partner_t else 0
+
                     crew.append({
                         "type": "pair",
                         "users": [t.user, t.partner]
@@ -742,6 +758,11 @@ def skipper_dashboard(request, toern_id):
             continue
 
         if t.partner:
+            partner_t = teilnahme_map.get(t.partner.id)
+
+            t.user.fortschritt = t.fortschritt
+            t.partner.fortschritt = partner_t.fortschritt if partner_t else 0
+
             unassigned.append({
                 "type": "pair",
                 "users": [t.user, t.partner]
@@ -1771,7 +1792,7 @@ def reduce_gegenstand(request, gegenstand_id):
     return JsonResponse({"status": "ok"})
 
 
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, A4
 from django.http import HttpResponse
@@ -1812,7 +1833,7 @@ def crewlist_pdf(request, boot_id):
         pagesize=landscape(A4),
         rightMargin=15,
         leftMargin=15,
-        topMargin=15,
+        topMargin=35,
         bottomMargin=15
     )
 
@@ -1859,6 +1880,8 @@ def crewlist_pdf(request, boot_id):
             ((today.month, today.day) < (birthdate.month, birthdate.day))
         )
 
+    icon_path = os.path.join(settings.BASE_DIR, "static/medien/icons/cake.png")
+
     def has_birthday_in_toern(birthdate):
         if not birthdate:
             return False
@@ -1893,24 +1916,28 @@ def crewlist_pdf(request, boot_id):
     for i, t in enumerate(teilnahmen, start=1):
         u = t.user
 
-        birth_field = ""
+        birth_text = ""
 
         if u.geburtsdatum:
             birth_str = u.geburtsdatum.strftime("%d.%m.%Y")
             age = calc_age(u.geburtsdatum)
 
-            cake = " *" if has_birthday_in_toern(u.geburtsdatum) else ""
+            # 🎂 Inline Image
+            cake_html = ""
+            if has_birthday_in_toern(u.geburtsdatum):
+                cake_html = f'&nbsp; <img src="{icon_path}" width="10" height="10"/>'
 
-            birth_field = f"{birth_str} ({age}){cake}"
+            birth_text = f"{birth_str} ({age}){cake_html}"
 
-        if u.geburtsland and birth_field:
-            birth_field = f"{u.geburtsland}\n{birth_field}"
+        # Geburtsland kombinieren
+        if u.geburtsland and birth_text:
+            full_text = f"{u.geburtsland}<br/>{birth_text}"
         elif u.geburtsland:
-            birth_field = u.geburtsland
-        elif birth_field:
-            pass  # nur Datum anzeigen
+            full_text = u.geburtsland
         else:
-            birth_field = ""
+            full_text = birth_text
+
+        birth_cell = Paragraph(full_text, small_style) if full_text else ""
 
         data.append([
             i,
@@ -1918,7 +1945,7 @@ def crewlist_pdf(request, boot_id):
                 f"{u.last_name}<br/>{u.first_name}",
                 small_style
             ) if (u.last_name or u.first_name) else "",
-            Paragraph(birth_field.replace("\n", "<br/>"), small_style) if birth_field else "",
+            birth_cell,
             ident_label(u.identifikationstyp) if u.identifikationstyp else "",
             u.passnummer or "",
             u.nationalitaet or "",
@@ -1966,11 +1993,7 @@ def crewlist_pdf(request, boot_id):
 
     elements.append(Spacer(1, 10))
 
-    legend = Table([
-        ["* Hat Geburtstag während des Törns!"],
-    ], colWidths=[300])
-
-    elements.append(legend)
+    
     doc.build(elements)
 
     return response

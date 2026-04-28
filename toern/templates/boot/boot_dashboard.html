@@ -116,28 +116,33 @@
 
             <div class="flex justify-between items-center">
                 <h2 class="card-title">🎒 Meine Packliste</h2>
-                 <div class="flex flex-col md:flex-row gap-2 items-start md:items-center">
-
-                    <input type="text" id="new-name"
-                        placeholder="Neuer Gegenstand"
-                        class="input input-sm input-bordered">
-
-                    <input type="number" id="new-menge"
-                        value="1"
-                        min="1"
-                        class="input input-sm input-bordered w-20">
-
-                    <button onclick="addItem()"
-                            class="btn btn-sm btn-primary">
-                        + Hinzufügen
-                    </button>
-
-                </div>
+                 
             </div>
-            <p class="text-sm opacity-60">
-                Hier kannst du deine persönliche Packliste verwalten. Füge eigene Gegenstände hinzu, markiere erledigte Items oder gib an, welche Gegenstände du mitbringst. <br>
-                <strong>Achtung: Grundsätzlich ist der Platz auf einem Segelboot sehr begrenzt. Daher sollte gut überlegt werden, was wirklich notwendig ist.</strong> Auf keinen Fall sollten Schalenkoffer mitgenommen werden, sondern ausschließlich faltbare Taschen. Diese können während der Fahrt in engen Schränken verstaut werden.
-            </p>
+            <div class="space-y-4">
+                <div class="alert bg-primary shadow-sm">
+                    <div class="text-sm text-primary-content">
+                    <span class="font-semibold block mb-1">Wichtiger Hinweis zur Packliste</span>
+                    Auf einem Segelboot ist der Platz stark begrenzt. Überlege daher genau, was du wirklich benötigst.<br>
+                    <strong>Hartschalenkoffer sind nicht erlaubt</strong> – bitte bring ausschließlich <strong>faltbare Reisetaschen</strong> mit. 
+                    Diese lassen sich während der Fahrt platzsparend verstauen.
+                    </div>
+                </div>
+
+                <div class="alert bg-secondary shadow-sm">
+                    <div class="text-sm text-secondary-content">
+                    <span class="font-semibold block mb-1">Kleiderwahl an Bord</span>
+                    Orientiere dich am Wetterbericht, aber beachte: Durch den Fahrtwind fühlt es sich deutlich kühler an. 
+                    Ziehe daher etwa <strong>10&nbsp;°C von der vorhergesagten Temperatur ab</strong>.
+                    <br><br>
+                    <strong>Beispiel:</strong>
+                    23&nbsp;°C laut Wetterbericht &rarr; ca. 13&nbsp;°C an Bord als realistischer Richtwert.
+                    </div>
+                </div>
+
+                <p class="text-sm opacity-60">
+                    Hier kannst du deine persönliche Packliste verwalten. Füge eigene Gegenstände hinzu, markiere erledigte Items oder gib an, welche Gegenstände du mitbringst.
+                </p>
+            </div>
             <div class="mb-3">
 
                 <div class="flex justify-between text-sm mb-1">
@@ -149,6 +154,23 @@
                         class="progress progress-success w-full"
                         value="{{ progress }}"
                         max="100"></progress>
+
+            </div>
+            <div class="flex flex-col md:flex-row gap-2 items-start md:items-center ">
+
+                <input type="text" id="new-name"
+                    placeholder="Neuer Gegenstand"
+                    class="input input-sm input-bordered">
+
+                <input type="number" id="new-menge"
+                    value="1"
+                    min="1"
+                    class="input input-sm input-bordered w-20">
+
+                <button onclick="addItem()"
+                        class="btn btn-sm btn-primary">
+                    + Hinzufügen
+                </button>
 
             </div>
             <div class="space-y-2 mt-3">
@@ -182,13 +204,13 @@
                             <input type="text"
                                 value="{{ p.name }}"
                                 id="name-{{ p.id }}"
-                                class="input input-xs input-bordered w-full max-w-37.5
+                                class="input input-md input-bordered w-full
                                 {% if p.erledigt %}line-through text-success opacity-60{% endif %}">
                         {% endif %}
 
                         <!-- MENGE -->
                         {% if p.ist_vom_boot %}
-                            <span class="text-xs opacity-60">
+                            <span class="text-md text-center opacity-60">
                                 ({{ p.menge }})
                             </span>
                         {% else %}
@@ -196,7 +218,7 @@
                                 value="{{ p.menge }}"
                                 min="1"
                                 id="menge-{{ p.id }}"
-                                class="input input-xs input-bordered w-16
+                                class="input input-md text-center input-bordered w-16
                                 {% if p.erledigt %}text-success opacity-60{% endif %}">
                         {% endif %}
 
