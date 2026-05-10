@@ -16,8 +16,8 @@
             {% include "includes/nav.html" %}
         </div>
     </nav>
-    
-    <main class="">
+
+    <main class="pb-20 lg:pb-0">
         {% if messages %}
         <div class="">
             {% for message in messages %}
@@ -29,16 +29,18 @@
         {% endif %}
         <div class="">
             {% block content %}
-            
+
             {% endblock %}
         </div>
     </main>
 
-    <footer>
+    <footer class="lg:block hidden">
         <div>
             {% include "includes/footer.html" %}
         </div>
     </footer>
+
+    {% include "includes/bottom_nav.html" %}
     <script src="https://unpkg.com/cropperjs"></script>
   </body>
 </html>
