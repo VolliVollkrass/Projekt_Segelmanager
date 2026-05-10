@@ -17,9 +17,10 @@
                  alt="Profilbild" class="w-32 h-32 rounded-full object-cover border mb-2">
           </a>
         {% else %}
-          <img id="profilbild-preview"
-               src="https://api.dicebear.com/7.x/initials/svg?seed={{ user.first_name }}"
-               alt="Profilbild" class="w-32 h-32 rounded-full object-cover border mb-2">
+          <div id="profilbild-placeholder" class="w-32 h-32 rounded-full bg-primary flex items-center justify-center text-primary-content font-bold text-3xl select-none mb-2">
+              {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+          </div>
+          <img id="profilbild-preview" src="" alt="Profilbild" class="w-32 h-32 rounded-full object-cover border mb-2 hidden">
         {% endif %}
         
       </div>
@@ -142,6 +143,11 @@
     if (!file) return;
 
     const url = URL.createObjectURL(file);
+
+    // Placeholder ausblenden, Vorschau einblenden
+    const placeholder = document.getElementById("profilbild-placeholder");
+    if (placeholder) placeholder.classList.add("hidden");
+    profilbildPreview.classList.remove("hidden");
 
     profilbildPreview.src = url;
 

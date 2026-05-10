@@ -1,9 +1,38 @@
 from django.shortcuts import render
+from django.db.models import Count, Sum, OuterRef, Subquery, IntegerField, Q
+from django.db.models.functions import Coalesce
 from toern.models import Toern, Teilnahme
+from boote.models import Kabine
+
 
 def index(request):
-    # Nur Törns mit Status 'ANMELDUNG_OFFEN' oder 'VEROEFFENTLICHT'
-    toerns = Toern.objects.filter(status__in=['ANMELDUNG_OFFEN', 'VEROEFFENTLICHT']).order_by('startdatum')
+    # Subquery: belegte Plätze pro Törn (1 DB-Query für alle Törns)
+    belegte_sq = (
+        Teilnahme.objects
+        .filter(toern=OuterRef('pk'), status__in=['angemeldet', 'bestaetigt'])
+        .values('toern')
+        .annotate(n=Count('pk'))
+        .values('n')[:1]
+    )
+
+    # Subquery: Gesamtplätze pro Törn aus Kabinen (1 DB-Query für alle Törns)
+    gesamtplaetze_sq = (
+        Kabine.objects
+        .filter(boot__toern=OuterRef('pk'))
+        .values('boot__toern')
+        .annotate(total=Sum('betten'))
+        .values('total')[:1]
+    )
+
+    toerns = (
+        Toern.objects
+        .filter(status__in=['ANMELDUNG_OFFEN', 'VEROEFFENTLICHT'])
+        .annotate(
+            _belegte_plaetze=Coalesce(Subquery(belegte_sq, output_field=IntegerField()), 0),
+            _gesamtplaetze=Coalesce(Subquery(gesamtplaetze_sq, output_field=IntegerField()), 0),
+        )
+        .order_by('startdatum')
+    )
 
     user_teilnahme = None
     if request.user.is_authenticated:
@@ -12,10 +41,7 @@ def index(request):
             toern__in=toerns
         ).first()
 
-    rtx = {
+    return render(request, 'home/index.html', {
         'toerns': toerns,
         'user_teilnahme': user_teilnahme,
-    }
-
-    return render(request, 'home/index.html', rtx)
-
+    })

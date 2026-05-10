@@ -13,7 +13,9 @@
                     {% if user.profilbild %}
                         <img src="{{ user.profilbild.url }}" alt="Profilbild">
                     {% else %}
-                        <img src="https://api.dicebear.com/7.x/initials/svg?seed={{ user.first_name }}+{{ user.last_name }}" alt="Avatar">
+                        <div class="w-full h-full rounded-full bg-primary flex items-center justify-center text-primary-content font-bold text-xl select-none">
+                            {{ user.first_name|first|upper }}{{ user.last_name|first|upper }}
+                        </div>
                     {% endif %}
                 </div>
             </div>

@@ -50,16 +50,14 @@ def toern_detail(request, pk):
     # optional: alle Boote des Törns laden
     boote = toern.boote.all()
 
-    # Skipper pro Boot
-    skipper_pro_boot = {
-        boot.id: Teilnahme.objects.filter(
-            toern=toern,
-            boot=boot,
-            rolle="skipper",
-            status__in=["angemeldet", "bestaetigt"]
-        ).select_related("user").first()
-        for boot in boote
-    }
+    # Skipper pro Boot — 1 Query für alle Boote statt 1 pro Boot
+    skippers = Teilnahme.objects.filter(
+        toern=toern,
+        boot__in=boote,
+        rolle="skipper",
+        status__in=["angemeldet", "bestaetigt"]
+    ).select_related("user")
+    skipper_pro_boot = {s.boot_id: s for s in skippers}
 
     user_teilnahme = None
 
@@ -170,11 +168,14 @@ def toern_anmeldung(request, pk):
 @anbieter_required
 def anbieter_dashboard(request):
 
-    toerns = Toern.objects.filter(anbieter=request.user).order_by("-startdatum")
+    toerns = (
+        Toern.objects
+        .filter(anbieter=request.user)
+        .order_by("-startdatum")
+        .prefetch_related("boote__kabinen", "teilnahmen__user", "teilnahmen__boot")
+    )
 
-    ctx = {
-        "toerns": toerns.prefetch_related("boote__kabinen")
-    }
+    ctx = {"toerns": toerns}
 
     return render(request, "toern/anbieter_dashboard.html", ctx)
 
@@ -1245,20 +1246,22 @@ def auto_assign(request, toern_id):
         best["used"] += g["size"]
 
     # =========================
-    # 8. BOOT SPEICHERN
+    # 8. BOOT SPEICHERN (bulk — 2 Queries statt N)
     # =========================
     Teilnahme.objects.filter(toern=toern).update(boot=None)
 
+    teilnahme_map_for_save = {t.user.id: t for t in teilnahmen}
     for state in boot_state.values():
         for g in state["groups"]:
             for u in g["users"]:
-                Teilnahme.objects.filter(
-                    toern=toern,
-                    user=u
-                ).update(boot=state["boot"])
+                t = teilnahme_map_for_save.get(u.id)
+                if t:
+                    t.boot = state["boot"]
+
+    Teilnahme.objects.bulk_update(list(teilnahme_map_for_save.values()), ["boot"])
 
     # =========================
-    # 9. KABINEN ZUWEISUNG
+    # 9. KABINEN ZUWEISUNG (bulk — 2 Queries statt N)
     # =========================
     Teilnahme.objects.filter(toern=toern).update(kabine=None)
 
@@ -1291,13 +1294,13 @@ def auto_assign(request, toern_id):
                 for u in g["users"]:
                     unassigned.append(u)
 
-        # speichern
         for k in kabinen_state:
             for u in k["users"]:
-                Teilnahme.objects.filter(
-                    toern=toern,
-                    user=u
-                ).update(kabine=k["kabine"])
+                t = teilnahme_map_for_save.get(u.id)
+                if t:
+                    t.kabine = k["kabine"]
+
+    Teilnahme.objects.bulk_update(list(teilnahme_map_for_save.values()), ["kabine"])
 
     return JsonResponse({
         "status": "ok",

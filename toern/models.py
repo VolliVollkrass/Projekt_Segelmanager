@@ -67,18 +67,18 @@ class Toern(models.Model):
     
     @property
     def gesamtplaetze(self):
-        """
-        Berechnet die Gesamtzahl aller Betten der Boote, die diesem Törn zugeordnet sind.
-        """
+        # Use annotation from queryset if available (avoids extra DB query)
+        if hasattr(self, '_gesamtplaetze'):
+            return self._gesamtplaetze
         return self.boote.aggregate(
             total=Sum('kabinen__betten')
         )['total'] or 0
 
     @property
     def freie_plaetze(self):
-        """
-        Berechnet die noch freien Plätze anhand der Gesamtplätze minus angemeldete Teilnehmer.
-        """
+        # Use annotations from queryset if available (avoids 2 extra DB queries per toern)
+        if hasattr(self, '_gesamtplaetze') and hasattr(self, '_belegte_plaetze'):
+            return max(0, self._gesamtplaetze - self._belegte_plaetze)
         belegte_plaetze = self.teilnahmen.filter(status__in=['angemeldet', 'bestaetigt']).count()
         return max(0, self.gesamtplaetze - belegte_plaetze)
     
