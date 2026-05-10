@@ -1,225 +1,146 @@
 {% extends "base.html" %}
+{% block title %}Anbieter Dashboard{% endblock %}
 
 {% block content %}
+<div class="max-w-4xl mx-auto px-4 py-6 space-y-5">
 
-<div class="max-w-6xl mx-auto p-6 space-y-6">
-
-    <!-- HEADER -->
-    <div class="flex justify-between items-center">
-        <h1 class="text-3xl font-bold">⚓ Meine Törns</h1>
-
-        <a href="{% url 'toern_create' %}" class="btn btn-primary">
-            + Neuer Törn
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold">Meine Törns</h1>
+            <p class="text-sm text-base-content/50 mt-0.5">Verwalte deine Angebote</p>
+        </div>
+        <a href="{% url 'toern_create' %}" class="btn btn-primary btn-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Neuer Törn
         </a>
     </div>
 
-    <!-- TÖRNS -->
-    <div class="grid md:grid-cols-2 gap-6">
+    <!-- Törn-Liste -->
+    {% for toern in toerns %}
+    <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden shadow-sm">
 
-        {% for toern in toerns %}
-        <div class="card bg-base-100 shadow">
+        {% if toern.bild_toern %}
+        <img src="{{ toern.bild_toern.url }}" class="h-40 w-full object-cover">
+        {% endif %}
 
-            {% if toern.bild_toern %}
-            <figure>
-                <img src="{{ toern.bild_toern.url }}" class="h-48 w-full object-cover">
-            </figure>
-            {% endif %}
+        <div class="p-5 space-y-4">
 
-            <div class="card-body">
-
-                <!-- HEADER -->
-                <h2 class="card-title">{{ toern.titel }}</h2>
-
-                <p class="text-sm opacity-70">
-                    {{ toern.startdatum|date:"d.m.Y" }} - {{ toern.enddatum|date:"d.m.Y" }}
-                </p>
-
-                <p>{{ toern.revier }}</p>
-
-                {% url 'toern_detail' toern.id as detail_url %}
-                <a 
-                href="mailto:
-                ?subject=Einladung zum Törn: {{ toern.titel|urlencode }}
-                &body=Hallo,%0D%0A%0D%0Aich möchte dich herzlich zu folgendem Segeltörn einladen:%0D%0A%0D%0A{{ toern.titel|urlencode }}%0D%0ARevier: {{ toern.revier|urlencode }}%0D%0AStart: {{ toern.startdatum|date:'d.m.Y'|urlencode }}%0D%0A%0D%0AHier findest du alle Details:%0D%0A{{ request.scheme }}://{{ request.get_host }}{{ detail_url }}%0D%0A%0D%0AViele Grüße"
-                class="btn btn-outline"
-                >
-                    Einladung senden 📧
-                </a>
-
-                <!-- ========================= -->
-                <!-- BOOTE -->
-                <!-- ========================= -->
-                <div class="mt-4 border-t pt-4 space-y-3">
-
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-semibold">Boote</h3>
-
-                        <a href="{% url 'boot_create' toern.id %}" class="btn btn-xs btn-primary">
-                            + Boot
-                        </a>
-                    </div>
-
-                    {% for boot in toern.boote.all %}
-                    <div class="bg-base-200 p-4 rounded-xl space-y-3">
-
-                        <!-- Boot Header -->
-                        <div class="flex justify-between items-center">
-                            <div>
-                                <div class="font-semibold text-lg">
-                                    {{ boot.name }}
-                                </div>
-                                <div class="text-xs opacity-70">
-                                    {{ boot.typ }} | {{ boot.charterunternehmen }}
-                                </div>
-                            </div>
-
-                            <a href="{% url 'boot_update' boot.id %}" class="btn btn-xs">
-                                Bearbeiten
-                            </a>
-                        </div>
-
-                        <div class="text-xs opacity-70">
-                            {{ boot.kabinen.count }} Kabinen |
-                            {{ boot.anzahl_betten_boot }} Betten
-                        </div>
-
-                        <!-- ========================= -->
-                        <!-- AKTUELLE ZUWEISUNG -->
-                        <!-- ========================= -->
-                        <div class="flex flex-wrap gap-2">
-
-                            {% for t in toern.teilnahmen.all %}
-                                {% if t.boot == boot and t.rolle == "skipper" %}
-                                    <span class="badge badge-primary">
-                                        👨‍✈️ {{ t.user.first_name }} {{ t.user.last_name }}
-                                    </span>
-                                {% endif %}
-
-                                {% if t.boot == boot and t.rolle == "coskipper" %}
-                                    <span class="badge badge-secondary">
-                                        🧭 {{ t.user.first_name }} {{ t.user.last_name }}
-                                    </span>
-                                {% endif %}
-                            {% endfor %}
-
-                        </div>
-
-                        <!-- ========================= -->
-                        <!-- SKIPPER ZUWEISUNG -->
-                        <!-- ========================= -->
-                        <form method="POST"
-                              action="{% url 'boot_skipper_assign' boot.id %}"
-                              class="grid grid-cols-1 md:grid-cols-2 gap-2">
-
-                            {% csrf_token %}
-
-                            <!-- Skipper -->
-                            <select name="skipper_id"
-                                    class="select select-bordered select-sm w-full">
-
-                                <option value="">-- Skipper wählen --</option>
-
-                                {% for t in toern.teilnahmen.all %}
-                                    <option value="{{ t.user.id }}"
-                                        {% if t.boot == boot and t.rolle == "skipper" %}selected{% endif %}>
-                                        {{ t.user.first_name }} {{ t.user.last_name }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-
-                            <!-- Co-Skipper -->
-                            <select name="coskipper_id"
-                                    class="select select-bordered select-sm w-full">
-
-                                <option value="">-- Co-Skipper wählen --</option>
-
-                                {% for t in toern.teilnahmen.all %}
-                                    <option value="{{ t.user.id }}"
-                                        {% if t.boot == boot and t.rolle == "coskipper" %}selected{% endif %}>
-                                        {{ t.user.first_name }} {{ t.user.last_name }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-
-                            <button class="btn btn-primary btn-sm col-span-full">
-                                💾 Skipper speichern
-                            </button>
-
-                        </form>
-
-                    </div>
-                    {% empty %}
-                        <p class="text-sm opacity-60">Noch keine Boote</p>
-                    {% endfor %}
-
+            <!-- Törn-Titel + Status -->
+            <div class="flex items-start justify-between gap-3">
+                <div class="flex-1 min-w-0">
+                    <h2 class="font-bold text-lg leading-tight">{{ toern.titel }}</h2>
+                    <p class="text-sm text-base-content/50 mt-0.5">{{ toern.revier }} · {{ toern.startdatum|date:"d. M." }} – {{ toern.enddatum|date:"d. M. Y" }}</p>
                 </div>
-
-                <!-- ========================= -->
-                <!-- STATUS -->
-                <!-- ========================= -->
-                <div class="flex justify-between items-center mt-4">
-
-                    <div class="flex flex-col gap-2">
-
-                        <div class="badge badge-outline">
-                            {{ toern.get_status_display }}
-                        </div>
-
-                        <form method="post" action="{% url 'toern_status_update' toern.id %}">
-                            {% csrf_token %}
-
-                            <div class="flex gap-2 flex-wrap">
-
-                                {% if toern.status == "DRAFT" %}
-                                    <button name="status" value="ANMELDUNG_OFFEN"
-                                            class="btn btn-xs btn-success">
-                                        Veröffentlichen
-                                    </button>
-                                {% endif %}
-
-                                {% if toern.status == "ANMELDUNG_OFFEN" %}
-                                    <button name="status" value="ANMELDUNG_GESCHLOSSEN"
-                                            class="btn btn-xs btn-warning">
-                                        Anmeldung schließen
-                                    </button>
-                                {% endif %}
-
-                                {% if toern.status != "DRAFT" %}
-                                    <button name="status" value="DRAFT"
-                                            class="btn btn-xs">
-                                        Entwurf
-                                    </button>
-                                {% endif %}
-
-                            </div>
-                        </form>
-
-                    </div>
-                    <div class="flex gap-2">
-
-                        <a href="{% url 'skipper_dashboard' toern.id %}"
-                        class="btn btn-sm btn-outline">
-                            Skipper Dashboard
-                        </a>
-
-                        <a href="{% url 'toern_detail' toern.id %}"
-                        class="btn btn-sm btn-outline">
-                            Details
-                        </a>
-
-                    </div>
-
-                </div>
-
+                <span class="badge badge-outline badge-sm shrink-0">{{ toern.get_status_display }}</span>
             </div>
+
+            <!-- Einladung -->
+            {% url 'toern_detail' toern.id as detail_url %}
+            <a href="mailto:?subject=Einladung zum Törn: {{ toern.titel|urlencode }}&body=Hallo,%0D%0A%0D%0Aich möchte dich herzlich zu folgendem Segeltörn einladen:%0D%0A%0D%0A{{ toern.titel|urlencode }}%0D%0ARevier: {{ toern.revier|urlencode }}%0D%0AStart: {{ toern.startdatum|date:'d.m.Y'|urlencode }}%0D%0A%0D%0AHier findest du alle Details:%0D%0A{{ request.scheme }}://{{ request.get_host }}{{ detail_url }}%0D%0A%0D%0AViele Grüße"
+               class="btn btn-outline btn-sm w-full">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                </svg>
+                Einladung senden
+            </a>
+
+            <!-- Boote -->
+            <div class="border-t border-base-200 pt-4 space-y-3">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-semibold text-sm">Boote</h3>
+                    <a href="{% url 'boot_create' toern.id %}" class="btn btn-xs btn-primary">+ Boot</a>
+                </div>
+
+                {% for boot in toern.boote.all %}
+                <div class="bg-base-200 rounded-xl p-4 space-y-3">
+
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="font-semibold">{{ boot.name }}</p>
+                            <p class="text-xs text-base-content/50">{{ boot.typ }} · {{ boot.charterunternehmen }}</p>
+                            <p class="text-xs text-base-content/40 mt-0.5">{{ boot.kabinen.count }} Kabinen · {{ boot.anzahl_betten_boot }} Betten</p>
+                        </div>
+                        <a href="{% url 'boot_update' boot.id %}" class="btn btn-xs btn-outline">Bearbeiten</a>
+                    </div>
+
+                    <!-- Aktuelle Skipper-Zuteilung -->
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for t in toern.teilnahmen.all %}
+                            {% if t.boot == boot and t.rolle == "skipper" %}
+                                <span class="badge badge-primary badge-sm">Skipper: {{ t.user.first_name }} {{ t.user.last_name }}</span>
+                            {% endif %}
+                            {% if t.boot == boot and t.rolle == "coskipper" %}
+                                <span class="badge badge-secondary badge-sm">Co-Skipper: {{ t.user.first_name }} {{ t.user.last_name }}</span>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+
+                    <!-- Skipper-Zuweisung -->
+                    <form method="POST" action="{% url 'boot_skipper_assign' boot.id %}" class="space-y-2">
+                        {% csrf_token %}
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <select name="skipper_id" class="select select-bordered select-sm w-full">
+                                <option value="">Skipper wählen</option>
+                                {% for t in toern.teilnahmen.all %}
+                                    <option value="{{ t.user.id }}" {% if t.boot == boot and t.rolle == "skipper" %}selected{% endif %}>
+                                        {{ t.user.first_name }} {{ t.user.last_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                            <select name="coskipper_id" class="select select-bordered select-sm w-full">
+                                <option value="">Co-Skipper wählen</option>
+                                {% for t in toern.teilnahmen.all %}
+                                    <option value="{{ t.user.id }}" {% if t.boot == boot and t.rolle == "coskipper" %}selected{% endif %}>
+                                        {{ t.user.first_name }} {{ t.user.last_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <button class="btn btn-primary btn-sm w-full">Skipper speichern</button>
+                    </form>
+
+                </div>
+                {% empty %}
+                <p class="text-sm text-base-content/40 py-2">Noch keine Boote angelegt.</p>
+                {% endfor %}
+            </div>
+
+            <!-- Status + Aktionen -->
+            <div class="border-t border-base-200 pt-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+                <form method="post" action="{% url 'toern_status_update' toern.id %}" class="flex flex-wrap gap-2">
+                    {% csrf_token %}
+                    {% if toern.status == "DRAFT" %}
+                        <button name="status" value="ANMELDUNG_OFFEN" class="btn btn-xs btn-success">Veröffentlichen</button>
+                    {% endif %}
+                    {% if toern.status == "ANMELDUNG_OFFEN" %}
+                        <button name="status" value="ANMELDUNG_GESCHLOSSEN" class="btn btn-xs btn-warning">Anmeldung schließen</button>
+                    {% endif %}
+                    {% if toern.status != "DRAFT" %}
+                        <button name="status" value="DRAFT" class="btn btn-xs btn-ghost">Entwurf</button>
+                    {% endif %}
+                </form>
+
+                <div class="flex gap-2">
+                    <a href="{% url 'skipper_dashboard' toern.id %}" class="btn btn-sm btn-outline">Skipper Dashboard</a>
+                    <a href="{% url 'toern_detail' toern.id %}" class="btn btn-sm btn-ghost">Details</a>
+                </div>
+            </div>
+
         </div>
-
-        {% empty %}
-        <p>Noch keine Törns erstellt.</p>
-        {% endfor %}
-
     </div>
 
-</div>
+    {% empty %}
+    <div class="text-center py-20">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-base-content/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        <p class="text-base-content/40 font-medium">Noch keine Törns erstellt</p>
+        <a href="{% url 'toern_create' %}" class="btn btn-primary btn-sm mt-4">Ersten Törn erstellen</a>
+    </div>
+    {% endfor %}
 
+</div>
 {% endblock %}

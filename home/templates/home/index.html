@@ -1,69 +1,81 @@
 {% extends "base.html" %}
 {% load static %}
-{% block title %}Startseite{% endblock %}
+{% block title %}Törns entdecken{% endblock %}
 
 {% block content %}
+<div class="max-w-5xl mx-auto px-4 py-6">
 
-<div class="max-w-7xl mx-auto px-4 py-10">
-    <h1 class="text-3xl font-bold mb-8">Segeltörns</h1>
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold">Törns entdecken</h1>
+        <p class="text-sm text-base-content/50 mt-0.5">Finde deinen nächsten Segeltörn</p>
+    </div>
 
     {% if toerns %}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {% for toern in toerns %}
-        <div class="card bg-base-100 shadow-xl relative">
+        <div class="card bg-base-100 shadow border border-base-300 overflow-hidden hover:shadow-md transition-shadow">
 
-            <!-- Badge freie Plätze -->
-            <div class="badge badge-primary absolute top-3 right-3">
-                {{ toern.freie_plaetze }} Plätze frei
-            </div>
-
-            <figure>
+            <figure class="relative">
                 {% if toern.bild_toern %}
-                    <img src="{{ toern.bild_toern.url }}" alt="{{ toern.titel }}">
+                    <img src="{{ toern.bild_toern.url }}" alt="{{ toern.titel }}" class="h-44 w-full object-cover">
                 {% else %}
-                    <img src="{% static 'medien/Segeln_dummy.jpeg' %}" alt="{{ toern.titel }}">
+                    <img src="{% static 'medien/Segeln_dummy.jpeg' %}" alt="{{ toern.titel }}" class="h-44 w-full object-cover">
                 {% endif %}
+                <div class="absolute top-2 right-2">
+                    {% if toern.freie_plaetze == 0 %}
+                        <span class="badge badge-error badge-sm">Voll</span>
+                    {% elif toern.freie_plaetze <= 3 %}
+                        <span class="badge badge-warning badge-sm">{{ toern.freie_plaetze }} Plätze frei</span>
+                    {% else %}
+                        <span class="badge badge-success badge-sm">{{ toern.freie_plaetze }} Plätze frei</span>
+                    {% endif %}
+                </div>
             </figure>
 
-            <div class="card-body">
-                <h2 class="card-title">{{ toern.titel }} - {{ toern.revier }}</h2>
-                <p class="text-sm opacity-70">
-                    {{ toern.startdatum|date:"d.m.Y" }} – {{ toern.enddatum|date:"d.m.Y" }}
+            <div class="card-body p-4 gap-2">
+                <h2 class="font-bold text-base leading-tight">{{ toern.titel }}</h2>
+                <p class="text-xs text-base-content/50 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    {{ toern.revier }}
                 </p>
-                <p class="text-sm">{{ toern.kurzbeschreibung|default:"Hier könnte eine kurze Beschreibung des Törns stehen." }}</p>
+                <p class="text-xs text-base-content/50 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                    </svg>
+                    {{ toern.startdatum|date:"d. M." }} – {{ toern.enddatum|date:"d. M. Y" }}
+                </p>
+                {% if toern.kurzbeschreibung %}
+                    <p class="text-xs text-base-content/60 line-clamp-2">{{ toern.kurzbeschreibung }}</p>
+                {% endif %}
 
-                <div class="mt-2 font-semibold">
-                    Preis pro Person: {{ toern.preis_pro_person }} €
-                </div>
-
-                <div class="card-actions justify-end mt-4">
-                    <a href="{% url 'toern_detail' pk=toern.pk %}" class="btn btn-outline btn-sm">Details</a>
-                    {% if user_teilnahme %}
-
-                        <a href="{% url 'crew_dashboard' toern.pk %}" 
-                        class="btn btn-success btn-sm">
-                            Zum Crew Dashboard
-                        </a>
-
-                    {% else %}
-
-                        <a href="{% url 'toern_anmeldung' pk=toern.pk %}" 
-                        class="btn btn-primary btn-sm">
-                            Anmelden
-                        </a>
-
-                    {% endif %}
+                <div class="flex items-center justify-between mt-2 pt-2 border-t border-base-200">
+                    <span class="font-bold text-primary">{{ toern.preis_pro_person }} €</span>
+                    <div class="flex gap-2">
+                        <a href="{% url 'toern_detail' pk=toern.pk %}" class="btn btn-outline btn-xs">Details</a>
+                        {% if user.is_authenticated %}
+                            <a href="{% url 'toern_anmeldung' pk=toern.pk %}" class="btn btn-primary btn-xs">Anmelden</a>
+                        {% else %}
+                            <a href="{% url 'login' %}" class="btn btn-primary btn-xs">Anmelden</a>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
         {% endfor %}
-
     </div>
+
     {% else %}
-        <p>Aktuell sind keine Törns verfügbar.</p>
+    <div class="text-center py-20">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-base-content/20 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+        </svg>
+        <p class="text-base-content/40 font-medium">Aktuell keine Törns verfügbar</p>
+        <p class="text-sm text-base-content/30 mt-1">Schau bald wieder rein!</p>
+    </div>
     {% endif %}
 
 </div>
-
 {% endblock %}
