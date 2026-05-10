@@ -63,7 +63,34 @@ class CustomLoginView(LoginView):
 
 @login_required
 def my_account(request):
-    return render(request, "accounts/my_account.html")
+    from toern.models import Teilnahme
+    from django.utils.timezone import now
+    from utils.user_profil_fortschritt import user_profil_fortschritt
+
+    jetzt = now()
+    teilnahmen = (
+        Teilnahme.objects
+        .filter(user=request.user)
+        .select_related("toern")
+        .order_by("toern__startdatum")
+    )
+
+    kommende = [t for t in teilnahmen if t.toern.startdatum >= jetzt]
+    vergangene = [t for t in teilnahmen if t.toern.startdatum < jetzt]
+
+    naechste = kommende[0] if kommende else None
+    tage_bis_naechster = None
+    if naechste:
+        delta = naechste.toern.startdatum - jetzt
+        tage_bis_naechster = max(0, delta.days)
+
+    return render(request, "accounts/my_account.html", {
+        "kommende_teilnahmen": kommende,
+        "vergangene_teilnahmen": vergangene,
+        "naechste_teilnahme": naechste,
+        "tage_bis_naechster": tage_bis_naechster,
+        "profil_prozent": user_profil_fortschritt(request.user),
+    })
 
 
 @login_required
