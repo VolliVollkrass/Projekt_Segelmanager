@@ -1,7 +1,11 @@
+import logging
+
 from PIL import Image, ImageOps
 from io import BytesIO
 from django.core.files.base import ContentFile
 from pillow_heif import register_heif_opener
+
+logger = logging.getLogger(__name__)
 
 # 👉 HEIC Support aktivieren (NEU)
 register_heif_opener()
@@ -45,5 +49,5 @@ def optimize_image(uploaded_image):
         return ContentFile(buffer.getvalue())
 
     except Exception as e:
-        print("Image Optimizer Fehler:", e)
+        logger.exception("Image Optimizer Fehler: %s", e)
         return uploaded_image
