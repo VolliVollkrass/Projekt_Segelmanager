@@ -804,6 +804,9 @@ def skipper_dashboard(request, toern_id):
     # =========================
     # 7. Context
     # =========================
+    count_bestaetigt = teilnahmen.filter(status="bestaetigt").count()
+    count_angemeldet = teilnahmen.filter(status="angemeldet").count()
+
     context = {
         "toern": toern,
 
@@ -818,6 +821,12 @@ def skipper_dashboard(request, toern_id):
         "teilnahmen": teilnahmen,
         "warteliste": warteliste,
         "teilnahme_map": teilnahme_map,
+
+        # Stats
+        "count_bestaetigt": count_bestaetigt,
+        "count_angemeldet": count_angemeldet,
+        "count_warteliste": warteliste.count(),
+        "count_unassigned": len(unassigned),
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)
