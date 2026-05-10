@@ -1,471 +1,469 @@
 {% extends "base.html" %}
-{% block content %}
 {% load dict_tools %}
+{% block title %}Skipper – {{ toern.titel }}{% endblock %}
 
-<div class="max-w-7xl mx-auto p-6 space-y-6">
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
 
     <!-- HEADER -->
-    <div class="flex flex-col gap-4 md:flex-row md:justify-between md:items-center">
-        <div>
-            <h1 class="text-3xl font-bold">{{ toern.titel }}</h1>
-            <p class="text-sm opacity-60">Skipper Dashboard</p>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-            <button class="btn btn-primary" onclick="document.getElementById('autoModal').showModal()">
-                ⚡ Auto-Zuteilung
-            </button>
-
-            <form method="POST" action="{% url 'reset_zuteilung' toern.id %}">
-                {% csrf_token %}
-                <button class="btn btn-error btn-outline">
-                    🔄 Reset
-                </button>
-            </form>
-            <form method="POST" action="{% url 'zuteilung_fixieren' toern.id %}">
-                {% csrf_token %}
-                <button class="btn btn-success">
-                    ✅ Zuteilung abschließen
-                </button>
-            </form>
-            <a href="{% url 'crew_dashboard' toern.id %}" class="btn btn-outline">
-                Crew
-            </a>
+    <div class="mb-5">
+        <a href="{% url 'crew_dashboard' toern.id %}" class="flex items-center gap-1 text-sm text-base-content/50 hover:text-base-content transition-colors mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+            Crew-Ansicht
+        </a>
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-bold leading-tight">{{ toern.titel }}</h1>
+                <p class="text-base-content/50 text-sm mt-0.5">Skipper-Dashboard</p>
+            </div>
         </div>
     </div>
 
-    {% if warteliste %}
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title">🕒 Warteliste</h2>
+    <!-- TAB-NAVIGATION -->
+    <div class="border-b border-base-300 mb-6 overflow-x-auto">
+        <div class="flex min-w-max">
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-primary whitespace-nowrap" data-tab="uebersicht">
+                Übersicht
+                {% if count_warteliste > 0 %}
+                <span class="ml-1 badge badge-warning badge-xs">{{ count_warteliste }}</span>
+                {% endif %}
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="zuteilung">
+                Zuteilung
+                {% if count_unassigned > 0 %}
+                <span class="ml-1 badge badge-error badge-xs">{{ count_unassigned }}</span>
+                {% endif %}
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="crew">
+                Crew
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="packliste">
+                Packliste
+            </button>
+        </div>
+    </div>
 
-            <div class="space-y-3 mt-3">
+    <!-- ========================= TAB: ÜBERSICHT ========================= -->
+    <div id="tab-uebersicht" class="space-y-5">
 
+        <!-- Stats -->
+        <div class="grid grid-cols-3 gap-3">
+            <div class="bg-base-100 border border-base-300 rounded-xl p-3 text-center">
+                <p class="text-2xl font-bold text-success">{{ count_bestaetigt }}</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Bestätigt</p>
+            </div>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-3 text-center">
+                <p class="text-2xl font-bold text-warning">{{ count_angemeldet }}</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Angemeldet</p>
+            </div>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-3 text-center">
+                <p class="text-2xl font-bold {% if count_unassigned > 0 %}text-error{% else %}text-base-content/30{% endif %}">{{ count_unassigned }}</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Ohne Boot</p>
+            </div>
+        </div>
+
+        <!-- Warteliste -->
+        {% if warteliste %}
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Warteliste</h2>
+            <div class="flex flex-col gap-2">
                 {% for t in warteliste %}
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-base-200 rounded-lg">
-
-                    <!-- User -->
-                    <div>
-                        <div class="font-medium">
-                            {{ t.user.first_name }} {{ t.user.last_name }}
-                        </div>
-                        <div class="text-xs opacity-60">
-                            {{ t.user.email }}
-                        </div>
+                <div class="flex items-center gap-3 bg-warning/5 border border-warning/30 rounded-xl p-4">
+                    <div class="w-9 h-9 rounded-full bg-warning/20 flex items-center justify-center shrink-0 text-sm font-semibold text-warning">
+                        {{ t.user.first_name|first }}
                     </div>
-
-                    <!-- Actions -->
-                    <div class="flex gap-2">
-
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-sm truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
+                        <p class="text-xs text-base-content/40 truncate">{{ t.user.email }}</p>
+                    </div>
+                    <div class="flex gap-1.5 shrink-0">
                         <form method="POST" action="{% url 'warteliste_bestaetigen' t.id %}">
                             {% csrf_token %}
-                            <button class="btn btn-success btn-sm">
-                                ✓ Bestätigen
-                            </button>
+                            <button class="btn btn-success btn-sm">Bestätigen</button>
                         </form>
-
                         <form method="POST" action="{% url 'warteliste_ablehnen' t.id %}">
                             {% csrf_token %}
-                            <button class="btn btn-error btn-sm">
-                                ✕ Ablehnen
-                            </button>
+                            <button class="btn btn-error btn-outline btn-sm">Ablehnen</button>
                         </form>
-
                     </div>
-
                 </div>
                 {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Schnellaktionen -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Aktionen</h2>
+            <div class="grid grid-cols-2 gap-3">
+
+                <button onclick="document.getElementById('autoModal').showModal()"
+                        class="flex flex-col items-center gap-2 bg-primary text-primary-content rounded-xl p-5 hover:opacity-90 transition-opacity">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    <span class="text-sm font-semibold text-center leading-tight">Auto-Zuteilung</span>
+                </button>
+
+                <form method="POST" action="{% url 'zuteilung_fixieren' toern.id %}">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="w-full h-full flex flex-col items-center gap-2 bg-success text-success-content rounded-xl p-5 hover:opacity-90 transition-opacity">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="text-sm font-semibold text-center leading-tight">Zuteilung abschließen</span>
+                    </button>
+                </form>
 
             </div>
         </div>
+
+        <!-- Kabinenpaare -->
+        {% if kabinenpaare %}
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Bestätigte Kabinenpaare</h2>
+            <div class="flex flex-col gap-2">
+                {% for p in kabinenpaare %}
+                <div class="flex items-center gap-3 bg-success/5 border border-success/20 rounded-xl px-4 py-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-success shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    <span class="text-sm font-medium">{{ p.user1.first_name }} {{ p.user1.last_name }} &amp; {{ p.user2.first_name }} {{ p.user2.last_name }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Gefährliche Aktionen -->
+        <div class="border-t border-base-300 pt-5">
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/30 mb-3">Gefährliche Aktionen</h2>
+            <form method="POST" action="{% url 'reset_zuteilung' toern.id %}">
+                {% csrf_token %}
+                <button type="submit"
+                        class="flex items-center gap-2 text-sm text-error/70 hover:text-error transition-colors"
+                        onclick="return confirm('Alle Kabinenzuteilungen zurücksetzen?')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Zuteilung zurücksetzen
+                </button>
+            </form>
+        </div>
+
     </div>
-    {% endif %}
 
-    <!-- ========================= -->
-    <!-- KABINENPAARE -->
-    <!-- ========================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title">Kabinenpaare</h2>
+    <!-- ========================= TAB: ZUTEILUNG ========================= -->
+    <div id="tab-zuteilung" class="hidden space-y-5">
 
-            {% if kabinenpaare %}
-                <div class="grid md:grid-cols-2 gap-3 mt-3">
-                    {% for p in kabinenpaare %}
-                        <div class="alert alert-success">
-                            👥 {{ p.user1.first_name }} {{ p.user1.last_name }}
-                            +
-                            {{ p.user2.first_name }} {{ p.user2.last_name }}
+        <!-- Mobile Hinweis -->
+        <div class="flex items-start gap-2 bg-base-200 rounded-xl p-3 text-xs text-base-content/60">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span>Person antippen zum Auswählen, dann Kabine antippen zum Zuweisen. Am Desktop auch per Drag &amp; Drop.</span>
+        </div>
+
+        <!-- Nicht zugewiesen -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">
+                Nicht zugewiesen
+                {% if count_unassigned > 0 %}
+                <span class="badge badge-error badge-xs ml-1">{{ count_unassigned }}</span>
+                {% endif %}
+            </h2>
+
+            <div class="dropzone min-h-16 bg-base-200/50 border-2 border-dashed border-base-300 rounded-xl p-3" data-kabine-id="">
+                <div class="crew-container flex flex-wrap gap-2">
+                    {% for item in unassigned %}
+                    <div class="crew-item flex items-center gap-2 bg-base-100 border border-base-300 rounded-xl px-3 py-2 cursor-pointer hover:border-primary transition-colors"
+                         draggable="true"
+                         data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
+                        <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                            {{ item.users.0.first_name|first }}
                         </div>
+                        <div class="text-sm">
+                            {% for u in item.users %}
+                            <span class="font-medium">{{ u.first_name }} {{ u.last_name }}</span>{% if not forloop.last %} &amp; {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% with t=teilnahme_map|get_item:item.users.0.id %}
+                        {% if t %}
+                        <span class="badge badge-xs
+                            {% if t.status == 'bestaetigt' %}badge-success
+                            {% elif t.status == 'angemeldet' %}badge-warning
+                            {% else %}badge-ghost{% endif %}">
+                            {% if t.status == 'bestaetigt' %}✓
+                            {% elif t.status == 'angemeldet' %}neu
+                            {% else %}{{ t.status }}{% endif %}
+                        </span>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                    {% empty %}
+                    <p class="text-sm text-base-content/40 py-2 px-1">Alle Crewmitglieder sind zugeteilt.</p>
                     {% endfor %}
                 </div>
-            {% else %}
-                <p class="text-sm opacity-60">Keine bestätigten Kabinenpaare</p>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- ========================= -->
-    <!-- KONFLIKTE -->
-    <!-- ========================= -->
-    <div class="grid md:grid-cols-2 gap-6">
-
-        <div class="card bg-error/10 shadow">
-            <div class="card-body">
-                <h2 class="card-title text-error">❌ Nicht zusammen</h2>
-
-                {% for k in harte_konflikte %}
-                    <div class="alert alert-error py-2">
-                        {{ k.von.first_name }} {{ k.von.last_name }}
-                        ❌
-                        {{ k.zu.first_name }} {{ k.zu.last_name }}
-                    </div>
-                {% empty %}
-                    <p class="text-sm opacity-60">Keine Konflikte</p>
-                {% endfor %}
             </div>
         </div>
 
-        <div class="card bg-warning/10 shadow">
-            <div class="card-body">
-                <h2 class="card-title text-warning">⚠️ Vermeiden</h2>
-
-                {% for k in kritische_konflikte %}
-                    <div class="alert alert-warning py-2">
-                        {{ k.von.first_name }} {{ k.von.last_name }}
-                        ⚠️
-                        {{ k.zu.first_name }} {{ k.zu.last_name }}
-                    </div>
-                {% empty %}
-                    <p class="text-sm opacity-60">Keine kritischen Fälle</p>
-                {% endfor %}
-            </div>
-        </div>
-
-    </div>
-
-    <!-- ========================= -->
-    <!-- BOOT ZUWEISUNG -->
-    <!-- ========================= -->
-    <div class="grid lg:grid-cols-2 gap-6">
-
+        <!-- Boote & Kabinen -->
         {% for boot in boots_data %}
-        <div class="card bg-base-100 shadow boot-zone"
-             data-boot-id="{{ boot.boot.id }}">
+        <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden boot-zone" data-boot-id="{{ boot.boot.id }}">
 
-            <div class="card-body">
-                <h2 class="card-title">{{ boot.boot.name }}</h2>
-                <a href="{% url 'crewlist_pdf' boot.boot.id %}" 
-                    class="btn btn-sm btn-outline"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="btn btn-sm btn-outline">
-                    📄 Crewliste
+            <!-- Boot-Header -->
+            <div class="flex items-center justify-between px-4 py-3 border-b border-base-300 bg-base-200/50">
+                <h2 class="font-bold">{{ boot.boot.name }}</h2>
+                <a href="{% url 'crewlist_pdf' boot.boot.id %}"
+                   target="_blank" rel="noopener noreferrer"
+                   class="flex items-center gap-1 text-xs text-base-content/50 hover:text-base-content transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 9.414V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    Crewliste PDF
                 </a>
+            </div>
+
+            <!-- Kabinen -->
+            <div class="divide-y divide-base-200">
                 {% for k in boot.kabinen %}
-                <div class="bg-base-200 p-4 rounded-xl mb-4 dropzone"
-                     data-kabine-id="{{ k.kabine.id }}">
-
-                    <h3 class="font-semibold mb-3">
+                <div class="p-3 dropzone" data-kabine-id="{{ k.kabine.id }}">
+                    <p class="text-xs font-semibold text-base-content/40 mb-2">
                         Kabine {{ k.kabine.name }}
-                    </h3>
-
-                    <div class="space-y-2 crew-container">
-
+                        <span class="font-normal">({{ k.kabine.betten }} Betten)</span>
+                    </p>
+                    <div class="crew-container flex flex-wrap gap-2 min-h-10">
                         {% for item in k.crew %}
-                        <div class="bg-base-100 p-3 rounded-lg border cursor-move crew-item"
+                        <div class="crew-item flex items-center gap-2 bg-base-200 border border-base-300 rounded-xl px-3 py-2 cursor-pointer hover:border-primary transition-colors"
                              draggable="true"
                              data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
-
-                            <div class="flex items-center gap-3">
-
-                                <!-- Avatar -->
-                                <div class="avatar placeholder">
-                                    <div class="bg-neutral text-neutral-content rounded-full w-10">
-                                        <span>
-                                            {{ item.users.0.first_name|slice:":1" }}{{ item.users.0.last_name|slice:":1" }}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                <!-- Namen -->
-                                <div class="w-full space-y-1">
-
-                                    {% for u in item.users %}
-                                        <div>
-
-                                            <!-- Name + Prozent -->
-                                            <div class="flex justify-between text-sm">
-                                                <span class="font-medium">
-                                                    {{ u.first_name }} {{ u.last_name }}
-                                                </span>
-                                                <span class="opacity-60">
-                                                    {{ u.fortschritt|default:0 }}%
-                                                </span>
-                                            </div>
-
-                                            <!-- Progressbar -->
-                                            <progress 
-                                                class="progress w-full h-2
-                                                    {% if u.fortschritt < 40 %}
-                                                        progress-error
-                                                    {% elif u.fortschritt < 80 %}
-                                                        progress-warning
-                                                    {% else %}
-                                                        progress-success
-                                                    {% endif %}
-                                                "
-                                                value="{{ u.fortschritt|default:0 }}"
-                                                max="100">
-                                            </progress>
-
-                                        </div>
-                                    {% endfor %}
-
-                                </div>
-
+                            <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                                {{ item.users.0.first_name|first }}
                             </div>
-
+                            <div class="min-w-0">
+                                {% for u in item.users %}
+                                <div class="text-sm font-medium leading-tight">{{ u.first_name }} {{ u.last_name }}</div>
+                                <div class="flex items-center gap-1 mt-0.5">
+                                    <progress class="progress h-1 w-16
+                                        {% if u.fortschritt < 40 %}progress-error
+                                        {% elif u.fortschritt < 80 %}progress-warning
+                                        {% else %}progress-success{% endif %}"
+                                        value="{{ u.fortschritt|default:0 }}" max="100"></progress>
+                                    <span class="text-xs text-base-content/40">{{ u.fortschritt|default:0 }}%</span>
+                                </div>
+                                {% endfor %}
+                            </div>
                         </div>
                         {% endfor %}
-
                     </div>
-
                 </div>
                 {% endfor %}
-
             </div>
+
         </div>
         {% endfor %}
 
     </div>
 
-    <!-- ========================= -->
-    <!-- UNASSIGNED -->
-    <!-- ========================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title">Nicht zugewiesen</h2>
+    <!-- ========================= TAB: CREW ========================= -->
+    <div id="tab-crew" class="hidden space-y-5">
 
-            <div class="dropzone" data-kabine-id="">
-                <div class="crew-container grid md:grid-cols-3 gap-3">
-
-                    {% for item in unassigned %}
-                    <div class="bg-base-200 p-3 rounded-lg border crew-item flex flex-col gap-2"
-                        draggable="true"
-                        data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
-
-                        {% for u in item.users %}
-                        {% with t=teilnahme_map|get_item:u.id %}
-                        
-                        <div class="flex items-center justify-between">
-                            
-                            <!-- Name -->
-                            <div class="font-medium text-sm">
-                                {{ u.first_name }} {{ u.last_name }}
-                            </div>
-                            <span class="badge badge-outline text-xs">
-                                {{ t.status }}
+        <!-- Crewliste mit Fortschritt -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Alle Crewmitglieder</h2>
+            <div class="flex flex-col gap-2">
+                {% for t in teilnahmen %}
+                <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-xl px-4 py-3">
+                    <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-semibold text-primary">
+                        {{ t.user.first_name|first }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <p class="font-medium text-sm truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
+                            <span class="badge badge-xs shrink-0
+                                {% if t.status == 'bestaetigt' %}badge-success
+                                {% elif t.status == 'angemeldet' %}badge-warning
+                                {% elif t.status == 'warteliste' %}badge-ghost
+                                {% else %}badge-error{% endif %}">
+                                {% if t.status == 'bestaetigt' %}Bestätigt
+                                {% elif t.status == 'angemeldet' %}Angemeldet
+                                {% elif t.status == 'warteliste' %}Warteliste
+                                {% elif t.status == 'abgesagt' %}Abgesagt
+                                {% else %}{{ t.status }}{% endif %}
                             </span>
-                            <!-- Actions -->
-                            <div class="flex gap-1">
-
-                                <form method="POST" action="{% url 'teilnehmer_bestaetigen' t.id %}">
-                                    {% csrf_token %}
-                                    <button class="btn btn-success btn-xs px-2">
-                                        ✓
-                                    </button>
-                                </form>
-
-                                <form method="POST" action="{% url 'teilnehmer_ablehnen' t.id %}">
-                                    {% csrf_token %}
-                                    <button class="btn btn-error btn-xs px-2">
-                                        ✕
-                                    </button>
-                                </form>
-
-                            </div>
-
                         </div>
+                        <div class="flex items-center gap-2 mt-1">
+                            <progress class="progress h-1.5 flex-1
+                                {% if t.fortschritt < 40 %}progress-error
+                                {% elif t.fortschritt < 80 %}progress-warning
+                                {% else %}progress-success{% endif %}"
+                                value="{{ t.fortschritt|default:0 }}" max="100"></progress>
+                            <span class="text-xs text-base-content/40 shrink-0">{{ t.fortschritt|default:0 }}%</span>
+                        </div>
+                        <p class="text-xs text-base-content/30 mt-0.5">{{ t.rolle }}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
 
-                        {% endwith %}
-                        {% endfor %}
+        <!-- Konflikte -->
+        {% if harte_konflikte or kritische_konflikte %}
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Crew-Präferenzen</h2>
 
+            {% if harte_konflikte %}
+            <div class="bg-error/5 border border-error/20 rounded-xl p-4 mb-3">
+                <p class="text-xs font-semibold text-error mb-2">Auf keinen Fall zusammen</p>
+                <div class="space-y-1.5">
+                    {% for k in harte_konflikte %}
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="font-medium">{{ k.von.first_name }} {{ k.von.last_name }}</span>
+                        <span class="text-error/60">↔</span>
+                        <span class="font-medium">{{ k.zu.first_name }} {{ k.zu.last_name }}</span>
                     </div>
                     {% endfor %}
-
                 </div>
             </div>
+            {% endif %}
 
+            {% if kritische_konflikte %}
+            <div class="bg-warning/5 border border-warning/20 rounded-xl p-4">
+                <p class="text-xs font-semibold text-warning mb-2">Wenn möglich vermeiden</p>
+                <div class="space-y-1.5">
+                    {% for k in kritische_konflikte %}
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="font-medium">{{ k.von.first_name }} {{ k.von.last_name }}</span>
+                        <span class="text-warning/60">↔</span>
+                        <span class="font-medium">{{ k.zu.first_name }} {{ k.zu.last_name }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
         </div>
+        {% else %}
+        <div class="text-center py-8">
+            <p class="text-sm text-base-content/40">Keine Konflikte gemeldet.</p>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- ========================= TAB: PACKLISTE ========================= -->
+    <div id="tab-packliste" class="hidden space-y-4">
+
+        <div>
+            <p class="text-sm text-base-content/60">Passe die Vorlage für dein Segelgebiet an. Beim Anwenden werden nur fehlende Einträge ergänzt — individuelle Änderungen der Crew bleiben erhalten.</p>
+        </div>
+
+        <!-- Revier-Auswahl -->
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Segelgebiet</p>
+            <div class="flex flex-wrap gap-2">
+                <button id="btn-revier-standard" class="btn btn-sm btn-primary vorlage-revier-btn" onclick="setRevier('standard')">Standard</button>
+                <button id="btn-revier-warm" class="btn btn-sm btn-outline vorlage-revier-btn" onclick="setRevier('warm')">Warm (Mittelmeer)</button>
+                <button id="btn-revier-kalt" class="btn btn-sm btn-outline vorlage-revier-btn" onclick="setRevier('kalt')">Kalt (Nordsee)</button>
+            </div>
+        </div>
+
+        <!-- Typ-Tabs -->
+        <div role="tablist" class="tabs tabs-boxed">
+            <button role="tab" id="tab-personal" class="tab tab-active" onclick="setTyp('personal')">Persönlich</button>
+            <button role="tab" id="tab-boot" class="tab" onclick="setTyp('boot')">Boot</button>
+        </div>
+
+        <!-- Item-Liste -->
+        <div id="vorlage-loading" class="flex justify-center py-6">
+            <span class="loading loading-spinner loading-md"></span>
+        </div>
+        <div id="vorlage-list" class="hidden space-y-2"></div>
+
+        <!-- Neuen Eintrag hinzufügen -->
+        <div class="flex gap-2 pt-2 border-t border-base-300">
+            <input type="text" id="new-vorlage-name" placeholder="Neuer Eintrag…" class="input input-bordered flex-1 input-sm"/>
+            <input type="number" id="new-vorlage-menge" value="1" min="1" class="input input-bordered w-20 input-sm"/>
+            <button onclick="addVorlageItem()" class="btn btn-primary btn-sm">Hinzufügen</button>
+        </div>
+
+        <!-- Vorlage anwenden -->
+        <button onclick="document.getElementById('vorlageAnwendenModal').showModal()" class="btn btn-success w-full">
+            Vorlage auf diesen Törn anwenden
+        </button>
+
     </div>
 
 </div>
 
-    <!-- ========================= -->
-    <!-- PACKLISTEN-VORLAGEN       -->
-    <!-- ========================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body gap-4">
+<!-- ===================== MODALS ===================== -->
 
-            <div>
-                <h2 class="card-title">📦 Packlisten-Vorlagen</h2>
-                <p class="text-sm opacity-60 mt-1">
-                    Passe die Vorlage für dein Segelgebiet an. Beim Anwenden werden nur fehlende Einträge ergänzt — individuelle Änderungen der Crew bleiben erhalten.
-                </p>
-            </div>
-
-            <!-- Revier-Auswahl -->
-            <div>
-                <p class="text-xs font-semibold uppercase opacity-50 mb-2">Segelgebiet</p>
-                <div class="flex flex-wrap gap-2">
-                    <button id="btn-revier-standard"
-                        class="btn btn-sm btn-primary vorlage-revier-btn"
-                        onclick="setRevier('standard')">
-                        Standard
-                    </button>
-                    <button id="btn-revier-warm"
-                        class="btn btn-sm btn-outline vorlage-revier-btn"
-                        onclick="setRevier('warm')">
-                        ☀️ Warm (Mittelmeer, Karibik)
-                    </button>
-                    <button id="btn-revier-kalt"
-                        class="btn btn-sm btn-outline vorlage-revier-btn"
-                        onclick="setRevier('kalt')">
-                        🧊 Kalt (Nordsee, Ostsee)
-                    </button>
-                </div>
-            </div>
-
-            <!-- Typ-Tabs -->
-            <div role="tablist" class="tabs tabs-boxed">
-                <button role="tab" id="tab-personal"
-                    class="tab tab-active"
-                    onclick="setTyp('personal')">
-                    👤 Persönlich
-                </button>
-                <button role="tab" id="tab-boot"
-                    class="tab"
-                    onclick="setTyp('boot')">
-                    ⛵ Boot
-                </button>
-            </div>
-
-            <!-- Item-Liste -->
-            <div id="vorlage-loading" class="flex justify-center py-6">
-                <span class="loading loading-spinner loading-md"></span>
-            </div>
-
-            <div id="vorlage-list" class="hidden space-y-2">
-                <!-- filled by JS -->
-            </div>
-
-            <!-- Neuen Eintrag hinzufügen -->
-            <div class="flex gap-2 pt-2 border-t">
-                <input type="text" id="new-vorlage-name"
-                    placeholder="Neuer Eintrag..."
-                    class="input input-bordered flex-1 input-sm" />
-                <input type="number" id="new-vorlage-menge"
-                    value="1" min="1"
-                    class="input input-bordered w-20 input-sm" />
-                <button onclick="addVorlageItem()" class="btn btn-primary btn-sm">
-                    + Hinzufügen
-                </button>
-            </div>
-
-            <!-- Vorlage anwenden -->
-            <div class="pt-2">
-                <button onclick="document.getElementById('vorlageAnwendenModal').showModal()"
-                    class="btn btn-success w-full sm:w-auto">
-                    🚀 Vorlage auf diesen Törn anwenden
-                </button>
-            </div>
-
-        </div>
-    </div>
-
-</div>
-
-<!-- VORLAGE ANWENDEN MODAL -->
+<!-- Vorlage Anwenden Modal -->
 <dialog id="vorlageAnwendenModal" class="modal">
     <div class="modal-box">
         <h3 class="font-bold text-lg mb-2">Vorlage anwenden</h3>
-        <p class="text-sm opacity-70 mb-4">
-            Nur fehlende Einträge werden ergänzt. Bestehende Änderungen der Crew bleiben erhalten.
-        </p>
-
+        <p class="text-sm opacity-70 mb-4">Nur fehlende Einträge werden ergänzt. Bestehende Änderungen bleiben erhalten.</p>
         <div class="space-y-3">
             <label class="flex items-center gap-3 cursor-pointer bg-base-200 p-3 rounded-lg">
-                <input type="checkbox" id="apply-personal" class="checkbox checkbox-primary" checked />
+                <input type="checkbox" id="apply-personal" class="checkbox checkbox-primary" checked/>
                 <div>
-                    <p class="font-medium text-sm">👤 Persönliche Packliste</p>
+                    <p class="font-medium text-sm">Persönliche Packliste</p>
                     <p class="text-xs opacity-60">Für alle bestätigten Crewmitglieder</p>
                 </div>
             </label>
             <label class="flex items-center gap-3 cursor-pointer bg-base-200 p-3 rounded-lg">
-                <input type="checkbox" id="apply-boot" class="checkbox checkbox-primary" checked />
+                <input type="checkbox" id="apply-boot" class="checkbox checkbox-primary" checked/>
                 <div>
-                    <p class="font-medium text-sm">⛵ Boot-Packliste</p>
+                    <p class="font-medium text-sm">Boot-Packliste</p>
                     <p class="text-xs opacity-60">Für alle Boote dieses Törns</p>
                 </div>
             </label>
         </div>
-
         <div id="vorlage-result" class="hidden mt-4 alert alert-success text-sm"></div>
-
         <div class="modal-action mt-4">
             <button class="btn btn-ghost" onclick="vorlageAnwendenModal.close()">Abbrechen</button>
-            <button class="btn btn-success" onclick="submitVorlageAnwenden()">
-                Anwenden
-            </button>
+            <button class="btn btn-success" onclick="submitVorlageAnwenden()">Anwenden</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
+<!-- Auto-Zuteilung Modal -->
 <dialog id="autoModal" class="modal">
-    <div class="modal-box w-full max-w-3xl h-[90vh] p-0 flex flex-col">
+    <div class="modal-box w-full max-w-lg">
 
-        <!-- HEADER -->
-        <div class="p-6 border-b bg-base-200">
-            <h3 class="text-xl font-bold flex items-center gap-2">
-                ⚡ Auto-Zuteilung
-            </h3>
-            <p class="text-sm opacity-60 mt-1">
-                Lege fest, wie deine Crew optimal auf die Boote verteilt werden soll
-            </p>
-        </div>
+        <h3 class="text-xl font-bold mb-1">Auto-Zuteilung</h3>
+        <p class="text-sm opacity-60 mb-6">Lege fest, wie die Crew auf die Boote verteilt werden soll.</p>
 
-        <!-- CONTENT -->
-        <form id="autoForm" class="p-6 space-y-8 overflow-y-auto flex-1">
+        <form id="autoForm" class="space-y-6">
 
             <!-- ALTER -->
             <div>
-                <h4 class="font-semibold mb-3 flex items-center gap-2">
-                    👥 Alter
-                </h4>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300 transition w-full">
+                <p class="text-sm font-semibold mb-2">Altersgruppen</p>
+                <div class="grid grid-cols-3 gap-2">
+                    {% for val, label in "similar:Ähnlich,mixed:Durchmischen,ignore:Egal"|split:"," %}
+                    {% endfor %}
+                    <label class="cursor-pointer">
                         <input type="radio" name="age_mode" value="similar" class="hidden peer" checked>
-                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
-                            <p class="font-medium">Ähnlich</p>
-                            <p class="text-xs opacity-60">Gruppen im gleichen Alter</p>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Ähnlich</p>
+                            <p class="text-xs opacity-50 mt-0.5">Gleiche Altersgruppe</p>
                         </div>
                     </label>
-
-                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300 transition w-full">
+                    <label class="cursor-pointer">
                         <input type="radio" name="age_mode" value="mixed" class="hidden peer">
-                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
-                            <p class="font-medium">Durchmischen</p>
-                            <p class="text-xs opacity-60">Jung & Alt kombinieren</p>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Mischen</p>
+                            <p class="text-xs opacity-50 mt-0.5">Jung &amp; Alt</p>
                         </div>
                     </label>
-
-                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300 transition w-full">
+                    <label class="cursor-pointer">
                         <input type="radio" name="age_mode" value="ignore" class="hidden peer">
-                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
-                            <p class="font-medium">Egal</p>
-                            <p class="text-xs opacity-60">Keine Berücksichtigung</p>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Egal</p>
+                            <p class="text-xs opacity-50 mt-0.5">Keine Vorgabe</p>
                         </div>
                     </label>
                 </div>
@@ -473,32 +471,27 @@
 
             <!-- ERFAHRUNG -->
             <div>
-                <h4 class="font-semibold mb-3 flex items-center gap-2">
-                    ⚓ Erfahrung
-                </h4>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                <p class="text-sm font-semibold mb-2">Segelerfahrung</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <label class="cursor-pointer">
                         <input type="radio" name="experience_mode" value="mixed" class="hidden peer" checked>
-                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
-                            <p class="font-medium">Durchmischen</p>
-                            <p class="text-xs opacity-60">Anfänger + Profis</p>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Mischen</p>
+                            <p class="text-xs opacity-50 mt-0.5">Anfänger + Profis</p>
                         </div>
                     </label>
-
-                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                    <label class="cursor-pointer">
                         <input type="radio" name="experience_mode" value="separate" class="hidden peer">
-                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
-                            <p class="font-medium">Trennen</p>
-                            <p class="text-xs opacity-60">Level getrennt halten</p>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Trennen</p>
+                            <p class="text-xs opacity-50 mt-0.5">Level getrennt</p>
                         </div>
                     </label>
-
-                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                    <label class="cursor-pointer">
                         <input type="radio" name="experience_mode" value="ignore" class="hidden peer">
-                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
-                            <p class="font-medium">Egal</p>
-                            <p class="text-xs opacity-60">Keine Rolle</p>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Egal</p>
+                            <p class="text-xs opacity-50 mt-0.5">Keine Vorgabe</p>
                         </div>
                     </label>
                 </div>
@@ -506,32 +499,27 @@
 
             <!-- GESCHLECHT -->
             <div>
-                <h4 class="font-semibold mb-3 flex items-center gap-2">
-                    🚻 Geschlecht (Kabine)
-                </h4>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                <p class="text-sm font-semibold mb-2">Geschlecht (Kabine)</p>
+                <div class="grid grid-cols-3 gap-2">
+                    <label class="cursor-pointer">
                         <input type="radio" name="gender_mode" value="same" class="hidden peer" checked>
-                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
-                            <p class="font-medium">Trennen</p>
-                            <p class="text-xs opacity-60">Gleiches Geschlecht</p>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Trennen</p>
+                            <p class="text-xs opacity-50 mt-0.5">Gleiches Geschlecht</p>
                         </div>
                     </label>
-
-                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                    <label class="cursor-pointer">
                         <input type="radio" name="gender_mode" value="mixed" class="hidden peer">
-                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
-                            <p class="font-medium">Mischen</p>
-                            <p class="text-xs opacity-60">Gemischt möglich</p>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Mischen</p>
+                            <p class="text-xs opacity-50 mt-0.5">Gemischt möglich</p>
                         </div>
                     </label>
-
-                    <label class="card bg-base-200 p-4 cursor-pointer hover:bg-base-300">
+                    <label class="cursor-pointer">
                         <input type="radio" name="gender_mode" value="ignore" class="hidden peer">
-                        <div class="peer-checked:border-primary border-2 rounded-lg p-2">
-                            <p class="font-medium">Egal</p>
-                            <p class="text-xs opacity-60">Keine Einschränkung</p>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Egal</p>
+                            <p class="text-xs opacity-50 mt-0.5">Keine Vorgabe</p>
                         </div>
                     </label>
                 </div>
@@ -539,61 +527,54 @@
 
             <!-- KONFLIKTE -->
             <div>
-                <h4 class="font-semibold mb-3 flex items-center gap-2">
-                    ⚠️ Konflikte
-                </h4>
-
-                <div class="flex gap-4">
-                    <label class="label cursor-pointer">
-                        <input type="radio" name="avoid_mode" value="strict" class="radio" checked>
-                        <span class="ml-2">Streng vermeiden</span>
+                <p class="text-sm font-semibold mb-2">Konflikte berücksichtigen</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="cursor-pointer">
+                        <input type="radio" name="avoid_mode" value="strict" class="hidden peer" checked>
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Streng</p>
+                            <p class="text-xs opacity-50 mt-0.5">Konsequent vermeiden</p>
+                        </div>
                     </label>
-
-                    <label class="label cursor-pointer">
-                        <input type="radio" name="avoid_mode" value="soft" class="radio">
-                        <span class="ml-2">Locker behandeln</span>
+                    <label class="cursor-pointer">
+                        <input type="radio" name="avoid_mode" value="soft" class="hidden peer">
+                        <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
+                            <p class="font-medium text-sm">Locker</p>
+                            <p class="text-xs opacity-50 mt-0.5">Nach Möglichkeit</p>
+                        </div>
                     </label>
                 </div>
             </div>
 
             <!-- BALANCE -->
-            <div class="bg-base-200 p-4 rounded-xl">
-                <label class="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" name="balance" class="checkbox checkbox-primary" checked>
-                    <div>
-                        <p class="font-medium">Boote gleichmäßig füllen</p>
-                        <p class="text-xs opacity-60">Verteilt Crew fair auf alle Boote</p>
-                    </div>
-                </label>
-            </div>
+            <label class="flex items-center gap-3 cursor-pointer bg-base-200 rounded-xl p-4">
+                <input type="checkbox" name="balance" class="checkbox checkbox-primary" checked>
+                <div>
+                    <p class="font-medium text-sm">Boote gleichmäßig füllen</p>
+                    <p class="text-xs opacity-60">Crew fair auf alle Boote verteilen</p>
+                </div>
+            </label>
 
         </form>
 
-        <!-- FOOTER -->
-        <div class="p-4 border-t flex justify-between items-center sticky bottom-0 bg-base-100">
-
-            <button class="btn btn-ghost" onclick="autoModal.close()">
-                Abbrechen
-            </button>
-
-            <button class="btn btn-primary px-6 w-full sm:w-auto" onclick="submitAutoAssign()">
-                🚀 Zuteilung berechnen
-            </button>
-
+        <div class="modal-action border-t border-base-300 pt-4 mt-4">
+            <button class="btn btn-ghost" onclick="autoModal.close()">Abbrechen</button>
+            <button class="btn btn-primary flex-1 sm:flex-none" onclick="submitAutoAssign()">Zuteilung berechnen</button>
         </div>
 
     </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
-<!-- ========================= -->
-<!-- KONFLIKT DATEN -->
-<!-- ========================= -->
+
+<!-- ===================== SCRIPTS ===================== -->
+
+<!-- Konflikt-Daten für JS -->
 <script>
 const excludeMap = {
     {% for t in teilnahmen %}
         "{{ t.user.id }}": [{% for u in t.exclude_list %}"{{ u.id }}",{% endfor %}],
     {% endfor %}
 };
-
 const avoidMap = {
     {% for t in teilnahmen %}
         "{{ t.user.id }}": [{% for u in t.avoid_list %}"{{ u.id }}",{% endfor %}],
@@ -601,37 +582,50 @@ const avoidMap = {
 };
 </script>
 
-<!-- ========================= -->
-<!-- DRAG & DROP + LOGIK -->
-<!-- ========================= -->
 <script>
+// ===================== TAB-SWITCHING =====================
+(function () {
+    const buttons = document.querySelectorAll('.tab-btn');
+    const panels  = document.querySelectorAll('[id^="tab-"]');
 
-// =====================
-// 🔐 CSRF
-// =====================
+    function activate(tabId) {
+        buttons.forEach(b => {
+            const active = b.dataset.tab === tabId;
+            b.classList.toggle('border-primary', active);
+            b.classList.toggle('text-primary', active);
+            b.classList.toggle('border-transparent', !active);
+            b.classList.toggle('text-base-content/50', !active);
+        });
+        panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + tabId));
+        if (tabId === 'packliste') loadVorlage();
+    }
+
+    buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            activate(btn.dataset.tab);
+            history.replaceState(null, '', '?tab=' + btn.dataset.tab);
+        });
+    });
+
+    const params = new URLSearchParams(location.search);
+    const initial = params.get('tab') || location.hash.replace('#', '') || 'uebersicht';
+    activate(initial);
+})();
+
+// ===================== CSRF =====================
 function getCSRFToken() {
-    return document.cookie
-        .split('; ')
-        .find(row => row.startsWith('csrftoken='))
-        ?.split('=')[1];
+    return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1];
 }
 
-// =====================
-// 🎯 DRAG STATE
-// =====================
+// ===================== DRAG STATE =====================
 let draggedItem = null;
 let originContainer = null;
 
-// =====================
-// 🖱 DRAG EVENTS
-// =====================
 document.addEventListener("dragstart", e => {
     const target = e.target.closest('.crew-item');
     if (!target) return;
-
     draggedItem = target;
     originContainer = target.parentElement;
-
     target.classList.add("opacity-50");
 });
 
@@ -643,207 +637,130 @@ document.addEventListener("dragend", () => {
     }
 });
 
-// =====================
-// 🔥 KONFLIKT CHECK (BOOT LEVEL)
-// =====================
+// ===================== KONFLIKT CHECK =====================
 function checkConflictsForBoot(bootZone) {
-
     const items = bootZone.querySelectorAll('.crew-item');
-
     const statusMap = new Map();
-
-    // Reset
     items.forEach(i => {
         statusMap.set(i, "none");
-        i.classList.remove(
-            "border-error","bg-error/20",
-            "border-warning","bg-warning/20"
-        );
+        i.classList.remove("border-error","bg-error/20","border-warning","bg-warning/20");
     });
-
-    // Compare
     for (let i = 0; i < items.length; i++) {
         for (let j = i + 1; j < items.length; j++) {
-
-            const itemA = items[i];
-            const itemB = items[j];
-
-            const idsA = itemA.dataset.ids.split(",");
-            const idsB = itemB.dataset.ids.split(",");
-
+            const idsA = items[i].dataset.ids.split(",");
+            const idsB = items[j].dataset.ids.split(",");
             for (let a of idsA) {
                 for (let b of idsB) {
-
                     if (excludeMap[a]?.includes(b) || excludeMap[b]?.includes(a)) {
-                        statusMap.set(itemA, "exclude");
-                        statusMap.set(itemB, "exclude");
+                        statusMap.set(items[i], "exclude");
+                        statusMap.set(items[j], "exclude");
+                    } else if (avoidMap[a]?.includes(b) || avoidMap[b]?.includes(a)) {
+                        if (statusMap.get(items[i]) !== "exclude") statusMap.set(items[i], "avoid");
+                        if (statusMap.get(items[j]) !== "exclude") statusMap.set(items[j], "avoid");
                     }
-                    else if (avoidMap[a]?.includes(b) || avoidMap[b]?.includes(a)) {
-                        if (statusMap.get(itemA) !== "exclude") {
-                            statusMap.set(itemA, "avoid");
-                        }
-                        if (statusMap.get(itemB) !== "exclude") {
-                            statusMap.set(itemB, "avoid");
-                        }
-                    }
-
                 }
             }
         }
     }
-
-    // Apply Styles
     statusMap.forEach((status, item) => {
-        if (status === "exclude") {
-            item.classList.add("border-error","bg-error/20");
-        } else if (status === "avoid") {
-            item.classList.add("border-warning","bg-warning/20");
-        }
+        if (status === "exclude") item.classList.add("border-error","bg-error/20");
+        else if (status === "avoid") item.classList.add("border-warning","bg-warning/20");
     });
 }
 
-// =====================
-// 📦 SAVE FUNCTION (NEU & ROBUST)
-// =====================
+// ===================== SAVE ASSIGNMENT =====================
 function saveAssignment(item, zone) {
-
-    const userIds = item.dataset.ids;
-    const kabineId = zone.dataset.kabineId;
-
     return fetch("{% url 'kabine_update' toern.id %}", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": getCSRFToken()
-        },
-        body: JSON.stringify({
-            user_ids: userIds,
-            kabine_id: kabineId
-        })
-    })
-    .then(res => res.json());
+        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+        body: JSON.stringify({ user_ids: item.dataset.ids, kabine_id: zone.dataset.kabineId })
+    }).then(res => res.json());
 }
 
-// =====================
-// 📥 DROP LOGIC
-// =====================
+// ===================== DRAG DROP =====================
 document.querySelectorAll('.dropzone').forEach(zone => {
-
-    zone.addEventListener('dragover', e => {
-        e.preventDefault();
-        zone.classList.add('ring','ring-primary');
-    });
-
-    zone.addEventListener('dragleave', () => {
-        zone.classList.remove('ring','ring-primary');
-    });
-
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('ring','ring-primary'); });
+    zone.addEventListener('dragleave', () => { zone.classList.remove('ring','ring-primary'); });
     zone.addEventListener('drop', e => {
         e.preventDefault();
         zone.classList.remove('ring','ring-primary');
-
         if (!draggedItem) return;
-
         const container = zone.querySelector('.crew-container');
         if (!container) return;
-
-        // =====================
-        // 🟢 OPTIMISTISCH UI UPDATE
-        // =====================
         container.appendChild(draggedItem);
-
         const bootZone = zone.closest('.boot-zone');
         if (bootZone) checkConflictsForBoot(bootZone);
-
-        // =====================
-        // 💾 SAVE
-        // =====================
-        saveAssignment(draggedItem, zone)
-            .then(data => {
-
-                if (data.status !== "ok") {
-                    throw new Error(data.message || "Save failed");
-                }
-
-            })
-            .catch(err => {
-
-                console.error("❌ SAVE ERROR:", err);
-
-                // 🔥 ROLLBACK
-                if (originContainer) {
-                    originContainer.appendChild(draggedItem);
-
-                    const originBoot = originContainer.closest('.boot-zone');
-                    if (originBoot) checkConflictsForBoot(originBoot);
-                }
-
-                alert("Speichern fehlgeschlagen!");
-            });
-
+        saveAssignment(draggedItem, zone).then(data => {
+            if (data.status !== "ok") throw new Error(data.message || "Save failed");
+        }).catch(err => {
+            console.error("SAVE ERROR:", err);
+            if (originContainer) {
+                originContainer.appendChild(draggedItem);
+                const ob = originContainer.closest('.boot-zone');
+                if (ob) checkConflictsForBoot(ob);
+            }
+            alert("Speichern fehlgeschlagen!");
+        });
     });
-
 });
 
-// =====================
-// 🚀 INITIAL CHECK
-// =====================
-document.querySelectorAll('.boot-zone').forEach(boot => {
-    checkConflictsForBoot(boot);
+// ===================== TAP-TO-MOVE (MOBILE) =====================
+let selectedItem = null;
+
+document.addEventListener("click", e => {
+    const item = e.target.closest(".crew-item");
+    if (item) {
+        selectedItem = item;
+        document.querySelectorAll(".crew-item").forEach(i => i.classList.remove("ring","ring-primary","ring-2"));
+        item.classList.add("ring-2","ring-primary");
+    }
 });
 
-// =====================
-// 🤖 AUTO ASSIGN
-// =====================
+document.querySelectorAll('.dropzone').forEach(zone => {
+    zone.addEventListener('click', e => {
+        if (!selectedItem || e.target.closest('.crew-item')) return;
+        const container = zone.querySelector('.crew-container');
+        if (!container) return;
+        container.appendChild(selectedItem);
+        const bootZone = zone.closest('.boot-zone');
+        if (bootZone) checkConflictsForBoot(bootZone);
+        saveAssignment(selectedItem, zone).catch(() => alert("Speichern fehlgeschlagen"));
+        selectedItem.classList.remove("ring-2","ring","ring-primary");
+        selectedItem = null;
+    });
+});
+
+// Initial Konflikt-Check
+document.querySelectorAll('.boot-zone').forEach(b => checkConflictsForBoot(b));
+
+// ===================== AUTO ASSIGN =====================
 function submitAutoAssign() {
-
     const form = document.getElementById("autoForm");
     const formData = new FormData(form);
-
-    const config = {
-        age_mode: formData.get("age_mode"),
-        experience_mode: formData.get("experience_mode"),
-        gender_mode: formData.get("gender_mode"),
-        avoid_mode: formData.get("avoid_mode"),
-        balance: formData.get("balance") ? true : false
-    };
-
     fetch("{% url 'auto_assign' toern.id %}", {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": getCSRFToken()
-        },
-        body: JSON.stringify(config)
-    })
-    .then(res => res.json())
-    .then(data => {
-
-        if (data.status === "ok") {
-            location.reload();
-        } else {
-            alert("Fehler: " + data.message);
-        }
-
-    })
-    .catch(err => {
-        console.error("❌ AUTO ASSIGN ERROR:", err);
-        alert("Serverfehler");
-    });
+        headers: { "Content-Type": "application/json", "X-CSRFToken": getCSRFToken() },
+        body: JSON.stringify({
+            age_mode: formData.get("age_mode"),
+            experience_mode: formData.get("experience_mode"),
+            gender_mode: formData.get("gender_mode"),
+            avoid_mode: formData.get("avoid_mode"),
+            balance: !!formData.get("balance")
+        })
+    }).then(r => r.json()).then(data => {
+        if (data.status === "ok") location.reload();
+        else alert("Fehler: " + data.message);
+    }).catch(() => alert("Serverfehler"));
 }
-// =========================
-// PACKLISTEN-VORLAGEN
-// =========================
+
+// ===================== PACKLISTEN-VORLAGEN =====================
 let vorlageRevier = 'standard';
 let vorlageTyp = 'personal';
 let vorlageId = null;
 
 function setRevier(revier) {
     vorlageRevier = revier;
-    document.querySelectorAll('.vorlage-revier-btn').forEach(b => {
-        b.classList.remove('btn-primary');
-        b.classList.add('btn-outline');
-    });
+    document.querySelectorAll('.vorlage-revier-btn').forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-outline'); });
     const active = document.getElementById('btn-revier-' + revier);
     if (active) { active.classList.add('btn-primary'); active.classList.remove('btn-outline'); }
     loadVorlage();
@@ -851,39 +768,25 @@ function setRevier(revier) {
 
 function setTyp(typ) {
     vorlageTyp = typ;
-    ['personal', 'boot'].forEach(t => {
-        const tab = document.getElementById('tab-' + t);
-        tab.classList.toggle('tab-active', t === typ);
-    });
+    ['personal','boot'].forEach(t => { document.getElementById('tab-' + t).classList.toggle('tab-active', t === typ); });
     loadVorlage();
 }
 
 function loadVorlage() {
     document.getElementById('vorlage-loading').classList.remove('hidden');
     document.getElementById('vorlage-list').classList.add('hidden');
-
-    fetch(`{% url 'vorlage_items_get' toern.id 'REVIER' 'TYP' %}`
-        .replace('REVIER', vorlageRevier)
-        .replace('TYP', vorlageTyp))
-        .then(r => r.json())
-        .then(data => {
-            vorlageId = data.vorlage_id;
-            renderVorlageItems(data.items);
-        });
+    fetch(`{% url 'vorlage_items_get' toern.id 'REVIER' 'TYP' %}`.replace('REVIER', vorlageRevier).replace('TYP', vorlageTyp))
+        .then(r => r.json()).then(data => { vorlageId = data.vorlage_id; renderVorlageItems(data.items); });
 }
 
 function renderVorlageItems(items) {
     const list = document.getElementById('vorlage-list');
     list.innerHTML = '';
-
     if (items.length === 0) {
-        list.innerHTML = '<p class="text-sm opacity-50 text-center py-4">Noch keine Einträge. Füge oben neue hinzu.</p>';
+        list.innerHTML = '<p class="text-sm opacity-50 text-center py-4">Noch keine Einträge.</p>';
     } else {
-        items.forEach(item => {
-            list.appendChild(buildVorlageRow(item));
-        });
+        items.forEach(item => list.appendChild(buildVorlageRow(item)));
     }
-
     document.getElementById('vorlage-loading').classList.add('hidden');
     list.classList.remove('hidden');
 }
@@ -895,13 +798,12 @@ function buildVorlageRow(item) {
     div.innerHTML = `
         <span class="flex-1 text-sm font-medium view-mode">${escapeHtml(item.name)}</span>
         <span class="badge badge-outline text-xs view-mode">${item.menge}×</span>
-        <input type="text" value="${escapeHtml(item.name)}" class="input input-bordered input-xs flex-1 hidden edit-mode" />
-        <input type="number" value="${item.menge}" min="1" class="input input-bordered input-xs w-16 hidden edit-mode" />
-        <button onclick="editVorlageRow(${item.id})" class="btn btn-xs btn-ghost view-mode" title="Bearbeiten">✏️</button>
+        <input type="text" value="${escapeHtml(item.name)}" class="input input-bordered input-xs flex-1 hidden edit-mode"/>
+        <input type="number" value="${item.menge}" min="1" class="input input-bordered input-xs w-16 hidden edit-mode"/>
+        <button onclick="editVorlageRow(${item.id})" class="btn btn-xs btn-ghost view-mode">✏️</button>
         <button onclick="saveVorlageRow(${item.id})" class="btn btn-xs btn-primary hidden edit-mode">✓</button>
         <button onclick="cancelVorlageEdit(${item.id})" class="btn btn-xs btn-ghost hidden edit-mode">✕</button>
-        <button onclick="deleteVorlageItem(${item.id})" class="btn btn-xs btn-ghost text-error view-mode" title="Löschen">🗑</button>
-    `;
+        <button onclick="deleteVorlageItem(${item.id})" class="btn btn-xs btn-ghost text-error view-mode">🗑</button>`;
     return div;
 }
 
@@ -910,121 +812,56 @@ function editVorlageRow(id) {
     row.querySelectorAll('.view-mode').forEach(el => el.classList.add('hidden'));
     row.querySelectorAll('.edit-mode').forEach(el => el.classList.remove('hidden'));
 }
-
 function cancelVorlageEdit(id) {
     const row = document.getElementById('vorlage-row-' + id);
     row.querySelectorAll('.view-mode').forEach(el => el.classList.remove('hidden'));
     row.querySelectorAll('.edit-mode').forEach(el => el.classList.add('hidden'));
 }
-
 function saveVorlageRow(id) {
     const row = document.getElementById('vorlage-row-' + id);
     const inputs = row.querySelectorAll('.edit-mode input');
     const name = inputs[0].value.trim();
     const menge = parseInt(inputs[1].value) || 1;
     if (!name) return;
-
     fetch(`{% url 'vorlage_item_update' toern.id 9999 %}`.replace('9999', id), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
         body: JSON.stringify({ name, menge })
     }).then(() => loadVorlage());
 }
-
 function deleteVorlageItem(id) {
     fetch(`{% url 'vorlage_item_delete' toern.id 9999 %}`.replace('9999', id), {
-        method: 'POST',
-        headers: { 'X-CSRFToken': getCSRFToken() }
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
     }).then(() => loadVorlage());
 }
-
 function addVorlageItem() {
     const nameEl = document.getElementById('new-vorlage-name');
     const mengeEl = document.getElementById('new-vorlage-menge');
     const name = nameEl.value.trim();
     const menge = parseInt(mengeEl.value) || 1;
     if (!name || !vorlageId) return;
-
     fetch("{% url 'vorlage_item_add' toern.id %}", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
         body: JSON.stringify({ vorlage_id: vorlageId, name, menge })
-    }).then(() => {
-        nameEl.value = '';
-        mengeEl.value = 1;
-        loadVorlage();
-    });
+    }).then(() => { nameEl.value = ''; mengeEl.value = 1; loadVorlage(); });
 }
-
 function submitVorlageAnwenden() {
-    const applyPersonal = document.getElementById('apply-personal').checked;
-    const applyBoot = document.getElementById('apply-boot').checked;
     const resultEl = document.getElementById('vorlage-result');
     resultEl.classList.add('hidden');
-
     fetch("{% url 'vorlage_anwenden' toern.id %}", {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
         body: JSON.stringify({
             revier_typ: vorlageRevier,
-            apply_personal: applyPersonal,
-            apply_boot: applyBoot
+            apply_personal: document.getElementById('apply-personal').checked,
+            apply_boot: document.getElementById('apply-boot').checked
         })
-    })
-    .then(r => r.json())
-    .then(data => {
+    }).then(r => r.json()).then(data => {
         resultEl.textContent = `✓ ${data.added.personal} persönliche & ${data.added.boot} Boot-Einträge ergänzt.`;
         resultEl.classList.remove('hidden');
     });
 }
-
 function escapeHtml(str) {
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-// Initial laden
-loadVorlage();
-
-let selectedItem = null;
-
-// Tap auf Item (Mobile)
-document.addEventListener("click", e => {
-
-    const item = e.target.closest(".crew-item");
-
-    if (item) {
-        selectedItem = item;
-
-        document.querySelectorAll(".crew-item").forEach(i =>
-            i.classList.remove("ring", "ring-primary")
-        );
-
-        item.classList.add("ring", "ring-primary");
-    }
-});
-
-// Tap auf Dropzone
-document.querySelectorAll('.dropzone').forEach(zone => {
-
-    zone.addEventListener('click', () => {
-
-        if (!selectedItem) return;
-
-        const container = zone.querySelector('.crew-container');
-        if (!container) return;
-
-        container.appendChild(selectedItem);
-
-        const bootZone = zone.closest('.boot-zone');
-        if (bootZone) checkConflictsForBoot(bootZone);
-
-        saveAssignment(selectedItem, zone)
-            .catch(() => alert("Speichern fehlgeschlagen"));
-
-        selectedItem.classList.remove("ring", "ring-primary");
-        selectedItem = null;
-    });
-
-});
 </script>
+
 {% endblock %}
