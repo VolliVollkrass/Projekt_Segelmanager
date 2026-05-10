@@ -301,6 +301,127 @@
 
 </div>
 
+    <!-- ========================= -->
+    <!-- PACKLISTEN-VORLAGEN       -->
+    <!-- ========================= -->
+    <div class="card bg-base-100 shadow">
+        <div class="card-body gap-4">
+
+            <div>
+                <h2 class="card-title">📦 Packlisten-Vorlagen</h2>
+                <p class="text-sm opacity-60 mt-1">
+                    Passe die Vorlage für dein Segelgebiet an. Beim Anwenden werden nur fehlende Einträge ergänzt — individuelle Änderungen der Crew bleiben erhalten.
+                </p>
+            </div>
+
+            <!-- Revier-Auswahl -->
+            <div>
+                <p class="text-xs font-semibold uppercase opacity-50 mb-2">Segelgebiet</p>
+                <div class="flex flex-wrap gap-2">
+                    <button id="btn-revier-standard"
+                        class="btn btn-sm btn-primary vorlage-revier-btn"
+                        onclick="setRevier('standard')">
+                        Standard
+                    </button>
+                    <button id="btn-revier-warm"
+                        class="btn btn-sm btn-outline vorlage-revier-btn"
+                        onclick="setRevier('warm')">
+                        ☀️ Warm (Mittelmeer, Karibik)
+                    </button>
+                    <button id="btn-revier-kalt"
+                        class="btn btn-sm btn-outline vorlage-revier-btn"
+                        onclick="setRevier('kalt')">
+                        🧊 Kalt (Nordsee, Ostsee)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Typ-Tabs -->
+            <div role="tablist" class="tabs tabs-boxed">
+                <button role="tab" id="tab-personal"
+                    class="tab tab-active"
+                    onclick="setTyp('personal')">
+                    👤 Persönlich
+                </button>
+                <button role="tab" id="tab-boot"
+                    class="tab"
+                    onclick="setTyp('boot')">
+                    ⛵ Boot
+                </button>
+            </div>
+
+            <!-- Item-Liste -->
+            <div id="vorlage-loading" class="flex justify-center py-6">
+                <span class="loading loading-spinner loading-md"></span>
+            </div>
+
+            <div id="vorlage-list" class="hidden space-y-2">
+                <!-- filled by JS -->
+            </div>
+
+            <!-- Neuen Eintrag hinzufügen -->
+            <div class="flex gap-2 pt-2 border-t">
+                <input type="text" id="new-vorlage-name"
+                    placeholder="Neuer Eintrag..."
+                    class="input input-bordered flex-1 input-sm" />
+                <input type="number" id="new-vorlage-menge"
+                    value="1" min="1"
+                    class="input input-bordered w-20 input-sm" />
+                <button onclick="addVorlageItem()" class="btn btn-primary btn-sm">
+                    + Hinzufügen
+                </button>
+            </div>
+
+            <!-- Vorlage anwenden -->
+            <div class="pt-2">
+                <button onclick="document.getElementById('vorlageAnwendenModal').showModal()"
+                    class="btn btn-success w-full sm:w-auto">
+                    🚀 Vorlage auf diesen Törn anwenden
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+<!-- VORLAGE ANWENDEN MODAL -->
+<dialog id="vorlageAnwendenModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-2">Vorlage anwenden</h3>
+        <p class="text-sm opacity-70 mb-4">
+            Nur fehlende Einträge werden ergänzt. Bestehende Änderungen der Crew bleiben erhalten.
+        </p>
+
+        <div class="space-y-3">
+            <label class="flex items-center gap-3 cursor-pointer bg-base-200 p-3 rounded-lg">
+                <input type="checkbox" id="apply-personal" class="checkbox checkbox-primary" checked />
+                <div>
+                    <p class="font-medium text-sm">👤 Persönliche Packliste</p>
+                    <p class="text-xs opacity-60">Für alle bestätigten Crewmitglieder</p>
+                </div>
+            </label>
+            <label class="flex items-center gap-3 cursor-pointer bg-base-200 p-3 rounded-lg">
+                <input type="checkbox" id="apply-boot" class="checkbox checkbox-primary" checked />
+                <div>
+                    <p class="font-medium text-sm">⛵ Boot-Packliste</p>
+                    <p class="text-xs opacity-60">Für alle Boote dieses Törns</p>
+                </div>
+            </label>
+        </div>
+
+        <div id="vorlage-result" class="hidden mt-4 alert alert-success text-sm"></div>
+
+        <div class="modal-action mt-4">
+            <button class="btn btn-ghost" onclick="vorlageAnwendenModal.close()">Abbrechen</button>
+            <button class="btn btn-success" onclick="submitVorlageAnwenden()">
+                Anwenden
+            </button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 <dialog id="autoModal" class="modal">
     <div class="modal-box w-full max-w-3xl h-[90vh] p-0 flex flex-col">
 
@@ -710,6 +831,160 @@ function submitAutoAssign() {
         alert("Serverfehler");
     });
 }
+// =========================
+// PACKLISTEN-VORLAGEN
+// =========================
+let vorlageRevier = 'standard';
+let vorlageTyp = 'personal';
+let vorlageId = null;
+
+function setRevier(revier) {
+    vorlageRevier = revier;
+    document.querySelectorAll('.vorlage-revier-btn').forEach(b => {
+        b.classList.remove('btn-primary');
+        b.classList.add('btn-outline');
+    });
+    const active = document.getElementById('btn-revier-' + revier);
+    if (active) { active.classList.add('btn-primary'); active.classList.remove('btn-outline'); }
+    loadVorlage();
+}
+
+function setTyp(typ) {
+    vorlageTyp = typ;
+    ['personal', 'boot'].forEach(t => {
+        const tab = document.getElementById('tab-' + t);
+        tab.classList.toggle('tab-active', t === typ);
+    });
+    loadVorlage();
+}
+
+function loadVorlage() {
+    document.getElementById('vorlage-loading').classList.remove('hidden');
+    document.getElementById('vorlage-list').classList.add('hidden');
+
+    fetch(`{% url 'vorlage_items_get' toern.id 'REVIER' 'TYP' %}`
+        .replace('REVIER', vorlageRevier)
+        .replace('TYP', vorlageTyp))
+        .then(r => r.json())
+        .then(data => {
+            vorlageId = data.vorlage_id;
+            renderVorlageItems(data.items);
+        });
+}
+
+function renderVorlageItems(items) {
+    const list = document.getElementById('vorlage-list');
+    list.innerHTML = '';
+
+    if (items.length === 0) {
+        list.innerHTML = '<p class="text-sm opacity-50 text-center py-4">Noch keine Einträge. Füge oben neue hinzu.</p>';
+    } else {
+        items.forEach(item => {
+            list.appendChild(buildVorlageRow(item));
+        });
+    }
+
+    document.getElementById('vorlage-loading').classList.add('hidden');
+    list.classList.remove('hidden');
+}
+
+function buildVorlageRow(item) {
+    const div = document.createElement('div');
+    div.id = 'vorlage-row-' + item.id;
+    div.className = 'flex items-center gap-2 bg-base-200 rounded-lg px-3 py-2';
+    div.innerHTML = `
+        <span class="flex-1 text-sm font-medium view-mode">${escapeHtml(item.name)}</span>
+        <span class="badge badge-outline text-xs view-mode">${item.menge}×</span>
+        <input type="text" value="${escapeHtml(item.name)}" class="input input-bordered input-xs flex-1 hidden edit-mode" />
+        <input type="number" value="${item.menge}" min="1" class="input input-bordered input-xs w-16 hidden edit-mode" />
+        <button onclick="editVorlageRow(${item.id})" class="btn btn-xs btn-ghost view-mode" title="Bearbeiten">✏️</button>
+        <button onclick="saveVorlageRow(${item.id})" class="btn btn-xs btn-primary hidden edit-mode">✓</button>
+        <button onclick="cancelVorlageEdit(${item.id})" class="btn btn-xs btn-ghost hidden edit-mode">✕</button>
+        <button onclick="deleteVorlageItem(${item.id})" class="btn btn-xs btn-ghost text-error view-mode" title="Löschen">🗑</button>
+    `;
+    return div;
+}
+
+function editVorlageRow(id) {
+    const row = document.getElementById('vorlage-row-' + id);
+    row.querySelectorAll('.view-mode').forEach(el => el.classList.add('hidden'));
+    row.querySelectorAll('.edit-mode').forEach(el => el.classList.remove('hidden'));
+}
+
+function cancelVorlageEdit(id) {
+    const row = document.getElementById('vorlage-row-' + id);
+    row.querySelectorAll('.view-mode').forEach(el => el.classList.remove('hidden'));
+    row.querySelectorAll('.edit-mode').forEach(el => el.classList.add('hidden'));
+}
+
+function saveVorlageRow(id) {
+    const row = document.getElementById('vorlage-row-' + id);
+    const inputs = row.querySelectorAll('.edit-mode input');
+    const name = inputs[0].value.trim();
+    const menge = parseInt(inputs[1].value) || 1;
+    if (!name) return;
+
+    fetch(`{% url 'vorlage_item_update' toern.id 9999 %}`.replace('9999', id), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ name, menge })
+    }).then(() => loadVorlage());
+}
+
+function deleteVorlageItem(id) {
+    fetch(`{% url 'vorlage_item_delete' toern.id 9999 %}`.replace('9999', id), {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(() => loadVorlage());
+}
+
+function addVorlageItem() {
+    const nameEl = document.getElementById('new-vorlage-name');
+    const mengeEl = document.getElementById('new-vorlage-menge');
+    const name = nameEl.value.trim();
+    const menge = parseInt(mengeEl.value) || 1;
+    if (!name || !vorlageId) return;
+
+    fetch("{% url 'vorlage_item_add' toern.id %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ vorlage_id: vorlageId, name, menge })
+    }).then(() => {
+        nameEl.value = '';
+        mengeEl.value = 1;
+        loadVorlage();
+    });
+}
+
+function submitVorlageAnwenden() {
+    const applyPersonal = document.getElementById('apply-personal').checked;
+    const applyBoot = document.getElementById('apply-boot').checked;
+    const resultEl = document.getElementById('vorlage-result');
+    resultEl.classList.add('hidden');
+
+    fetch("{% url 'vorlage_anwenden' toern.id %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({
+            revier_typ: vorlageRevier,
+            apply_personal: applyPersonal,
+            apply_boot: applyBoot
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        resultEl.textContent = `✓ ${data.added.personal} persönliche & ${data.added.boot} Boot-Einträge ergänzt.`;
+        resultEl.classList.remove('hidden');
+    });
+}
+
+function escapeHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Initial laden
+loadVorlage();
+
 let selectedItem = null;
 
 // Tap auf Item (Mobile)

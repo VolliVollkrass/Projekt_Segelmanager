@@ -67,8 +67,44 @@ BASIS_PACKLISTE = [
     ("Powerbank / Ladekabel", 1), 
     ("Ohropax (für die Nacht)", 1), 
     ] 
-BOOT_STANDARD_LISTE = [ 
-    ("Wäscheklammern aus Holz", 30), 
+KALT_PACKLISTE = BASIS_PACKLISTE + [
+    ("Thermounterwäsche", 2),
+    ("Ölzeug / Segeloverall", 1),
+    ("Segelstiefel / wasserfeste Stiefel", 1),
+    ("Neopren-Handschuhe", 1),
+    ("Neopren-Socken", 2),
+    ("Wollsocken extra", 3),
+    ("Warmer Fleece extra", 1),
+    ("Sturmhaube / Balaclava", 1),
+]
+
+KALT_BOOT_LISTE = [
+    ("Wäscheklammern aus Holz", 30),
+    ("scharfe Küchenmesser", 1),
+    ("Schärfer für Küchenmesser", 1),
+    ("Hygienespray - Sagrotan", 1),
+    ("Ökologische Handseife - für die Toilette", 3),
+    ("Verschlussklammern Lebensmittel", 5),
+    ("Aufbewahrungsdosen Lebensmittel", 5),
+    ("Gewürze Nordisch", 5),
+    ("French Press / Bialetti", 1),
+    ("Thermoskanne", 2),
+    ("Angelzeug", 1),
+    ("Musikbox", 1),
+    ("Spiele", 1),
+    ("Rei aus der Tube", 1),
+    ("Lichterkette", 1),
+    ("Bändsel", 1),
+    ("Kamera", 1),
+    ("Infomaterial", 1),
+    ("Notfallpässe", 1),
+    ("Erste Hilfe Set (erweitert)", 1),
+    ("Wärmflasche", 2),
+    ("Regenklammerbox / Spritzschutz", 1),
+]
+
+BOOT_STANDARD_LISTE = [
+    ("Wäscheklammern aus Holz", 30),
     ("scharfe Küchenmesser", 1), 
     ("Schärfer für Küchenmesser", 1), 
     ("Hygienespray - Sagrotan", 1), 
