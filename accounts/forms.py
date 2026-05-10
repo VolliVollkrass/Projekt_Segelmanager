@@ -249,6 +249,37 @@ class AccountEditForm(forms.ModelForm):
             self.fields['geburtsdatum'].initial = self.instance.geburtsdatum.strftime("%Y-%m-%d")
 
 
+class OnboardingForm(forms.ModelForm):
+
+    geburtsdatum = forms.DateField(
+        required=False,
+        widget=forms.DateInput(
+            attrs={"type": "date", "class": "input input-bordered w-full text-lg h-14"},
+            format="%Y-%m-%d"
+        ),
+        input_formats=["%Y-%m-%d"]
+    )
+
+    class Meta:
+        model = User
+        fields = ["telefonnummer", "geburtsdatum", "nationalitaet", "passnummer"]
+        widgets = {
+            "telefonnummer": forms.TextInput(attrs={
+                "class": "input input-bordered w-full text-lg h-14",
+                "type": "tel",
+                "placeholder": "+49 …",
+            }),
+            "nationalitaet": forms.TextInput(attrs={
+                "class": "input input-bordered w-full text-lg h-14",
+                "placeholder": "z.B. Deutsch",
+            }),
+            "passnummer": forms.TextInput(attrs={
+                "class": "input input-bordered w-full text-lg h-14",
+                "placeholder": "Dokumentnummer",
+            }),
+        }
+
+
 class LizenzForm(forms.ModelForm):
     class Meta:
         model = Lizenz

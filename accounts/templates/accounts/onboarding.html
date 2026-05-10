@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Willkommen an Bord{% endblock %}
+
+{% block content %}
+<div class="min-h-screen flex flex-col max-w-md mx-auto px-5 py-8">
+
+    <!-- Logo & Titel -->
+    <div class="text-center mb-8">
+        <img src="{% static 'medien/Logo_Meer_erleben.png' %}" alt="Logo" class="h-12 mx-auto mb-4">
+        <h1 class="text-2xl font-bold">Willkommen an Bord!</h1>
+        <p class="text-base-content/50 text-sm mt-1">Noch ein paar Infos, dann kann's losgehen.</p>
+    </div>
+
+    <!-- Schritt-Indikatoren -->
+    <div class="flex justify-center gap-2 mb-8" id="step-dots">
+        <div class="w-8 h-1.5 rounded-full bg-primary transition-all" id="dot-1"></div>
+        <div class="w-2 h-1.5 rounded-full bg-base-300 transition-all" id="dot-2"></div>
+        <div class="w-2 h-1.5 rounded-full bg-base-300 transition-all" id="dot-3"></div>
+    </div>
+
+    <form method="POST" id="onboarding-form" class="flex-1 flex flex-col">
+        {% csrf_token %}
+
+        <!-- ======= SCHRITT 1: Telefon ======= -->
+        <div id="step-1" class="flex-1 flex flex-col">
+            <div class="flex-1">
+                <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Schritt 1 von 3</p>
+                <h2 class="text-xl font-bold mb-1">Wie erreicht man dich?</h2>
+                <p class="text-base-content/50 text-sm mb-6">Deine Telefonnummer ist für den Skipper im Notfall wichtig.</p>
+
+                <div class="form-control">
+                    <label class="label pb-1">
+                        <span class="label-text font-medium">Handynummer</span>
+                    </label>
+                    {{ form.telefonnummer }}
+                    {% if form.telefonnummer.errors %}
+                        <p class="text-error text-sm mt-1">{{ form.telefonnummer.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-8">
+                <button type="button" onclick="nextStep(2)"
+                        class="btn btn-primary flex-1 h-14 text-base">
+                    Weiter
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="text-center mt-4">
+                <button type="button" onclick="nextStep(2)" class="text-sm text-base-content/40 hover:text-base-content transition-colors">
+                    Überspringen
+                </button>
+            </div>
+        </div>
+
+        <!-- ======= SCHRITT 2: Persönliche Daten ======= -->
+        <div id="step-2" class="hidden flex-1 flex flex-col">
+            <div class="flex-1">
+                <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Schritt 2 von 3</p>
+                <h2 class="text-xl font-bold mb-1">Persönliche Daten</h2>
+                <p class="text-base-content/50 text-sm mb-6">Werden für die offizielle Crewliste benötigt.</p>
+
+                <div class="space-y-4">
+                    <div class="form-control">
+                        <label class="label pb-1">
+                            <span class="label-text font-medium">Geburtsdatum</span>
+                        </label>
+                        {{ form.geburtsdatum }}
+                        {% if form.geburtsdatum.errors %}
+                            <p class="text-error text-sm mt-1">{{ form.geburtsdatum.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label pb-1">
+                            <span class="label-text font-medium">Nationalität</span>
+                        </label>
+                        {{ form.nationalitaet }}
+                        {% if form.nationalitaet.errors %}
+                            <p class="text-error text-sm mt-1">{{ form.nationalitaet.errors.0 }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-8">
+                <button type="button" onclick="prevStep(1)"
+                        class="btn btn-ghost h-14 px-5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </button>
+                <button type="button" onclick="nextStep(3)"
+                        class="btn btn-primary flex-1 h-14 text-base">
+                    Weiter
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="text-center mt-4">
+                <button type="button" onclick="nextStep(3)" class="text-sm text-base-content/40 hover:text-base-content transition-colors">
+                    Überspringen
+                </button>
+            </div>
+        </div>
+
+        <!-- ======= SCHRITT 3: Ausweisdokument ======= -->
+        <div id="step-3" class="hidden flex-1 flex flex-col">
+            <div class="flex-1">
+                <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Schritt 3 von 3</p>
+                <h2 class="text-xl font-bold mb-1">Ausweisdokument</h2>
+                <p class="text-base-content/50 text-sm mb-6">Reisepass- oder Personalausweisnummer – optional, aber wichtig für internationale Törns.</p>
+
+                <div class="form-control">
+                    <label class="label pb-1">
+                        <span class="label-text font-medium">Dokumentnummer</span>
+                        <span class="label-text-alt text-base-content/40">optional</span>
+                    </label>
+                    {{ form.passnummer }}
+                    {% if form.passnummer.errors %}
+                        <p class="text-error text-sm mt-1">{{ form.passnummer.errors.0 }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-8">
+                <button type="button" onclick="prevStep(2)"
+                        class="btn btn-ghost h-14 px-5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </button>
+                <button type="submit"
+                        class="btn btn-primary flex-1 h-14 text-base">
+                    Fertig & los geht's!
+                </button>
+            </div>
+            <div class="text-center mt-4">
+                <button type="submit" class="text-sm text-base-content/40 hover:text-base-content transition-colors">
+                    Überspringen & direkt starten
+                </button>
+            </div>
+        </div>
+
+    </form>
+
+</div>
+
+<script>
+(function () {
+    const TOTAL = 3;
+
+    function showStep(n) {
+        for (let i = 1; i <= TOTAL; i++) {
+            document.getElementById('step-' + i).classList.toggle('hidden', i !== n);
+            document.getElementById('step-' + i).classList.toggle('flex', i === n);
+            const dot = document.getElementById('dot-' + i);
+            if (i === n) {
+                dot.classList.add('w-8', 'bg-primary');
+                dot.classList.remove('w-2', 'bg-base-300');
+            } else {
+                dot.classList.remove('w-8', 'bg-primary');
+                dot.classList.add('w-2', 'bg-base-300');
+            }
+        }
+    }
+
+    window.nextStep = function (n) { showStep(n); };
+    window.prevStep = function (n) { showStep(n); };
+
+    showStep(1);
+})();
+</script>
+
+{% endblock %}
