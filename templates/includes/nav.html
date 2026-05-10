@@ -23,7 +23,7 @@
         <li><a href="/">ℹ️ Info</a></li>
 
         {% if user.is_authenticated %}
-          <li><a href="/">🌊 Törn</a></li>
+          <li><a href="{% url 'crew_overview' %}">🌊 Törn</a></li>
 
           {% if user.is_staff %}
             <li>
@@ -34,7 +34,7 @@
             </li>
           {% endif %}
 
-          {% if user.is_anbieter or user.is_staff %}
+          {% if user.is_authenticated %}
             <li>
               <a href="{% url 'crew_overview' %}">
                 ⛵️ Crewbereich
@@ -79,7 +79,7 @@
       <li><a href="/">Info</a></li>
 
       {% if user.is_authenticated %}
-        <li><a href="/">Törn</a></li>
+        <li><a href="{% url 'crew_overview' %}">Törn</a></li>
 
         {% if user.is_staff %}
           <li>
