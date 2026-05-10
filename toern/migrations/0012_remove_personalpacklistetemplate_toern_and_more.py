@@ -10,14 +10,29 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name='personalpacklistetemplate',
-            name='toern',
-        ),
-        migrations.DeleteModel(
-            name='BootPacklisteTemplate',
-        ),
-        migrations.DeleteModel(
-            name='PersonalPacklisteTemplate',
+        # Use SeparateDatabaseAndState so the database operation is safe (IF EXISTS)
+        # while Django's migration state is updated correctly regardless.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunSQL(
+                    sql=[
+                        "DROP TABLE IF EXISTS toern_personalpacklistetemplate",
+                        "DROP TABLE IF EXISTS toern_bootpacklistetemplate",
+                    ],
+                    reverse_sql=migrations.RunSQL.noop,
+                ),
+            ],
+            state_operations=[
+                migrations.RemoveField(
+                    model_name='personalpacklistetemplate',
+                    name='toern',
+                ),
+                migrations.DeleteModel(
+                    name='BootPacklisteTemplate',
+                ),
+                migrations.DeleteModel(
+                    name='PersonalPacklisteTemplate',
+                ),
+            ],
         ),
     ]
