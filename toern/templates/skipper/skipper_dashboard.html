@@ -443,8 +443,6 @@
             <div>
                 <p class="text-sm font-semibold mb-2">Altersgruppen</p>
                 <div class="grid grid-cols-3 gap-2">
-                    {% for val, label in "similar:Ähnlich,mixed:Durchmischen,ignore:Egal"|split:"," %}
-                    {% endfor %}
                     <label class="cursor-pointer">
                         <input type="radio" name="age_mode" value="similar" class="hidden peer" checked>
                         <div class="peer-checked:border-primary peer-checked:bg-primary/5 border-2 border-base-300 rounded-xl p-3 text-center transition-all">
