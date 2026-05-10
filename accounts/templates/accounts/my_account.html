@@ -1,350 +1,265 @@
 {% extends "base.html" %}
-
-{% block title %}Mein Account{% endblock %}
+{% load static %}
+{% block title %}Mein Profil{% endblock %}
 
 {% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-<div class="min-h-screen p-6">
-<div class="max-w-6xl mx-auto space-y-6">
+    <!-- ===================== HEADER ===================== -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl p-5">
+        <div class="flex items-center gap-4">
+            <div class="avatar shrink-0">
+                <div class="w-16 h-16 rounded-full">
+                    {% if user.profilbild %}
+                        <img src="{{ user.profilbild.url }}" alt="Profilbild">
+                    {% else %}
+                        <img src="https://api.dicebear.com/7.x/initials/svg?seed={{ user.first_name }}+{{ user.last_name }}" alt="Avatar">
+                    {% endif %}
+                </div>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h1 class="text-xl font-bold truncate">{{ user.first_name }} {{ user.last_name }}</h1>
+                <p class="text-sm text-base-content/50 truncate">{{ user.email }}</p>
+                <p class="text-xs text-base-content/30 mt-0.5">Mitglied seit {{ user.date_joined|date:"M Y" }}</p>
+            </div>
+        </div>
 
-<!-- Header -->
+        <div class="flex flex-wrap gap-2 mt-4">
+            <a href="{% url 'account_edit' %}" class="btn btn-primary btn-sm">Profil bearbeiten</a>
+            <a href="{% url 'crew_overview' %}" class="btn btn-outline btn-sm">Meine Törns</a>
+            <form action="{% url 'logout' %}" method="post">
+                {% csrf_token %}
+                <button class="btn btn-ghost btn-sm text-error">Abmelden</button>
+            </form>
+        </div>
+    </div>
 
-<div class="card bg-base-100 shadow border border-base-200">
-
-<div class="card-body">
-
-<div class="flex flex-col md:flex-row items-center gap-6">
-
-<div class="avatar">
-  <div class="w-24 rounded-full">
-    {% if user.profilbild %}
-      <img src="{{ user.profilbild.url }}">
-    {% else %}
-      <img src="https://api.dicebear.com/7.x/initials/svg?seed={{ user.first_name }}">
+    <!-- ===================== PROFIL-BANNER ===================== -->
+    {% if profil_prozent < 100 %}
+    <a href="{% url 'account_edit' %}"
+       class="flex items-center gap-3 bg-warning/10 border border-warning/30 rounded-xl p-4 hover:bg-warning/20 transition-colors">
+        <div class="shrink-0 w-9 h-9 rounded-full bg-warning/20 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold">Profil unvollständig</p>
+            <div class="flex items-center gap-2 mt-1">
+                <progress class="progress progress-warning h-1.5 flex-1" value="{{ profil_prozent }}" max="100"></progress>
+                <span class="text-xs text-base-content/50 shrink-0">{{ profil_prozent }}%</span>
+            </div>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+        </svg>
+    </a>
     {% endif %}
-  </div>
-</div>
 
-<div class="flex-1 text-center md:text-left">
-
-<h1 class="text-3xl font-bold">
-{{ user.first_name }} {{ user.last_name }}
-</h1>
-
-<p class="opacity-70">{{ user.email }}</p>
-
-</div>
-
-<div class="flex flex-wrap gap-2">
-
-<a class="btn btn-secondary" href="{% url 'account_edit' %}">
-Profil bearbeiten
-</a>
-
-<a class="btn btn-primary" href="{% url "index" %}">
-Home
-</a>
-
-<form action="{% url 'logout' %}" method="post">
-{% csrf_token %}
-<button class="btn btn-error">
-Logout
-</button>
-</form>
-
-</div>
-
-</div>
-</div>
-</div>
-
-<!-- Stats -->
-
-<div class="stats shadow w-full">
-
-<div class="stat">
-<div class="stat-title">Mitgesegelte Törns</div>
-<div class="stat-value">5</div>
-<div class="stat-desc">seit {{ user.date_joined|date:"Y" }}</div>
-</div>
-
-<div class="stat">
-<div class="stat-title">Seemeilen gesegelt</div>
-<div class="stat-value">1500</div>
-</div>
-
-<div class="stat">
-<div class="stat-title">Nächster Törn</div>
-<div class="stat-value text-primary">12 Tage</div>
-<div class="stat-desc">
-<a class="link link-primary">Zum Törn</a>
-</div>
-</div>
-
-</div>
-
-<div class="grid md:grid-cols-2 gap-6">
-
-<!-- Profilinfos -->
-
-<div class="card bg-base-100 shadow border border-base-200">
-
-<div class="card-body">
-
-<div class="flex justify-between items-center">
-
-<h2 class="card-title">Profilinformationen</h2>
-
-</div>
-
-<div class="divider"></div>
-
-<div class="space-y-2">
-
-<p><b>Benutzer-ID:</b> {{ user.username }}</p>
-
-<p><b>Telefon:</b> {{ user.telefonnummer|default:"-" }}</p>
-
-<p>
-<b>Geburtsdatum:</b>
-{% if user.geburtsdatum %}
-{{ user.geburtsdatum }}
-{% else %}
--
-{% endif %}
-</p>
-
-<p><b>Nationalität:</b> {{ user.nationalitaet|default:"-" }}</p>
-
-<p>
-<b>Adresse:</b><br>
-{{ user.strasse }}<br>
-{{ user.plz }} {{ user.ort }}
-</p>
-
-</div>
-
-</div>
-</div>
-
-
-<!-- Lizenzen -->
-
-<div class="card bg-base-100 shadow border border-base-200">
-
-<div class="card-body">
-
-<div class="flex justify-between items-center">
-
-<h2 class="card-title">Segellizenzen / Ausweisdokumente
-</h2>
-
-<button class="btn btn-primary btn-sm">
-  <a href="{% url 'lizenz_hinzufuegen' %}" class="text-white">
-    + Lizenz hinzufügen
-  </a>
-</button>
-
-</div>
-
-<div class="divider"></div>
-
-<div class="space-y-3">
-  {% for lizenz in user.lizenzen.all %}
-  <div class="flex justify-between items-center p-3 bg-base-200 rounded-box">
-    <div>
-      <p class="font-semibold">{{ lizenz.name }}</p>
-      <p class="text-sm opacity-70">Ausgestellt: {{ lizenz.ausstellungsdatum|date:"Y-m-d" }}</p>
-      {% if lizenz.ablaufdatum %}
-      <p class="text-sm opacity-70">Ablauf: {{ lizenz.ablaufdatum|date:"Y-m-d" }}</p>
-      {% endif %}
-        <div class="flex gap-3 mt-2">
-          {% if lizenz.dokument_vorne %}
-          <a href="{{ lizenz.dokument_vorne.url }}" target="_blank">
-            <img src="{{ lizenz.dokument_vorne.url }}" class="w-28 rounded-lg border hover:scale-105 transition">
-          </a>
-          {% endif %}
-
-          {% if lizenz.dokument_hinten %}
-          <a href="{{ lizenz.dokument_hinten.url }}" target="_blank">
-            <img src="{{ lizenz.dokument_hinten.url }}" class="w-28 rounded-lg border hover:scale-105 transition">
-          </a>
-          {% endif %}
+    <!-- ===================== STATS ===================== -->
+    <div class="grid grid-cols-3 gap-3">
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-primary">{{ kommende_teilnahmen|length }}</p>
+            <p class="text-xs text-base-content/50 mt-0.5 leading-tight">Kommende Törns</p>
+        </div>
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold">{{ vergangene_teilnahmen|length }}</p>
+            <p class="text-xs text-base-content/50 mt-0.5 leading-tight">Gesegelte Törns</p>
+        </div>
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4 text-center">
+            {% if tage_bis_naechster is not None %}
+                <p class="text-2xl font-bold text-success">{{ tage_bis_naechster }}</p>
+                <p class="text-xs text-base-content/50 mt-0.5 leading-tight">Tage bis nächster Törn</p>
+            {% else %}
+                <p class="text-2xl font-bold text-base-content/20">–</p>
+                <p class="text-xs text-base-content/50 mt-0.5 leading-tight">Kein Törn geplant</p>
+            {% endif %}
         </div>
     </div>
 
-    <form method="post" action="{% url 'lizenz_loeschen' lizenz.id %}">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-error btn-xs">Löschen</button>
-    </form>
-
-  </div>
-  {% empty %}
-  <p class="opacity-50">Noch keine Lizenzen hinterlegt.</p>
-  {% endfor %}
-  </div>
-</div>
-</div>
-
-
-<!-- Törn Archiv -->
-
-<div class="card bg-base-100 shadow border border-base-200">
-
-<div class="card-body">
-
-<h2 class="card-title">⛵ Logbuch</h2>
-
-<div class="divider"></div>
-
-<ul class="timeline timeline-vertical">
-
-<li>
-
-<div class="timeline-start">2024</div>
-
-<div class="timeline-middle">⛵</div>
-
-<div class="timeline-end timeline-box">
-
-<p class="font-semibold">
-Kroatien – Kornaten Törn
-</p>
-
-<p class="text-sm opacity-70">
-420 sm gesegelt
-</p>
-
-<a class="link link-primary text-sm">
-Törn ansehen
-</a>
-
-</div>
-
-<hr>
-
-</li>
-
-<li>
-
-<div class="timeline-start">2023</div>
-
-<div class="timeline-middle">⛵</div>
-
-<div class="timeline-end timeline-box">
-
-<p class="font-semibold">
-Ionisches Meer
-</p>
-
-<p class="text-sm opacity-70">
-350 sm gesegelt
-</p>
-
-<a class="link link-primary text-sm">
-Törn ansehen
-</a>
-
-</div>
-
-<hr>
-
-</li>
-
-<li>
-
-<div class="timeline-start">2022</div>
-
-<div class="timeline-middle">⛵</div>
-
-<div class="timeline-end timeline-box">
-
-<p class="font-semibold">
-Sardinien Rundtörn
-</p>
-
-<p class="text-sm opacity-70">
-510 sm gesegelt
-</p>
-
-<a class="link link-primary text-sm">
-Törn ansehen
-</a>
-
-</div>
-
-</li>
-
-</ul>
-
-</div>
-
-</div>
-{% if user.is_anbieter %}
-<div class="card bg-base-100 shadow border border-secondary">
-
-    <div class="card-body">
-
-        <h2 class="card-title text-secondary">
-            ⚓ Anbieterbereich
-        </h2>
-
-        <div class="divider"></div>
-
-        <div class="flex gap-4 flex-wrap">
-
-            <a href="{% url 'anbieter_dashboard' %}" class="btn btn-secondary">
-                Meine Törns
-            </a>
-
-            <a href="{% url 'toern_create' %}" class="btn btn-outline">
-                + Törn erstellen
-            </a>
-
+    <!-- ===================== NÄCHSTER TÖRN ===================== -->
+    {% if naechste_teilnahme %}
+    <a href="{% url 'crew_dashboard' naechste_teilnahme.toern.id %}"
+       class="block bg-primary text-primary-content rounded-2xl p-5 shadow-md hover:shadow-lg transition-shadow">
+        <p class="text-xs font-semibold uppercase tracking-widest text-primary-content/60 mb-1">Nächster Törn</p>
+        <h2 class="text-xl font-bold leading-tight">{{ naechste_teilnahme.toern.titel }}</h2>
+        <p class="text-primary-content/70 text-sm mt-0.5">{{ naechste_teilnahme.toern.revier }}</p>
+        <div class="flex items-center gap-1.5 mt-3 text-primary-content/80 text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            {{ naechste_teilnahme.toern.startdatum|date:"d. M. Y" }} – {{ naechste_teilnahme.toern.enddatum|date:"d. M. Y" }}
         </div>
+        <div class="flex justify-end mt-3">
+            <span class="text-sm font-medium text-primary-content/80 flex items-center gap-1">
+                Zum Törn
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                </svg>
+            </span>
+        </div>
+    </a>
+    {% endif %}
 
+    <!-- ===================== PROFILINFORMATIONEN ===================== -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-base-200">
+            <h2 class="font-bold">Persönliche Daten</h2>
+            <a href="{% url 'account_edit' %}" class="text-xs text-primary hover:underline">Bearbeiten</a>
+        </div>
+        <div class="divide-y divide-base-200">
+            <div class="flex justify-between items-center px-5 py-3">
+                <span class="text-sm text-base-content/50">Telefon</span>
+                <span class="text-sm font-medium {% if not user.telefonnummer %}text-base-content/30 italic{% endif %}">
+                    {{ user.telefonnummer|default:"Nicht angegeben" }}
+                </span>
+            </div>
+            <div class="flex justify-between items-center px-5 py-3">
+                <span class="text-sm text-base-content/50">Geburtsdatum</span>
+                <span class="text-sm font-medium {% if not user.geburtsdatum %}text-base-content/30 italic{% endif %}">
+                    {% if user.geburtsdatum %}{{ user.geburtsdatum|date:"d. M. Y" }}{% else %}Nicht angegeben{% endif %}
+                </span>
+            </div>
+            <div class="flex justify-between items-center px-5 py-3">
+                <span class="text-sm text-base-content/50">Nationalität</span>
+                <span class="text-sm font-medium {% if not user.nationalitaet %}text-base-content/30 italic{% endif %}">
+                    {{ user.nationalitaet|default:"Nicht angegeben" }}
+                </span>
+            </div>
+            <div class="flex justify-between items-center px-5 py-3">
+                <span class="text-sm text-base-content/50">Ausweis-Nr.</span>
+                <span class="text-sm font-medium {% if not user.passnummer %}text-base-content/30 italic{% endif %}">
+                    {% if user.passnummer %}••••{{ user.passnummer|slice:"-4:" }}{% else %}Nicht angegeben{% endif %}
+                </span>
+            </div>
+            <div class="flex justify-between items-center px-5 py-3">
+                <span class="text-sm text-base-content/50">Adresse</span>
+                <span class="text-sm font-medium text-right {% if not user.strasse %}text-base-content/30 italic{% endif %}">
+                    {% if user.strasse %}
+                        {{ user.strasse }}<br>
+                        <span class="text-base-content/50">{{ user.plz }} {{ user.ort }}</span>
+                    {% else %}
+                        Nicht angegeben
+                    {% endif %}
+                </span>
+            </div>
+        </div>
     </div>
 
+    <!-- ===================== LIZENZEN ===================== -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-base-200">
+            <h2 class="font-bold">Lizenzen & Dokumente</h2>
+            <a href="{% url 'lizenz_hinzufuegen' %}" class="text-xs text-primary hover:underline">+ Hinzufügen</a>
+        </div>
+
+        {% if user.lizenzen.all %}
+        <div class="divide-y divide-base-200">
+            {% for lizenz in user.lizenzen.all %}
+            <div class="px-5 py-4">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-sm">{{ lizenz.name }}</p>
+                        <p class="text-xs text-base-content/40 mt-0.5">
+                            Ausgestellt: {{ lizenz.ausstellungsdatum|date:"d. M. Y" }}
+                            {% if lizenz.ablaufdatum %}
+                                · Ablauf: {{ lizenz.ablaufdatum|date:"d. M. Y" }}
+                            {% endif %}
+                        </p>
+                        {% if lizenz.dokument_vorne or lizenz.dokument_hinten %}
+                        <div class="flex gap-2 mt-2">
+                            {% if lizenz.dokument_vorne %}
+                            <a href="{{ lizenz.dokument_vorne.url }}" target="_blank" class="block">
+                                <img src="{{ lizenz.dokument_vorne.url }}" class="h-14 w-20 object-cover rounded-lg border border-base-300 hover:scale-105 transition-transform">
+                            </a>
+                            {% endif %}
+                            {% if lizenz.dokument_hinten %}
+                            <a href="{{ lizenz.dokument_hinten.url }}" target="_blank" class="block">
+                                <img src="{{ lizenz.dokument_hinten.url }}" class="h-14 w-20 object-cover rounded-lg border border-base-300 hover:scale-105 transition-transform">
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    <form method="post" action="{% url 'lizenz_loeschen' lizenz.id %}">
+                        {% csrf_token %}
+                        <button type="submit"
+                                onclick="return confirm('Lizenz löschen?')"
+                                class="btn btn-ghost btn-xs text-error">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-5 py-8 text-center">
+            <p class="text-sm text-base-content/40">Noch keine Lizenzen hinterlegt.</p>
+            <a href="{% url 'lizenz_hinzufuegen' %}" class="btn btn-primary btn-sm mt-3">Erste Lizenz hinzufügen</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ===================== LOGBUCH ===================== -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-base-200">
+            <h2 class="font-bold">Logbuch</h2>
+            <p class="text-xs text-base-content/40 mt-0.5">Alle gesegelte Törns</p>
+        </div>
+
+        {% if vergangene_teilnahmen %}
+        <div class="divide-y divide-base-200">
+            {% for t in vergangene_teilnahmen reversed %}
+            <a href="{% url 'crew_dashboard' t.toern.id %}"
+               class="flex items-center gap-4 px-5 py-4 hover:bg-base-200/50 transition-colors">
+                <div class="shrink-0 text-center w-10">
+                    <p class="text-xs font-bold text-base-content/40">{{ t.toern.startdatum|date:"Y" }}</p>
+                    <p class="text-xs text-base-content/30">{{ t.toern.startdatum|date:"M" }}</p>
+                </div>
+                <div class="w-px h-8 bg-base-300 shrink-0"></div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-sm truncate">{{ t.toern.titel }}</p>
+                    <p class="text-xs text-base-content/40 mt-0.5">{{ t.toern.revier }} · {{ t.toern.startdatum|date:"d. M." }} – {{ t.toern.enddatum|date:"d. M. Y" }}</p>
+                </div>
+                <span class="badge badge-sm badge-ghost shrink-0">{{ t.rolle }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="px-5 py-8 text-center">
+            <p class="text-sm text-base-content/40">Noch keine Törns gesegelt.</p>
+            <a href="{% url 'index' %}" class="btn btn-primary btn-sm mt-3">Törns entdecken</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ===================== ANBIETERBEREICH ===================== -->
+    {% if user.is_anbieter %}
+    <div class="bg-base-100 border border-secondary/30 rounded-2xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-secondary/20 bg-secondary/5">
+            <h2 class="font-bold text-secondary">Anbieterbereich</h2>
+        </div>
+        <div class="flex flex-wrap gap-2 p-5">
+            <a href="{% url 'anbieter_dashboard' %}" class="btn btn-secondary btn-sm">Meine Törns</a>
+            <a href="{% url 'toern_create' %}" class="btn btn-outline btn-sm">+ Törn erstellen</a>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===================== ADMINBEREICH ===================== -->
+    {% if user.is_staff %}
+    <div class="bg-base-100 border border-primary/30 rounded-2xl overflow-hidden">
+        <div class="px-5 py-4 border-b border-primary/20 bg-primary/5">
+            <h2 class="font-bold text-primary">Administration</h2>
+        </div>
+        <div class="flex flex-wrap gap-2 p-5">
+            <a href="{% url 'admin:index' %}" class="btn btn-primary btn-sm">Django Admin</a>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
-{% endif %}
-
-<!-- Adminbereich -->
-
-{% if user.is_staff %}
-
-<div class="card bg-base-100 shadow border border-primary">
-
-<div class="card-body">
-
-<h2 class="card-title text-primary">
-🛡 Skipper / Administrationsbereich
-</h2>
-
-<div class="divider"></div>
-
-<div class="grid md:grid-cols-3 gap-4">
-
-<a class="btn btn-outline btn-primary">
-Törns verwalten
-</a>
-
-<a class="btn btn-outline btn-primary">
-Crews verwalten
-</a>
-
-<a class="btn btn-outline btn-primary">
-Boote verwalten
-</a>
-
-</div>
-
-</div>
-
-</div>
-
-{% endif %}
-
-</div>
-</div>
-
 {% endblock %}
