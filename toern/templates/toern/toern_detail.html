@@ -4,213 +4,139 @@
 {% block title %}{{ toern.titel }}{% endblock %}
 
 {% block content %}
-<div class="max-w-5xl mx-auto px-4 py-10">
+<div class="max-w-4xl mx-auto px-4 py-6 space-y-5">
 
-    <!-- Titel & Badge -->
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-3xl font-bold">{{ toern.titel }}</h1>
-        {% if user.is_authenticated and user.is_anbieter and toern.anbieter == user %}
-            <a href="{% url 'toern_edit' toern.pk %}" class="btn btn-sm btn-outline">
-                ✏️ Bearbeiten
-            </a>
-        {% endif %}
-            <div class="badge badge-outline">
-                {{ toern.get_status_display }}
-            </div>
-        <div class="badge 
-            {% if toern.freie_plaetze == 0 %}badge-error
-            {% elif toern.freie_plaetze <= 5 %}badge-warning
-            {% else %}badge-success{% endif %}">
-            {% if toern.freie_plaetze == 0 %}Voll{% else %}{{ toern.freie_plaetze }} Plätze frei{% endif %}
+    <!-- Header -->
+    <div class="flex items-start justify-between gap-3">
+        <div class="flex-1 min-w-0">
+            <h1 class="text-2xl font-bold leading-tight">{{ toern.titel }}</h1>
+            <p class="text-sm text-base-content/50 mt-0.5">{{ toern.revier }}</p>
+        </div>
+        <div class="flex flex-col items-end gap-1 shrink-0">
+            <span class="badge badge-outline badge-sm">{{ toern.get_status_display }}</span>
+            <span class="badge badge-sm {% if toern.freie_plaetze == 0 %}badge-error{% elif toern.freie_plaetze <= 5 %}badge-warning{% else %}badge-success{% endif %}">
+                {% if toern.freie_plaetze == 0 %}Voll{% else %}{{ toern.freie_plaetze }} Plätze frei{% endif %}
+            </span>
         </div>
     </div>
-    <!-- Datum, Revier & Preis -->
-    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-
-        <div class="card bg-base-100 shadow">
-            <div class="card-body p-4 text-center">
-                <div class="text-sm opacity-60">Von</div>
-                <div class="font-semibold">
-                    {{ toern.startdatum|date:"d.m.Y" }}
-                </div>
-            </div>
-        </div>
-
-        <div class="card bg-base-100 shadow">
-            <div class="card-body p-4 text-center">
-                <div class="text-sm opacity-60">Bis</div>
-                <div class="font-semibold">
-                    {{ toern.enddatum|date:"d.m.Y" }}
-                </div>
-            </div>
-        </div>
-
-        <div class="card bg-base-100 shadow col-span-2 md:col-span-1">
-            <div class="card-body p-4 text-center">
-                <div class="text-sm opacity-60">Destination</div>
-                <div class="font-semibold">
-                    {{ toern.revier }}
-                </div>
-            </div>
-        </div>
-
-        <div class="card bg-base-100 shadow">
-            <div class="card-body p-4 text-center">
-                <div class="text-sm opacity-60">Preis p.P.</div>
-                <div class="font-semibold">
-                    {{ toern.preis_pro_person }} €
-                </div>
-            </div>
-        </div>
-
-        <div class="card bg-base-100 shadow">
-            <div class="card-body p-4 text-center">
-
-                <div class="text-sm flex items-center justify-center gap-1 z-10">
-                    Nebenkosten
-
-                    <div class="tooltip tooltip-bottom"
-                        data-tip="Die Nebenkosten beinhalten meist Diesel, Hafengebühren, Endreinigung und die Bordkasse für gemeinsame Einkäufe wie Lebensmittel oder Wasser. Die tatsächlichen Kosten können je nach Route und Bedürfnisse variieren.">
-
-                        <button class="btn btn-xs btn-circle ">
-                            i
-                        </button>
-
-                    </div>
-                </div>
-
-                <div class="font-semibold">
-                    ca. {{ toern.nebenkosten }} €
-                </div>
-
-            </div>
-        </div>
-
-        <div class="card bg-primary text-primary-content shadow">
-            <div class="card-body p-4 text-center">
-                <div class="text-sm opacity-80">Gesamt ca.</div>
-                <div class="text-xl font-bold">
-                    {{ toern.gesamtpreis }} €
-                </div>
-            </div>
-        </div>
-    </div>
-
-
 
     <!-- Bild -->
     {% if toern.bild_toern %}
-        <img src="{{ toern.bild_toern.url }}" alt="{{ toern.titel }}" class="rounded-lg mb-6 shadow-md w-full">
+        <img src="{{ toern.bild_toern.url }}" alt="{{ toern.titel }}" class="rounded-2xl w-full object-cover max-h-64 shadow">
     {% else %}
-        <img src="{% static 'medien/Segeln_dummy.jpeg' %}" alt="{{ toern.titel }}" class="rounded-lg mb-6 shadow-md w-full">
+        <img src="{% static 'medien/Segeln_dummy.jpeg' %}" alt="{{ toern.titel }}" class="rounded-2xl w-full object-cover max-h-64 shadow">
     {% endif %}
+
+    <!-- Eckdaten -->
+    <div class="grid grid-cols-3 gap-3">
+        <div class="bg-base-100 border border-base-300 rounded-xl p-3 text-center">
+            <p class="text-xs text-base-content/40">Start</p>
+            <p class="font-semibold text-sm mt-0.5">{{ toern.startdatum|date:"d. M. Y" }}</p>
+        </div>
+        <div class="bg-base-100 border border-base-300 rounded-xl p-3 text-center">
+            <p class="text-xs text-base-content/40">Ende</p>
+            <p class="font-semibold text-sm mt-0.5">{{ toern.enddatum|date:"d. M. Y" }}</p>
+        </div>
+        <div class="bg-primary text-primary-content rounded-xl p-3 text-center">
+            <p class="text-xs text-primary-content/70">Gesamt ca.</p>
+            <p class="font-bold text-lg mt-0.5">{{ toern.gesamtpreis }} €</p>
+        </div>
+    </div>
+
+    <!-- Preisdetails -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
+        <div class="divide-y divide-base-200">
+            <div class="flex justify-between items-center px-5 py-3">
+                <span class="text-sm text-base-content/50">Preis pro Person</span>
+                <span class="font-semibold text-sm">{{ toern.preis_pro_person }} €</span>
+            </div>
+            <div class="flex justify-between items-center px-5 py-3">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-sm text-base-content/50">Nebenkosten</span>
+                    <div class="tooltip tooltip-right" data-tip="Diesel, Hafengebühren, Endreinigung und Bordkasse für gemeinsame Einkäufe.">
+                        <button type="button" class="btn btn-circle btn-ghost btn-xs text-base-content/30 h-5 w-5 min-h-0">i</button>
+                    </div>
+                </div>
+                <span class="font-semibold text-sm">ca. {{ toern.nebenkosten }} €</span>
+            </div>
+        </div>
+    </div>
 
     <!-- Beschreibung -->
     {% if toern.beschreibung %}
-        <div class="mb-6">
-            <h2 class="text-xl font-semibold mb-2">Beschreibung</h2>
-            <p class="text-sm">{{ toern.beschreibung }}</p>
-        </div>
-    {% endif %}
-
-    <!-- Boote & Kabinen -->
- <h2 class="text-xl font-semibold mb-4">Boote der Flottille</h2>
-
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-{% for boot in boote %}
-
-<div class="card bg-base-100 shadow-xl">
-
-    {% if boot.bild_boot %}
-    <figure>
-        <img src="{{ boot.bild_boot.url }}" alt="{{ boot.name }}" class="h-48 w-full object-cover">
-    </figure>
-    {% endif %}
-
-    <div class="card-body">
-
-        <h3 class="card-title">
-            {{ boot.name }}
-        </h3>
-
-        <p class="text-sm opacity-70">
-            {{ boot.typ }}
-        </p>
-
-        {% if boot.Hafen %}
-        <p class="text-sm">
-            Hafen: {{ boot.Hafen }}
-        </p>
-
-        {% endif %}
-        {% if boot.Hafen_googlemaps %}
-        <p class="text-sm">
-            Google Maps: <a href="{{ boot.Hafen_googlemaps }}" target="_blank" class="link link-primary">Karte</a>
-        </p>
-
-        {% endif %}
-
-        <!-- Skipper -->
-        {% with skipper=skipper_pro_boot|get_item:boot.id %}
-            {% if skipper %}
-                <p class="text-sm">
-                    <span class="font-semibold">Skipper:</span>
-                    {{ skipper.user.get_full_name }}
-                </p>
-            {% endif %}
-        {% endwith %}
-
-        <!-- Kabinen -->
-        <div class="mt-3">
-
-            <p class="font-semibold text-sm mb-1">
-                Kabinen
-            </p>
-
-            <ul class="text-sm space-y-1">
-
-                {% for kabine in boot.kabinen.all %}
-                <li>
-                    {{ kabine.name }} – {{ kabine.betten }} Betten
-                </li>
-                {% endfor %}
-
-            </ul>
-
-        </div>
-
+    <div class="bg-base-100 border border-base-300 rounded-2xl p-5">
+        <h2 class="font-bold mb-2">Beschreibung</h2>
+        <p class="text-sm text-base-content/70 leading-relaxed">{{ toern.beschreibung }}</p>
     </div>
+    {% endif %}
 
-</div>
+    <!-- Boote -->
+    {% if boote %}
+    <div>
+        <h2 class="font-bold mb-3">Boote der Flottille</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {% for boot in boote %}
+            <div class="card bg-base-100 shadow border border-base-300 overflow-hidden">
+                {% if boot.bild_boot %}
+                <figure>
+                    <img src="{{ boot.bild_boot.url }}" alt="{{ boot.name }}" class="h-40 w-full object-cover">
+                </figure>
+                {% endif %}
+                <div class="card-body p-4 gap-1.5">
+                    <h3 class="font-bold">{{ boot.name }}</h3>
+                    <p class="text-xs text-base-content/50">{{ boot.typ }}</p>
+                    {% if boot.Hafen %}
+                        <p class="text-xs text-base-content/50">Hafen: {{ boot.Hafen }}
+                            {% if boot.Hafen_googlemaps %}
+                                · <a href="{{ boot.Hafen_googlemaps }}" target="_blank" class="link link-primary">Karte</a>
+                            {% endif %}
+                        </p>
+                    {% endif %}
+                    {% with skipper=skipper_pro_boot|get_item:boot.id %}
+                        {% if skipper %}
+                            <p class="text-xs"><span class="font-medium">Skipper:</span> {{ skipper.user.get_full_name }}</p>
+                        {% endif %}
+                    {% endwith %}
+                    {% if boot.kabinen.all %}
+                    <div class="mt-2 pt-2 border-t border-base-200">
+                        <p class="text-xs font-medium text-base-content/50 mb-1">Kabinen</p>
+                        <ul class="text-xs space-y-0.5 text-base-content/70">
+                            {% for kabine in boot.kabinen.all %}
+                            <li>{{ kabine.name }} – {{ kabine.betten }} Betten</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
-{% endfor %}
+    <!-- Anbieter-Edit-Link -->
+    {% if user.is_authenticated and user.is_anbieter and toern.anbieter == user %}
+    <a href="{% url 'toern_edit' toern.pk %}" class="btn btn-outline btn-sm w-full">
+        Törn bearbeiten
+    </a>
+    {% endif %}
 
-</div>
-
-    <!-- Buttons -->
-    <div class="flex gap-4 mt-6">
+    <!-- CTA -->
+    <div class="sticky bottom-20 lg:static lg:bottom-auto">
         {% if user_teilnahme %}
-
             {% if user_teilnahme.status == "warteliste" %}
-                <button class="btn btn-warning w-full" disabled>
-                    Warteliste
-                </button>
+                <button class="btn btn-warning w-full" disabled>Auf der Warteliste</button>
             {% else %}
-                <a href="{% url 'crew_dashboard' toern.pk %}" 
-                class="btn btn-success w-full">
+                <a href="{% url 'crew_dashboard' toern.pk %}" class="btn btn-success w-full h-14 text-base">
                     Zum Crew Dashboard
                 </a>
             {% endif %}
-
         {% else %}
-
-            <a href="{% url 'toern_anmeldung' pk=toern.pk %}" 
-            class="btn btn-primary w-full">
-                Anmelden
+            <a href="{% url 'toern_anmeldung' pk=toern.pk %}" class="btn btn-primary w-full h-14 text-base">
+                Jetzt anmelden
             </a>
-
         {% endif %}
+    </div>
 
 </div>
 {% endblock %}
