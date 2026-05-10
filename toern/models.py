@@ -224,3 +224,35 @@ class CrewPraeferenz(models.Model):
 
     def __str__(self):
         return f"{self.from_user} -> {self.to_user} ({self.typ})"
+
+
+REVIER_TYP_CHOICES = [
+    ('standard', 'Standard'),
+    ('warm', 'Warmes Segelgebiet'),
+    ('kalt', 'Kaltes Segelgebiet'),
+]
+
+
+class PacklisteVorlage(models.Model):
+    erstellt_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='packliste_vorlagen'
+    )
+    revier_typ = models.CharField(max_length=20, choices=REVIER_TYP_CHOICES, default='standard')
+    typ = models.CharField(max_length=10, choices=[('personal', 'Persönlich'), ('boot', 'Boot')])
+
+    class Meta:
+        unique_together = [('erstellt_von', 'revier_typ', 'typ')]
+
+    def __str__(self):
+        return f"{self.get_typ_display()} - {self.get_revier_typ_display()} ({self.erstellt_von.username})"
+
+
+class PacklisteVorlageEintrag(models.Model):
+    vorlage = models.ForeignKey(PacklisteVorlage, on_delete=models.CASCADE, related_name='eintraege')
+    name = models.CharField(max_length=255)
+    menge = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.menge}x {self.name}"
