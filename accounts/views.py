@@ -5,7 +5,7 @@ from django.contrib.auth import update_session_auth_hash, authenticate, login
 from django.contrib.auth.views import LoginView
 from django_ratelimit.decorators import ratelimit
 
-from .forms import RegisterForm, LoginForm, AccountEditForm, LizenzForm
+from .forms import RegisterForm, LoginForm, AccountEditForm, LizenzForm, OnboardingForm
 from .models import Lizenz
 
 @ratelimit(key='ip', rate='5/h', block=True)
@@ -28,8 +28,7 @@ def register(request):
 
             if user is not None:
                 login(request, user)
-                messages.success(request, "Registrierung erfolgreich.")
-                return redirect("index")
+                return redirect("onboarding")
 
             messages.error(request, "Login nach Registrierung fehlgeschlagen.")
 
@@ -37,6 +36,24 @@ def register(request):
         form = RegisterForm()
 
     return render(request, "accounts/register.html", {"form": form})
+
+
+@login_required
+def onboarding(request):
+    from utils.user_profil_fortschritt import user_profil_fortschritt
+    if user_profil_fortschritt(request.user) >= 80:
+        return redirect("crew_overview")
+
+    if request.method == "POST":
+        form = OnboardingForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Profil gespeichert – willkommen an Bord!")
+            return redirect("crew_overview")
+    else:
+        form = OnboardingForm(instance=request.user)
+
+    return render(request, "accounts/onboarding.html", {"form": form})
 
 
 class CustomLoginView(LoginView):

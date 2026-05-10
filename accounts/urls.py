@@ -12,4 +12,5 @@ urlpatterns = [
     path("account-edit/", views.account_edit, name="account_edit"),
     path("lizenz-hinzufuegen/", views.lizenz_hinzufuegen, name="lizenz_hinzufuegen"),
     path("lizenz-loeschen/<int:pk>/", views.lizenz_loeschen, name="lizenz_loeschen"),
+    path("onboarding/", views.onboarding, name="onboarding"),
 ]
