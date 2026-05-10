@@ -1,63 +1,132 @@
 {% extends "base.html" %}
+{% load static %}
+{% block title %}Meine Törns{% endblock %}
+
 {% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
 
-<div class="max-w-6xl mx-auto px-4 py-8">
-
-    <h1 class="text-2xl font-semibold mb-6">Meine Törns</h1>
-
-    <!-- KOMMENDE TÖRNS -->
-    <div class="mb-10">
-        <h2 class="text-lg font-semibold mb-4 text-green-700">Kommende Törns</h2>
-
-        {% for t in kommende_toerns %}
-        <a href="{% url 'crew_dashboard' t.id %}">
-            <div class="bg-white shadow rounded-xl p-5 mb-3 hover:shadow-md transition">
-
-                <div class="flex justify-between">
-                    <h3 class="text-lg font-semibold">{{ t.titel }}</h3>
-                    <span class="text-sm text-gray-500">
-                        {{ t.startdatum }} – {{ t.enddatum }}
-                    </span>
-                </div>
-
-                <p class="text-sm text-gray-600 mt-2">
-                    {{ t.revier }}
-                </p>
-
-            </div>
-        </a>
-        {% empty %}
-            <p class="text-gray-500">Keine kommenden Törns</p>
-        {% endfor %}
+    <!-- Begrüßung -->
+    <div class="mb-5">
+        <h1 class="text-2xl font-bold">Hallo, {{ request.user.first_name|default:request.user.email }}!</h1>
+        <p class="text-base-content/60 text-sm mt-0.5">Schön, dass du dabei bist.</p>
     </div>
 
+    <!-- Profil-Banner -->
+    {% if profil_prozent < 100 %}
+    <a href="{% url 'account_edit' %}"
+       class="flex items-center gap-3 bg-warning/10 border border-warning/30 rounded-xl p-4 mb-6 hover:bg-warning/20 transition-colors">
+        <div class="shrink-0 w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+            </svg>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-warning-content">Profil vervollständigen</p>
+            <div class="mt-1 flex items-center gap-2">
+                <progress class="progress progress-warning h-1.5 flex-1" value="{{ profil_prozent }}" max="100"></progress>
+                <span class="text-xs text-base-content/60 shrink-0">{{ profil_prozent }}%</span>
+            </div>
+        </div>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+        </svg>
+    </a>
+    {% endif %}
 
-    <!-- VERGANGENE TÖRNS -->
-    <div>
-        <h2 class="text-lg font-semibold mb-4 text-gray-600">Vergangene Törns</h2>
+    <!-- Nächster Törn (Hero Card) -->
+    {% if naechste_teilnahme %}
+    <div class="mb-8">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Nächster Törn</h2>
+        <a href="{% url 'crew_dashboard' naechste_teilnahme.toern.id %}"
+           class="block bg-primary text-primary-content rounded-2xl p-5 shadow-lg hover:shadow-xl transition-shadow">
 
-        {% for t in vergangene_toerns %}
-        <a href="{% url 'crew_dashboard' t.id %}">
-            <div class="bg-gray-100 rounded-xl p-5 mb-3 hover:bg-gray-200 transition">
-
-                <div class="flex justify-between">
-                    <h3 class="text-lg font-semibold">{{ t.titel }}</h3>
-                    <span class="text-sm text-gray-500">
-                        {{ t.startdatum }} – {{ t.enddatum }}
-                    </span>
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="text-xl font-bold leading-tight">{{ naechste_teilnahme.toern.titel }}</h3>
+                    <p class="text-primary-content/70 text-sm mt-0.5">{{ naechste_teilnahme.toern.revier }}</p>
                 </div>
+                <span class="badge {{ naechste_teilnahme.status_info.badge }} badge-sm shrink-0 ml-2">
+                    {{ naechste_teilnahme.status_info.label }}
+                </span>
+            </div>
 
-                <p class="text-sm text-gray-600 mt-2">
-                    {{ t.revier }}
-                </p>
+            <div class="flex items-center gap-1.5 mt-4 text-primary-content/80 text-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                {{ naechste_teilnahme.toern.startdatum|date:"d. M. Y" }} &ndash; {{ naechste_teilnahme.toern.enddatum|date:"d. M. Y" }}
+            </div>
 
+            <div class="flex items-center justify-end mt-4 gap-1 text-primary-content/80 text-sm font-medium">
+                Zum Törn
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                </svg>
             </div>
         </a>
-        {% empty %}
-            <p class="text-gray-500">Keine vergangenen Törns</p>
-        {% endfor %}
     </div>
+    {% endif %}
+
+    <!-- Alle kommenden Törns -->
+    {% if kommende_teilnahmen|length > 1 %}
+    <div class="mb-8">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Weitere Törns</h2>
+        <div class="flex flex-col gap-3">
+            {% for teilnahme in kommende_teilnahmen %}
+            {% if not forloop.first %}
+            <a href="{% url 'crew_dashboard' teilnahme.toern.id %}"
+               class="flex items-center gap-4 bg-base-100 border border-base-300 rounded-xl p-4 hover:border-primary/40 hover:shadow-sm transition-all">
+                <div class="shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold truncate">{{ teilnahme.toern.titel }}</p>
+                    <p class="text-xs text-base-content/50 mt-0.5">{{ teilnahme.toern.startdatum|date:"d. M. Y" }}</p>
+                </div>
+                <span class="badge {{ teilnahme.status_info.badge }} badge-sm shrink-0">{{ teilnahme.status_info.label }}</span>
+            </a>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Kein Törn vorhanden -->
+    {% if not kommende_teilnahmen %}
+    <div class="text-center py-12">
+        <div class="w-16 h-16 rounded-full bg-base-200 flex items-center justify-center mx-auto mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+            </svg>
+        </div>
+        <h3 class="font-semibold text-base-content/60">Noch keine Törns</h3>
+        <p class="text-sm text-base-content/40 mt-1">Entdecke offene Törns und melde dich an.</p>
+        <a href="{% url 'index' %}" class="btn btn-primary btn-sm mt-4">Törns entdecken</a>
+    </div>
+    {% endif %}
+
+    <!-- Vergangene Törns -->
+    {% if vergangene_teilnahmen %}
+    <div class="mt-2">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Vergangene Törns</h2>
+        <div class="flex flex-col gap-2">
+            {% for teilnahme in vergangene_teilnahmen %}
+            <a href="{% url 'crew_dashboard' teilnahme.toern.id %}"
+               class="flex items-center gap-4 bg-base-200/50 rounded-xl p-4 hover:bg-base-200 transition-colors">
+                <div class="flex-1 min-w-0">
+                    <p class="font-medium text-base-content/60 truncate">{{ teilnahme.toern.titel }}</p>
+                    <p class="text-xs text-base-content/40 mt-0.5">{{ teilnahme.toern.startdatum|date:"d. M. Y" }} &ndash; {{ teilnahme.toern.enddatum|date:"d. M. Y" }}</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 
 </div>
-
 {% endblock %}

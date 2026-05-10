@@ -6,6 +6,7 @@ from boote.models import Boot, Kabine
 from config import settings
 from logistik.models import Einkaufspunkt, Gegenstand, Mitbringer, PersönlicherGegenstand
 from utils.profil_fortschritt import teilnahme_fortschritt
+from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag
@@ -247,23 +248,43 @@ def toern_status_update(request, pk):
 
     return redirect("anbieter_dashboard")
 
+STATUS_LABELS = {
+    "angemeldet":  {"label": "Anmeldung eingegangen", "badge": "badge-warning"},
+    "warteliste":  {"label": "Warteliste",             "badge": "badge-ghost"},
+    "bestaetigt":  {"label": "Bestätigt",              "badge": "badge-success"},
+    "abgesagt":    {"label": "Abgesagt",               "badge": "badge-error"},
+    "abgelehnt":   {"label": "Abgelehnt",              "badge": "badge-error"},
+}
+
+@login_required
 def crew_overview(request):
-    teilnahmen = Teilnahme.objects.filter(user=request.user).select_related("toern")
+    teilnahmen = (
+        Teilnahme.objects
+        .filter(user=request.user)
+        .select_related("toern")
+        .order_by("toern__startdatum")
+    )
 
-    kommende_toerns = []
-    vergangene_toerns = []
-
-    jetzt = now()  # <-- datetime!
+    jetzt = now()
+    kommende_teilnahmen = []
+    vergangene_teilnahmen = []
 
     for t in teilnahmen:
+        t.status_info = STATUS_LABELS.get(t.status, {"label": t.status, "badge": "badge-ghost"})
         if t.toern.startdatum >= jetzt:
-            kommende_toerns.append(t.toern)
+            kommende_teilnahmen.append(t)
         else:
-            vergangene_toerns.append(t.toern)
+            vergangene_teilnahmen.append(t)
+
+    naechste_teilnahme = kommende_teilnahmen[0] if kommende_teilnahmen else None
+
+    profil_prozent = user_profil_fortschritt(request.user)
 
     context = {
-        "kommende_toerns": kommende_toerns,
-        "vergangene_toerns": vergangene_toerns,
+        "kommende_teilnahmen": kommende_teilnahmen,
+        "vergangene_teilnahmen": vergangene_teilnahmen,
+        "naechste_teilnahme": naechste_teilnahme,
+        "profil_prozent": profil_prozent,
     }
 
     return render(request, "crew/crew_overview.html", context)
