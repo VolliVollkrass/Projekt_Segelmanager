@@ -1,298 +1,414 @@
 {% extends "base.html" %}
+{% block title %}{{ toern.titel }}{% endblock %}
+
 {% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
 
-<div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
-
-    <!-- ========================= -->
     <!-- HEADER -->
-    <!-- ========================= -->
-    <div class="space-y-4">
-
-        <a href="{% url 'crew_overview' %}" class="link link-hover text-sm opacity-60">
-            ← Meine Törns
+    <div class="mb-5">
+        <a href="{% url 'crew_overview' %}" class="flex items-center gap-1 text-sm text-base-content/50 hover:text-base-content transition-colors mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+            Meine Törns
         </a>
 
-        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-bold leading-tight">{{ toern.titel }}</h1>
+                <p class="text-base-content/50 text-sm mt-0.5">{{ toern.revier }}</p>
+            </div>
+            <span class="badge {{ teilnahme.status_info.badge }} badge-sm shrink-0 mt-1">
+                {{ teilnahme.status_info.label }}
+            </span>
+        </div>
 
-            <h1 class="text-2xl md:text-3xl font-bold">
-                {{ toern.titel }}
-            </h1>
+        {% if is_skipper or is_coskipper %}
+        <div class="flex flex-wrap gap-2 mt-3">
+            <a href="{% url 'skipper_dashboard' toern.id %}" class="btn btn-secondary btn-sm">
+                Skipper-Bereich
+            </a>
+            {% url 'toern_detail' toern.id as detail_url %}
+            <a href="mailto:?subject=Einladung zum Törn: {{ toern.titel|urlencode }}&body=Hallo,%0D%0A%0D%0Aich möchte dich herzlich zu folgendem Segeltörn einladen:%0D%0A%0D%0A⛵ {{ toern.titel|urlencode }}%0D%0A🌍 Revier: {{ toern.revier|urlencode }}%0D%0A📅 Start: {{ toern.startdatum|date:'d.m.Y'|urlencode }}%0D%0A%0D%0A📍 Details:%0D%0A{{ request.scheme }}://{{ request.get_host }}{{ detail_url }}%0D%0A%0D%0A{{ request.user.first_name|urlencode }} {{ request.user.last_name|urlencode }}"
+               class="btn btn-outline btn-sm">
+                Einladung senden
+            </a>
+        </div>
+        {% endif %}
+    </div>
 
-            <div class="flex flex-wrap gap-2">
-
-                {% if is_skipper or is_coskipper %}
-                    <a href="{% url 'skipper_dashboard' toern.id %}" class="btn btn-secondary btn-sm">
-                        Skipper
-                    </a>
-
-                    {% url 'toern_detail' toern.id as detail_url %}
-
-                    <a 
-                    href="mailto:?subject=Einladung zum Törn: {{ toern.titel|urlencode }}&body=Hallo,%0D%0A%0D%0Aich möchte dich herzlich zu folgendem Segeltörn einladen:%0D%0A%0D%0A⛵ {{ toern.titel|urlencode }}%0D%0A🌍 Revier: {{ toern.revier|urlencode }}%0D%0A📅 Start: {{ toern.startdatum|date:'d.m.Y'|urlencode }}%0D%0A%0D%0A📍 Details:%0D%0A{{ request.scheme }}://{{ request.get_host }}{{ detail_url }}%0D%0A%0D%0A📝 Beschreibung:%0D%0A{{ toern.beschreibung|striptags|urlencode }}%0D%0A%0D%0A---%0D%0AMit einer Handbreit Wasser unter dem Kiel%0D%0Aund stets einer frischen Brise im Segel,%0D%0A%0D%0A{{ request.user.first_name|urlencode }} {{ request.user.last_name|urlencode }}"
-                    class="btn btn-outline btn-sm">
-                        Einladung 📧
-                    </a>
+    <!-- TAB-NAVIGATION -->
+    <div class="border-b border-base-300 mb-6 overflow-x-auto">
+        <div class="flex min-w-max">
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-primary whitespace-nowrap" data-tab="info">
+                Info
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="crew">
+                Crew
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="packliste">
+                Packliste
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="daten">
+                Meine Daten
+                {% if profil_progress < 80 %}
+                <span class="ml-1 badge badge-warning badge-xs">!</span>
                 {% endif %}
+            </button>
+        </div>
+    </div>
 
-                <a href="{% url 'teilnahme_daten_edit' toern.id %}"
-                    class="btn btn-sm flex items-center gap-2
-                    {% if profil_progress < 40 %}
-                        btn-error
-                    {% elif profil_progress < 80 %}
-                        btn-warning
-                    {% else %}
-                        btn-success
-                    {% endif %}">
+    <!-- ========================= TAB: INFO ========================= -->
+    <div id="tab-info" class="space-y-4">
 
-                    ✏️ Daten
-
-                    <!-- Dezenter Fortschritt -->
-                    <div class="radial-progress text-base-300 text-xs"
-                        style="--value:{{ profil_progress }}; --size:2rem; --thickness:3px;"
-                        aria-valuenow="{{ profil_progress }}"
-                        role="progressbar">
-                        {{ profil_progress }}%
-                    </div>
-
-                </a>
-
+        <!-- Eckdaten -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4">
+                <p class="text-xs text-base-content/50 mb-0.5">Start</p>
+                <p class="font-semibold text-sm">{{ toern.startdatum|date:"d. M. Y" }}</p>
+            </div>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4">
+                <p class="text-xs text-base-content/50 mb-0.5">Ende</p>
+                <p class="font-semibold text-sm">{{ toern.enddatum|date:"d. M. Y" }}</p>
+            </div>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4">
+                <p class="text-xs text-base-content/50 mb-0.5">Revier</p>
+                <p class="font-semibold text-sm">{{ toern.revier }}</p>
+            </div>
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4">
+                <p class="text-xs text-base-content/50 mb-0.5">Gesamtpreis</p>
+                <p class="font-semibold text-sm">{{ toern.gesamtpreis }} €</p>
             </div>
         </div>
 
+        {% if toern.beschreibung %}
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4">
+            <p class="text-xs text-base-content/50 mb-2">Beschreibung</p>
+            <p class="text-sm leading-relaxed">{{ toern.beschreibung }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Skipper im Info-Tab -->
+        {% for t in teilnahmen %}
+            {% if t.rolle == "skipper" %}
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4 flex items-center gap-3">
+                <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-xs text-base-content/50">Skipper</p>
+                    <p class="font-semibold text-sm">{{ t.user.first_name }} {{ t.user.last_name }}</p>
+                </div>
+            </div>
+            {% endif %}
+        {% endfor %}
+
+        <!-- Boot-Zugang -->
         {% if boot_access %}
-            <a href="{% url 'boot_dashboard' toern.id %}" class="btn btn-primary">
-                ⛵ Zum Boot
-            </a>
+        <a href="{% url 'boot_dashboard' toern.id %}"
+           class="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl p-4 hover:bg-primary/10 transition-colors">
+            <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <p class="font-semibold text-sm text-primary">Boot-Dashboard öffnen</p>
+                <p class="text-xs text-base-content/50">Packliste, Crew & Kajüten</p>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+        </a>
         {% endif %}
 
     </div>
-    
-    <!-- ========================= -->
-    <!-- TÖRN DETAILS -->
-    <!-- ========================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-            <h2 class="card-title">Törn-Details</h2>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                    <p class="opacity-60">Revier</p>
-                    <p class="font-medium">{{ toern.revier }}</p>
-                </div>
-                <div>
-                    <p class="opacity-60">Start</p>
-                    <p class="font-medium">{{ toern.startdatum|date:"d.m.Y" }}</p>
-                </div>
-                <div>
-                    <p class="opacity-60">Ende</p>
-                    <p class="font-medium">{{ toern.enddatum|date:"d.m.Y" }}</p>
-                </div>
-                <div>
-                    <p class="opacity-60">Preis</p>
-                    <p class="font-medium">{{ toern.gesamtpreis }} €</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- ========================= TAB: CREW ========================= -->
+    <div id="tab-crew" class="hidden space-y-5">
 
-    <!-- ========================= -->
-    <!-- CREW -->
-    <!-- ========================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-
-            <h2 class="card-title">Crew</h2>
-
-            <!-- Rollen -->
-            <div class="flex flex-wrap gap-2 mt-2">
-                {% for t in teilnahmen %}
-                    {% if t.rolle == "skipper" %}
-                        <span class="badge badge-primary">
-                            Skipper: {{ t.user.first_name }}
-                        </span>
-                    {% elif t.rolle == "coskipper" %}
-                        <span class="badge badge-secondary">
-                            Co-Skipper: {{ t.user.first_name }}
-                        </span>
-                    {% endif %}
-                {% endfor %}
-            </div>
-
-            <!-- Crew Liste -->
-            <div class="grid gap-3 mt-4 sm:grid-cols-2 lg:grid-cols-3">
-
-                {% for t in teilnahmen %}
-                <div class="card bg-base-200 shadow-sm">
-
-                    <div class="card-body p-4 space-y-2">
-
-                        <div class="flex justify-between items-start">
-
-                            <div>
-                                <p class="font-medium">
-                                    {% if t.user == request.user %}
-                                        Du ({{ t.user.first_name }})
-                                    {% else %}
-                                        {{ t.user.first_name }} {{ t.user.last_name }}
-                                    {% endif %}
-                                </p>
-                                <p class="text-xs opacity-60">
-                                    {{ t.user.email }}
-                                </p>
-                            </div>
-
-                            {% if t.user.id in vergebene_user_ids %}
-                                <span class="badge badge-error">vergeben</span>
-                            {% elif t.user.id in pending_user_ids %}
-                                <span class="badge badge-warning">angefragt</span>
-                            {% else %}
-                                <span class="badge badge-success">frei</span>
-                            {% endif %}
-
-                        </div>
-
-                    </div>
-                </div>
-                {% endfor %}
-
-            </div>
-
-        </div>
-    </div>
-
-    <!-- ========================= -->
-    <!-- PRÄFERENZEN -->
-    <!-- ========================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
-
-            <h2 class="card-title">Crew-Präferenzen</h2>
-            <p class="text-sm opacity-60">
-                Deine Angaben sind vertraulich und helfen dem Skipper bei der Planung.
-            </p>
-
-            <form method="POST" action="{% url 'praeferenzen_speichern' toern.id %}">
-                {% csrf_token %}
-
-                <div class="grid md:grid-cols-2 gap-6 mt-4">
-
-                    <!-- EXCLUDE -->
-                    <div class="bg-error/10 p-4 rounded-xl">
-                        <h3 class="font-semibold text-error mb-3">❌ Auf keinen Fall</h3>
-
-                        {% for t in teilnahmen_ohne_mich %}
-                        <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer">
-                            <input type="checkbox"
-                                   name="exclude"
-                                   value="{{ t.user.id }}"
-                                   class="checkbox checkbox-error"
-                                   {% if t.user.id in exclude_ids %}checked{% endif %}>
-                            {{ t.user.first_name }} {{ t.user.last_name }}
-                        </label>
-                        {% endfor %}
-                    </div>
-
-                    <!-- AVOID -->
-                    <div class="bg-warning/10 p-4 rounded-xl">
-                        <h3 class="font-semibold text-warning mb-3">⚠️ Wenn möglich vermeiden</h3>
-
-                        {% for t in teilnahmen_ohne_mich %}
-                        <label class="flex items-center gap-3 p-2 rounded-lg cursor-pointer">
-                            <input type="checkbox"
-                                   name="avoid"
-                                   value="{{ t.user.id }}"
-                                   class="checkbox checkbox-warning"
-                                   {% if t.user.id in avoid_ids %}checked{% endif %}>
-                            {{ t.user.first_name }} {{ t.user.last_name }}
-                        </label>
-                        {% endfor %}
-                    </div>
-
-                </div>
-
-                <div class="mt-4 flex justify-end">
-                    <button class="btn btn-primary">Speichern</button>
-                </div>
-
-            </form>
-
-        </div>
-    </div>
-
-    <!-- ========================= -->
-    <!-- KABINEN -->
-    <!-- ========================= -->
-    <div class="grid md:grid-cols-2 gap-6">
-
-        <!-- Auswahl -->
-        <div class="card bg-base-100 shadow">
-            <div class="card-body">
-                <h2 class="card-title">Kabinenpartner</h2>
-
-                {% if eigener_partner %}
-                    <div class="alert alert-success">
-                        Du bist mit {{ eigener_partner.first_name }} {{ eigener_partner.last_name }} in einer Kabine
-                    </div>
-
-                {% elif eigene_anfrage %}
-                    <div class="alert alert-info">
-                        Anfrage an {{ eigene_anfrage.to_user.first_name }}
-                    </div>
-
-                {% else %}
-                    <form method="POST" action="{% url 'kabinenpartner_anfragen' toern.id %}">
-                        {% csrf_token %}
-
-                        <select name="partner_id" class="select select-bordered w-full">
-                            <option value="">Bitte wählen</option>
-                            {% for t in teilnahmen_ohne_mich %}
-                                <option value="{{ t.user.id }}">
-                                    {{ t.user.first_name }} {{ t.user.last_name }}
-                                </option>
-                            {% endfor %}
-                        </select>
-
-                        <button class="btn btn-primary w-full mt-3">
-                            Anfrage senden
-                        </button>
-                    </form>
+        <!-- Rollen-Badges -->
+        <div class="flex flex-wrap gap-2">
+            {% for t in teilnahmen %}
+                {% if t.rolle == "skipper" %}
+                    <span class="badge badge-primary">Skipper: {{ t.user.first_name }}</span>
+                {% elif t.rolle == "coskipper" %}
+                    <span class="badge badge-secondary">Co-Skipper: {{ t.user.first_name }}</span>
                 {% endif %}
+            {% endfor %}
+        </div>
+
+        <!-- Crew-Liste -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Crewmitglieder</h2>
+            <div class="flex flex-col gap-2">
+                {% for t in teilnahmen %}
+                <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-xl p-3">
+                    <div class="w-9 h-9 rounded-full bg-base-200 flex items-center justify-center shrink-0 text-sm font-semibold text-base-content/60">
+                        {{ t.user.first_name|first }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-medium text-sm truncate">
+                            {% if t.user == request.user %}
+                                Du ({{ t.user.first_name }})
+                            {% else %}
+                                {{ t.user.first_name }} {{ t.user.last_name }}
+                            {% endif %}
+                        </p>
+                        <p class="text-xs text-base-content/40 truncate">{{ t.user.email }}</p>
+                    </div>
+                    {% if t.user.id in vergebene_user_ids %}
+                        <span class="badge badge-error badge-sm shrink-0">Kabine vergeben</span>
+                    {% elif t.user.id in pending_user_ids %}
+                        <span class="badge badge-warning badge-sm shrink-0">Angefragt</span>
+                    {% else %}
+                        <span class="badge badge-success badge-sm shrink-0">Frei</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
             </div>
         </div>
 
-        <!-- Anfragen -->
-        <div class="card bg-base-100 shadow">
-            <div class="card-body">
-                <h2 class="card-title">Anfragen</h2>
+        <!-- Kabinenpartner -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Kabinenpartner</h2>
 
+            {% if eigener_partner %}
+                <div class="alert alert-success rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="text-sm">Du bist mit <strong>{{ eigener_partner.first_name }} {{ eigener_partner.last_name }}</strong> in einer Kabine.</span>
+                </div>
+
+            {% elif eigene_anfrage %}
+                <div class="alert alert-info rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="text-sm">Anfrage an <strong>{{ eigene_anfrage.to_user.first_name }}</strong> gesendet – wartet auf Antwort.</span>
+                </div>
+
+            {% else %}
+                <form method="POST" action="{% url 'kabinenpartner_anfragen' toern.id %}" class="flex gap-2">
+                    {% csrf_token %}
+                    <select name="partner_id" class="select select-bordered select-sm flex-1">
+                        <option value="">Person wählen…</option>
+                        {% for t in teilnahmen_ohne_mich %}
+                            <option value="{{ t.user.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-primary btn-sm">Anfragen</button>
+                </form>
+            {% endif %}
+
+            <!-- Eingehende Anfragen -->
+            {% if anfragen %}
+            <div class="mt-3 space-y-2">
+                <p class="text-xs text-base-content/40 font-medium">Eingehende Anfragen</p>
                 {% for a in anfragen %}
-                <div class="flex justify-between items-center bg-base-200 p-3 rounded-lg mb-2">
-                    <span class="text-sm">
-                        {{ a.from_user.first_name }} möchte mit dir
-                    </span>
-
-                    <div class="flex gap-2">
+                <div class="flex items-center justify-between bg-base-200 rounded-xl p-3">
+                    <span class="text-sm"><strong>{{ a.from_user.first_name }}</strong> möchte mit dir in eine Kabine</span>
+                    <div class="flex gap-1.5 shrink-0 ml-2">
                         <form method="POST" action="{% url 'kabinenpartner_antwort' a.id %}">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="accept">
-                            <button class="btn btn-success btn-sm">✓</button>
+                            <button class="btn btn-success btn-xs">Ja</button>
                         </form>
-
                         <form method="POST" action="{% url 'kabinenpartner_antwort' a.id %}">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="reject">
-                            <button class="btn btn-error btn-sm">✕</button>
+                            <button class="btn btn-error btn-xs">Nein</button>
                         </form>
                     </div>
                 </div>
-                {% empty %}
-                    <p class="text-sm opacity-60">Keine Anfragen</p>
                 {% endfor %}
             </div>
+            {% endif %}
         </div>
+
+        <!-- Crew-Präferenzen -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-1">Crew-Präferenzen</h2>
+            <p class="text-xs text-base-content/40 mb-3">Vertraulich – hilft dem Skipper bei der Planung.</p>
+
+            <form method="POST" action="{% url 'praeferenzen_speichern' toern.id %}" class="space-y-3">
+                {% csrf_token %}
+
+                <div class="bg-error/5 border border-error/20 rounded-xl p-4">
+                    <p class="text-xs font-semibold text-error mb-2">Auf keinen Fall zusammen</p>
+                    <div class="space-y-1">
+                        {% for t in teilnahmen_ohne_mich %}
+                        <label class="flex items-center gap-2 cursor-pointer py-1">
+                            <input type="checkbox" name="exclude" value="{{ t.user.id }}"
+                                   class="checkbox checkbox-error checkbox-sm"
+                                   {% if t.user.id in exclude_ids %}checked{% endif %}>
+                            <span class="text-sm">{{ t.user.first_name }} {{ t.user.last_name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="bg-warning/5 border border-warning/20 rounded-xl p-4">
+                    <p class="text-xs font-semibold text-warning mb-2">Wenn möglich vermeiden</p>
+                    <div class="space-y-1">
+                        {% for t in teilnahmen_ohne_mich %}
+                        <label class="flex items-center gap-2 cursor-pointer py-1">
+                            <input type="checkbox" name="avoid" value="{{ t.user.id }}"
+                                   class="checkbox checkbox-warning checkbox-sm"
+                                   {% if t.user.id in avoid_ids %}checked{% endif %}>
+                            <span class="text-sm">{{ t.user.first_name }} {{ t.user.last_name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="flex justify-end">
+                    <button class="btn btn-primary btn-sm">Speichern</button>
+                </div>
+            </form>
+        </div>
+
+    </div>
+
+    <!-- ========================= TAB: PACKLISTE ========================= -->
+    <div id="tab-packliste" class="hidden">
+
+        {% if boot_access %}
+        <div class="space-y-4">
+            <p class="text-sm text-base-content/60">Deine persönliche Packliste und die gemeinsamen Boot-Gegenstände findest du im Boot-Dashboard.</p>
+            <a href="{% url 'boot_dashboard' toern.id %}"
+               class="flex items-center gap-3 bg-primary text-primary-content rounded-xl p-4 hover:opacity-90 transition-opacity">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <div class="flex-1">
+                    <p class="font-semibold">Boot-Dashboard öffnen</p>
+                    <p class="text-sm text-primary-content/70">Packliste, Einkaufsliste & Inventar</p>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary-content/60 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                </svg>
+            </a>
+        </div>
+
+        {% else %}
+        <div class="text-center py-10">
+            <div class="w-14 h-14 rounded-full bg-base-200 flex items-center justify-center mx-auto mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+            </div>
+            <p class="font-medium text-base-content/50">Noch kein Boot zugewiesen</p>
+            <p class="text-sm text-base-content/40 mt-1">Der Skipper weist dir einen Boot zu, sobald die Planung abgeschlossen ist.</p>
+        </div>
+        {% endif %}
+
+    </div>
+
+    <!-- ========================= TAB: MEINE DATEN ========================= -->
+    <div id="tab-daten" class="hidden space-y-4">
+
+        <!-- Fortschritt -->
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-sm font-semibold">Vollständigkeit</p>
+                <span class="text-sm font-bold
+                    {% if profil_progress >= 80 %}text-success
+                    {% elif profil_progress >= 40 %}text-warning
+                    {% else %}text-error{% endif %}">
+                    {{ profil_progress }}%
+                </span>
+            </div>
+            <progress class="progress w-full
+                {% if profil_progress >= 80 %}progress-success
+                {% elif profil_progress >= 40 %}progress-warning
+                {% else %}progress-error{% endif %}"
+                value="{{ profil_progress }}" max="100"></progress>
+        </div>
+
+        <!-- Daten-Übersicht -->
+        <div class="bg-base-100 border border-base-300 rounded-xl divide-y divide-base-200">
+
+            <div class="flex justify-between items-center px-4 py-3">
+                <span class="text-sm text-base-content/50">Name</span>
+                <span class="text-sm font-medium">{{ request.user.first_name }} {{ request.user.last_name }}</span>
+            </div>
+
+            <div class="flex justify-between items-center px-4 py-3">
+                <span class="text-sm text-base-content/50">E-Mail</span>
+                <span class="text-sm font-medium">{{ request.user.email }}</span>
+            </div>
+
+            <div class="flex justify-between items-center px-4 py-3">
+                <span class="text-sm text-base-content/50">Telefon</span>
+                <span class="text-sm font-medium {% if not request.user.telefonnummer %}text-error/60 italic{% endif %}">
+                    {{ request.user.telefonnummer|default:"Nicht angegeben" }}
+                </span>
+            </div>
+
+            <div class="flex justify-between items-center px-4 py-3">
+                <span class="text-sm text-base-content/50">Notfallkontakt</span>
+                <span class="text-sm font-medium {% if not teilnahme.notfallkontakt_name %}text-error/60 italic{% endif %}">
+                    {{ teilnahme.notfallkontakt_name|default:"Nicht angegeben" }}
+                </span>
+            </div>
+
+            <div class="flex justify-between items-center px-4 py-3">
+                <span class="text-sm text-base-content/50">Allergien</span>
+                <span class="text-sm font-medium {% if not teilnahme.allergien %}text-base-content/30 italic{% endif %}">
+                    {{ teilnahme.allergien|default:"Keine" }}
+                </span>
+            </div>
+
+            <div class="flex justify-between items-center px-4 py-3">
+                <span class="text-sm text-base-content/50">T-Shirt</span>
+                <span class="text-sm font-medium {% if not teilnahme.tshirt_groesse %}text-base-content/30 italic{% endif %}">
+                    {{ teilnahme.tshirt_groesse|default:"–" }}
+                </span>
+            </div>
+
+        </div>
+
+        <a href="{% url 'teilnahme_daten_edit' toern.id %}" class="btn btn-primary w-full">
+            Daten bearbeiten
+        </a>
 
     </div>
 
 </div>
+
+<!-- Tab-Switching Script -->
+<script>
+(function () {
+    const buttons = document.querySelectorAll('.tab-btn');
+    const panels  = document.querySelectorAll('[id^="tab-"]');
+
+    function activate(tabId) {
+        buttons.forEach(b => {
+            const active = b.dataset.tab === tabId;
+            b.classList.toggle('border-primary', active);
+            b.classList.toggle('text-primary', active);
+            b.classList.toggle('border-transparent', !active);
+            b.classList.toggle('text-base-content/50', !active);
+        });
+        panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + tabId));
+    }
+
+    buttons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            activate(btn.dataset.tab);
+            history.replaceState(null, '', '?tab=' + btn.dataset.tab);
+        });
+    });
+
+    // Beim Laden: Query-Param oder Hash auswerten
+    const params = new URLSearchParams(location.search);
+    const initial = params.get('tab') || location.hash.replace('#', '') || 'info';
+    activate(initial);
+})();
+</script>
 
 {% endblock %}

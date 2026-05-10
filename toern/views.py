@@ -405,8 +405,11 @@ def crew_dashboard(request, toern_id):
     # =========================
     # 8. Context
     # =========================
+    teilnahme.status_info = STATUS_LABELS.get(teilnahme.status, {"label": teilnahme.status, "badge": "badge-ghost"})
+
     context = {
         "toern": toern,
+        "teilnahme": teilnahme,
         "teilnahmen": teilnahmen,
         "teilnahmen_ohne_mich": teilnahmen_ohne_mich,
         "profil_progress": teilnahme_fortschritt(teilnahme),
@@ -1377,7 +1380,9 @@ def teilnahme_daten_edit(request, toern_id):
             user.save()
 
             messages.success(request, "Daten gespeichert")
-            return redirect("crew_dashboard", toern_id=toern.id)
+            from django.urls import reverse
+            url = reverse("crew_dashboard", kwargs={"toern_id": toern.id})
+            return redirect(f"{url}?tab=daten")
 
     else:
         form = TeilnahmeDetailForm(instance=teilnahme)
