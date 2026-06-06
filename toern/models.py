@@ -147,7 +147,19 @@ class Teilnahme(models.Model):
     notfallkontakt_name = models.CharField(max_length=100, blank=True)
     notfallkontakt_telefon = models.CharField(max_length=20, blank=True)
     notfallkontakt_email = models.EmailField(blank=True)
-    essgewohnheiten = models.TextField(blank=True)
+    ESSGEWOHNHEITEN_CHOICES = [
+        ("alles", "Kein Fleischverzicht"),
+        ("vegetarisch", "Vegetarisch"),
+        ("vegan", "Vegan"),
+    ]
+
+    essgewohnheiten = models.CharField(
+        max_length=20,
+        choices=ESSGEWOHNHEITEN_CHOICES,
+        blank=True,
+        default=""
+    )
+    lebensmittelunvertraeglichkeiten = models.TextField(blank=True)
     allergien = models.TextField(blank=True)
     tshirt_groesse = models.CharField(max_length=5, choices=GROESSE_CHOICES, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

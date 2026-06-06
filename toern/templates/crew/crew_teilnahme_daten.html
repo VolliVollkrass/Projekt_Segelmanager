@@ -125,11 +125,18 @@
                 <div>
                     <h2 class="card-title mb-4">Segelerfahrung</h2>
 
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Dein Erfahrungslevel</span>
-                        </label>
-                        {{ form.seglerische_erfahrung }}
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Dein Erfahrungslevel</span>
+                            </label>
+                            {{ form.seglerische_erfahrung }}
+                        </div>
+
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">T-Shirt Größe</span></label>
+                            {{ form.tshirt_groesse }}
+                        </div>
                     </div>
                 </div>
 
@@ -157,25 +164,32 @@
                     </div>
                 </div>
 
-                <!-- 🍽️ INFOS -->
+                <!-- 🍽️ ESSEN & GESUNDHEIT -->
                 <div>
-                    <h2 class="card-title mb-4">Weitere Informationen</h2>
+                    <h2 class="card-title mb-4">Essen &amp; Gesundheit</h2>
+                    <p class="text-sm text-base-content/60 mb-4">
+                        Diese Angaben helfen beim gemeinsamen Kochen an Bord.
+                    </p>
 
-                    <div class="space-y-4">
+                    <div class="grid md:grid-cols-2 gap-4">
 
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">Allergien</span></label>
-                            {{ form.allergien }}
-                        </div>
-
-                        <div class="form-control">
+                        <div class="form-control md:col-span-2">
                             <label class="label"><span class="label-text">Essgewohnheiten</span></label>
                             {{ form.essgewohnheiten }}
                         </div>
 
-                        <div class="form-control">
-                            <label class="label"><span class="label-text">T-Shirt Größe</span></label>
-                            {{ form.tshirt_groesse }}
+                        <div class="form-control md:col-span-2">
+                            <label class="label">
+                                <span class="label-text">Lebensmittelunverträglichkeiten</span>
+                            </label>
+                            {{ form.lebensmittelunvertraeglichkeiten }}
+                        </div>
+
+                        <div class="form-control md:col-span-2">
+                            <label class="label">
+                                <span class="label-text">Sonstige Allergien</span>
+                            </label>
+                            {{ form.allergien }}
                         </div>
 
                     </div>

@@ -1,550 +1,655 @@
 {% extends "base.html" %}
 {% load static %}
+{% block title %}{{ boot.name }} – Boot-Dashboard{% endblock %}
 
 {% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
 
-<div class="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
-
-    <!-- ========================= -->
     <!-- HEADER -->
-    <!-- ========================= -->
-    <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
-
-        <div>
-            <h1 class="text-2xl md:text-3xl font-bold">
-                ⛵ {{ boot.name }}
-            </h1>
-            <p class="text-sm opacity-60">
-                {{ toern.titel }}
-            </p>
+    <div class="mb-5">
+        <a href="{% url 'crew_dashboard' toern.id %}" class="flex items-center gap-1 text-sm text-base-content/50 hover:text-base-content transition-colors mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+            Zurück zur Crew-Ansicht
+        </a>
+        <div class="flex items-start justify-between gap-3">
+            <div>
+                <h1 class="text-2xl font-bold leading-tight">⛵ {{ boot.name }}</h1>
+                <p class="text-base-content/50 text-sm mt-0.5">{{ toern.titel }} · {{ toern.revier }}</p>
+            </div>
+            <span class="badge badge-outline shrink-0 mt-1">{{ boot.anzahl_betten_boot }} Plätze</span>
         </div>
-
-        <div class="badge badge-outline">
-            {{ boot.anzahl_betten_boot }} Plätze
-        </div>
-
     </div>
 
-    <!-- ========================= -->
-    <!-- SKIPPER + CREW -->
-    <!-- ========================= -->
-    <div class="grid md:grid-cols-2 gap-6">
+    <!-- TAB-NAVIGATION -->
+    <div class="border-b border-base-300 mb-6 overflow-x-auto">
+        <div class="flex min-w-max">
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-primary whitespace-nowrap" data-tab="uebersicht">
+                Crew &amp; Boot
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="packliste">
+                Meine Packliste
+                {% if progress < 100 %}
+                <span class="ml-1 badge badge-warning badge-xs">{{ done_items }}/{{ total_items }}</span>
+                {% else %}
+                <span class="ml-1 badge badge-success badge-xs">✓</span>
+                {% endif %}
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="bootspackliste">
+                Mitbringen
+                {% with offen=gegenstaende|length %}
+                {% endwith %}
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="kasse">
+                Bootskasse
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="bordkueche">
+                Bordküche
+            </button>
+        </div>
+    </div>
 
-        <!-- SKIPPER -->
-        <div class="card bg-base-100 shadow">
-            <div class="card-body">
-                <h2 class="card-title">👨‍✈️ Skipper</h2>
+    <!-- ========================= TAB: CREW & BOOT ========================= -->
+    <div id="tab-uebersicht" class="space-y-5">
 
+        <!-- Skipper -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Skipper</h2>
+            <div class="flex flex-col gap-2">
                 {% for k in kabinen_data %}
                     {% for t in k.crew %}
                         {% if t.rolle == "skipper" or t.rolle == "coskipper" %}
-                            <div class="flex justify-between text-sm py-1">
-                                <span>{{ t.user.first_name }} {{ t.user.last_name }}</span>
-                                <span class="opacity-60">
-                                    {{ t.rolle }}
-                                </span>
+                        <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-xl p-3">
+                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-bold text-primary">
+                                {{ t.user.first_name|first }}{{ t.user.last_name|first }}
                             </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="font-semibold text-sm">{{ t.user.first_name }} {{ t.user.last_name }}</p>
+                                {% if t.user.telefonnummer %}
+                                <a href="tel:{{ t.user.telefonnummer }}" class="text-xs text-base-content/40 hover:text-primary transition-colors">
+                                    {{ t.user.telefonnummer }}
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% if t.rolle == "skipper" %}
+                                <span class="badge badge-primary badge-sm">Skipper</span>
+                            {% else %}
+                                <span class="badge badge-secondary badge-sm">Co-Skipper</span>
+                            {% endif %}
+                        </div>
                         {% endif %}
                     {% endfor %}
                 {% endfor %}
-
             </div>
         </div>
 
-        <!-- CREW -->
-        <div class="card bg-base-100 shadow">
-            <div class="card-body">
-
-                <h2 class="card-title">🛏 Crew & Kabinen</h2>
-
-                <div class="space-y-4 mt-3">
-
-                    {% for k in kabinen_data %}
-                    <div class="bg-base-200 p-3 rounded-lg">
-
-                        <!-- Kabinen Titel -->
-                        <div class="font-semibold mb-2">
-                            Kabine {{ k.kabine.name }} ({{ k.kabine.betten }} Plätze)
-                        </div>
-
-                        <!-- Crew -->
-                        {% if k.crew %}
-                            <div class="space-y-2 text-sm">
-
-                                {% for t in k.crew %}
-                                
-                                <div class="flex justify-between items-center">
-
-                                    <div>
-                                        {{ t.user.first_name }} {{ t.user.last_name }}
-                                        {% if t.rolle == "skipper" %}
-                                            <span class="badge badge-primary text-xs">Skipper</span>
-                                        {% elif t.rolle == "coskipper" %}
-                                            <span class="badge badge-secondary text-xs">Co-Skipper</span>
-                                        {% endif %}
-                                    </div>
-
-                                    <div class="text-xs opacity-60">
-                                        {{ t.user.telefonnummer|default:"-" }}
-                                    </div>
-
-                                </div>
-                                {% endfor %}
-
-                            </div>
-                        {% else %}
-                            <div class="text-sm opacity-50">
-                                Leer
-                            </div>
-                        {% endif %}
-
+        <!-- Kabinen & Crew -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Kabinen</h2>
+            <div class="flex flex-col gap-3">
+                {% for k in kabinen_data %}
+                <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+                    <div class="flex items-center justify-between px-4 py-3 border-b border-base-200 bg-base-200/40">
+                        <span class="font-semibold text-sm">{{ k.kabine.name }}</span>
+                        <span class="text-xs text-base-content/40">
+                            {{ k.crew|length }}/{{ k.kabine.betten }} Plätze
+                        </span>
                     </div>
-                    {% endfor %}
-
+                    {% if k.crew %}
+                    <div class="divide-y divide-base-200">
+                        {% for t in k.crew %}
+                        <div class="flex items-center gap-3 px-4 py-3">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold
+                                {% if t.rolle == 'skipper' %}bg-primary/10 text-primary
+                                {% elif t.rolle == 'coskipper' %}bg-secondary/10 text-secondary
+                                {% else %}bg-base-300 text-base-content/60{% endif %}">
+                                {{ t.user.first_name|first }}{{ t.user.last_name|first }}
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
+                                {% if t.user.telefonnummer %}
+                                <a href="tel:{{ t.user.telefonnummer }}" class="text-xs text-base-content/40 hover:text-primary transition-colors">
+                                    {{ t.user.telefonnummer }}
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% if t.rolle == "skipper" %}
+                                <span class="badge badge-primary badge-xs">Skipper</span>
+                            {% elif t.rolle == "coskipper" %}
+                                <span class="badge badge-secondary badge-xs">Co-Skipper</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="px-4 py-4 text-sm text-base-content/30 text-center">Noch niemand zugeteilt</div>
+                    {% endif %}
                 </div>
-
+                {% endfor %}
             </div>
         </div>
 
     </div>
 
-    <!-- ========================= -->
-    <!-- MEINE PACKLISTE -->
-    <!-- ========================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
+    <!-- ========================= TAB: MEINE PACKLISTE ========================= -->
+    <div id="tab-packliste" class="space-y-5 hidden">
 
-            <div class="flex justify-between items-center">
-                <h2 class="card-title">🎒 Meine Packliste</h2>
-                 
-            </div>
-            <div class="space-y-4">
-                <div class="alert bg-primary shadow-sm">
-                    <div class="text-sm text-primary-content">
-                    <span class="font-semibold block mb-1">Wichtiger Hinweis zur Packliste</span>
-                    Auf einem Segelboot ist der Platz stark begrenzt. Überlege daher genau, was du wirklich benötigst.<br>
-                    <strong>Hartschalenkoffer sind nicht erlaubt</strong> – bitte bring ausschließlich <strong>faltbare Reisetaschen</strong> mit. 
-                    Diese lassen sich während der Fahrt platzsparend verstauen.
-                    </div>
-                </div>
-
-                <div class="alert bg-secondary shadow-sm">
-                    <div class="text-sm text-secondary-content">
-                    <span class="font-semibold block mb-1">Kleiderwahl an Bord</span>
-                    Orientiere dich am Wetterbericht, aber beachte: Durch den Fahrtwind fühlt es sich deutlich kühler an. 
-                    Ziehe daher etwa <strong>10&nbsp;°C von der vorhergesagten Temperatur ab</strong>.
-                    <br><br>
-                    <strong>Beispiel:</strong>
-                    23&nbsp;°C laut Wetterbericht &rarr; ca. 13&nbsp;°C an Bord als realistischer Richtwert.
-                    </div>
-                </div>
-
-                <p class="text-sm opacity-60">
-                    Hier kannst du deine persönliche Packliste verwalten. Füge eigene Gegenstände hinzu, markiere erledigte Items oder gib an, welche Gegenstände du mitbringst.
+        <!-- Hinweise -->
+        <div class="space-y-3">
+            <div class="bg-primary/10 border border-primary/20 rounded-xl p-4">
+                <p class="font-semibold text-sm text-primary mb-1">Platzsparend packen</p>
+                <p class="text-sm text-base-content/70">
+                    Auf einem Segelboot ist Platz knapp. <strong>Hartschalenkoffer sind nicht erlaubt</strong> – bitte nur faltbare Reisetaschen mitbringen.
                 </p>
             </div>
-            <div class="mb-3">
+            <div class="bg-secondary/10 border border-secondary/20 rounded-xl p-4">
+                <p class="font-semibold text-sm text-secondary mb-1">Kleidung an Bord</p>
+                <p class="text-sm text-base-content/70">
+                    Durch Fahrtwind gefühlt ~10&nbsp;°C kälter als der Wetterbericht. Entsprechend einplanen.
+                </p>
+            </div>
+        </div>
 
-                <div class="flex justify-between text-sm mb-1">
-                    <span>Fortschritt</span>
-                    <span id="progress-text">{{ done_items }}/{{ total_items }}</span>
+        <!-- Fortschritt -->
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4">
+            <div class="flex justify-between text-sm mb-2">
+                <span class="font-medium">Fortschritt</span>
+                <span id="progress-text" class="text-base-content/50">{{ done_items }}/{{ total_items }}</span>
+            </div>
+            <progress id="progress-bar" class="progress progress-success w-full" value="{{ progress }}" max="100"></progress>
+        </div>
+
+        <!-- Neuen Gegenstand hinzufügen -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Hinzufügen</h2>
+            <div class="flex gap-2">
+                <input type="text" id="new-name" placeholder="Gegenstand…" class="input input-sm input-bordered flex-1">
+                <input type="number" id="new-menge" value="1" min="1" class="input input-sm input-bordered w-16">
+                <button onclick="addItem()" class="btn btn-sm btn-primary">+ Hinzufügen</button>
+            </div>
+        </div>
+
+        <!-- Boot-Items (nicht editierbar) -->
+        {% with boot_items=teilnahme.persoenliche_packliste.all %}
+        {% if boot_items %}
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Vom Boot vorgegeben</h2>
+            <div id="packliste-boot" class="flex flex-col gap-2">
+                {% for p in teilnahme.persoenliche_packliste.all %}
+                {% if p.ist_vom_boot %}
+                <div id="item-{{ p.id }}" class="flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors
+                    {% if p.erledigt %}bg-success/5 border-success/20{% else %}bg-base-100 border-base-300{% endif %}">
+                    <input type="checkbox" class="checkbox checkbox-sm"
+                        {% if p.erledigt %}checked{% endif %}
+                        onchange="toggleDone({{ p.id }})">
+                    <span class="flex-1 text-sm {% if p.erledigt %}line-through text-base-content/30{% endif %}">
+                        {{ p.name }}
+                    </span>
+                    <span class="text-xs text-base-content/40">({{ p.menge }})</span>
+                    <span class="badge badge-primary badge-xs">Boot</span>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <!-- Eigene Items -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Eigene Gegenstände</h2>
+            <div id="packliste" class="flex flex-col gap-2">
+                {% for p in teilnahme.persoenliche_packliste.all %}
+                {% if not p.ist_vom_boot %}
+                <div id="item-{{ p.id }}" class="flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors
+                    {% if p.erledigt %}bg-success/5 border-success/20{% else %}bg-base-100 border-base-300{% endif %}">
+                    <input type="checkbox" class="checkbox checkbox-sm"
+                        {% if p.erledigt %}checked{% endif %}
+                        onchange="toggleDone({{ p.id }})">
+                    <input type="text" value="{{ p.name }}" id="name-{{ p.id }}"
+                        class="input input-xs input-ghost flex-1 {% if p.erledigt %}line-through text-base-content/30{% endif %}"
+                        onblur="updateItem({{ p.id }})">
+                    <input type="number" value="{{ p.menge }}" min="1" id="menge-{{ p.id }}"
+                        class="input input-xs input-ghost w-12 text-center {% if p.erledigt %}text-base-content/30{% endif %}"
+                        onblur="updateItem({{ p.id }})">
+                    <button onclick="deleteItem({{ p.id }})" class="btn btn-ghost btn-xs text-error">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================= TAB: BOOT-PACKLISTE ========================= -->
+    <div id="tab-bootspackliste" class="space-y-5 hidden">
+
+        <p class="text-sm text-base-content/50">
+            Hier seht ihr, was für das Boot gebraucht wird. Tragt euch ein, was ihr mitbringen könnt.
+        </p>
+
+        <!-- Hinzufügen (nur Skipper/Co-Skipper) -->
+        {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Gegenstand hinzufügen</h2>
+            <div class="flex gap-2">
+                <input id="boot-new-name" placeholder="Gegenstand…" class="input input-sm input-bordered flex-1">
+                <input id="boot-new-menge" type="number" value="1" min="1" class="input input-sm input-bordered w-16">
+                <button onclick="addBootItem()" class="btn btn-sm btn-primary">+</button>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Liste -->
+        <div class="flex flex-col gap-3">
+            {% for g in gegenstaende %}
+            <div class="bg-base-100 border rounded-xl overflow-hidden
+                {% if g.offen == 0 %}border-success/30{% else %}border-base-300{% endif %}">
+
+                <!-- Header -->
+                <div class="flex items-center justify-between px-4 py-3
+                    {% if g.offen == 0 %}bg-success/5{% else %}bg-base-200/40{% endif %}">
+                    <div>
+                        <span id="boot-display-name-{{ g.id }}" class="font-semibold text-sm">{{ g.name }}</span>
+                        <span id="boot-display-menge-{{ g.id }}" class="text-xs text-base-content/40 ml-2">{{ g.vergeben }}/{{ g.menge }}</span>
+                    </div>
+                    {% if g.offen == 0 %}
+                        <span class="badge badge-success badge-sm">Erledigt</span>
+                    {% else %}
+                        <span class="text-xs text-warning font-medium">Noch {{ g.offen }} offen</span>
+                    {% endif %}
                 </div>
 
-                <progress id="progress-bar"
-                        class="progress progress-success w-full"
-                        value="{{ progress }}"
-                        max="100"></progress>
+                <!-- Mitbringer -->
+                {% if g.mitbringer.all %}
+                <div class="px-4 py-2 border-t border-base-200 flex gap-1 flex-wrap">
+                    {% for m in g.mitbringer.all %}
+                    <span class="badge badge-outline badge-sm">{{ m.participation.user.first_name }} ({{ m.menge }})</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
 
-            </div>
-            <div class="flex flex-col md:flex-row gap-2 items-start md:items-center ">
+                <!-- Aktionen -->
+                <div class="px-4 py-3 border-t border-base-200 flex flex-wrap gap-2">
 
-                <input type="text" id="new-name"
-                    placeholder="Neuer Gegenstand"
-                    class="input input-sm input-bordered">
-
-                <input type="number" id="new-menge"
-                    value="1"
-                    min="1"
-                    class="input input-sm input-bordered w-20">
-
-                <button onclick="addItem()"
-                        class="btn btn-sm btn-primary">
-                    + Hinzufügen
-                </button>
-
-            </div>
-            <div class="space-y-2 mt-3">
-
-                <!-- Eigene Items -->
-                <div id="packliste" class="space-y-2 mt-3">
-
-                {% for p in teilnahme.persoenliche_packliste.all|dictsortreversed:"ist_vom_boot" %}
-
-                <div id="item-{{ p.id }}"
-                    class="flex justify-between items-center p-2 rounded
-                    {% if p.erledigt %}bg-success/10{% else %}bg-base-200{% endif %}">
-
-                    <!-- LEFT -->
-                    <div class="flex items-center gap-3 w-full">
-
-                        <!-- Checkbox -->
-                        <input type="checkbox"
-                            class="checkbox checkbox-sm"
-                            {% if p.erledigt %}checked{% endif %}
-                            onchange="toggleDone({{ p.id }})">
-
-                        <!-- NAME -->
-                        {% if p.ist_vom_boot %}
-                            <!-- 🔵 Boot Item (NICHT editierbar) -->
-                            <span class="{% if p.erledigt %}line-through text-success opacity-60{% endif %}">
-                                {{ p.name }}
-                            </span>
-                        {% else %}
-                            <!-- 🟢 Eigenes Item -->
-                            <input type="text"
-                                value="{{ p.name }}"
-                                id="name-{{ p.id }}"
-                                class="input input-md input-bordered w-full
-                                {% if p.erledigt %}line-through text-success opacity-60{% endif %}">
-                        {% endif %}
-
-                        <!-- MENGE -->
-                        {% if p.ist_vom_boot %}
-                            <span class="text-md text-center opacity-60">
-                                ({{ p.menge }})
-                            </span>
-                        {% else %}
-                            <input type="number"
-                                value="{{ p.menge }}"
-                                min="1"
-                                id="menge-{{ p.id }}"
-                                class="input input-md text-center input-bordered w-16
-                                {% if p.erledigt %}text-success opacity-60{% endif %}">
-                        {% endif %}
-
-                        <!-- BADGE -->
-                        {% if p.ist_vom_boot %}
-                            <span class="badge badge-primary text-xs">Boot</span>
-                        {% endif %}
-
+                    {% if g.offen > 0 %}
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="take-{{ g.id }}" min="1" max="{{ g.offen }}" value="{{ g.offen }}"
+                            class="input input-xs input-bordered w-14">
+                        <button onclick="takeItem({{ g.id }})" class="btn btn-xs btn-primary">
+                            Ich bringe mit
+                        </button>
                     </div>
+                    {% endif %}
 
-                    <!-- ACTIONS -->
-                    {% if not p.ist_vom_boot %}
-                    <div class="flex gap-1 ml-2">
+                    {% for m in g.mitbringer.all %}
+                    {% if m.participation == teilnahme %}
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="reduce-{{ g.id }}" min="1" max="{{ m.menge }}" value="1"
+                            class="input input-xs input-bordered w-14">
+                        <button onclick="reduceItem({{ g.id }})" class="btn btn-xs btn-warning">Weniger</button>
+                        <button onclick="removeAll({{ g.id }})" class="btn btn-xs btn-error btn-outline">Entfernen</button>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
 
-                        <button onclick="updateItem({{ p.id }})"
-                                class="btn btn-xs btn-primary">
-                            💾
+                    <!-- Edit (nur Skipper) -->
+                    {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
+                    <div class="flex items-center gap-1 ml-auto">
+                        <input type="text" value="{{ g.name }}" id="boot-name-{{ g.id }}"
+                            class="input input-xs input-bordered w-32">
+                        <input type="number" value="{{ g.menge }}" id="boot-menge-{{ g.id }}"
+                            class="input input-xs input-bordered w-14">
+                        <button id="boot-save-btn-{{ g.id }}" onclick="updateBootItem({{ g.id }})" class="btn btn-xs btn-ghost">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
                         </button>
-
-                        <button onclick="deleteItem({{ p.id }})"
-                                class="btn btn-xs btn-error">
-                            🗑
+                        <button onclick="deleteBootItem({{ g.id }})" class="btn btn-xs btn-ghost text-error">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
                         </button>
-
                     </div>
                     {% endif %}
 
                 </div>
 
-                {% endfor %}
-
-                </div>
-
             </div>
-
+            {% empty %}
+            <div class="text-center py-8 text-base-content/30 text-sm">Noch keine Gegenstände erfasst.</div>
+            {% endfor %}
         </div>
+
     </div>
 
-    <!-- ========================= -->
-    <!-- BOOT PACKLISTE -->
-    <!-- ========================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
+    <!-- ========================= TAB: BORDKÜCHE ========================= -->
+    <div id="tab-bordkueche" class="space-y-6 hidden">
 
-            <h2 class="card-title">📦 Was wird benötigt?</h2>
+        <!-- Ess-Statistik -->
+        <div class="flex flex-wrap gap-3">
+            {% if ess_stats.alles %}
+            <div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-lg px-3 py-2">
+                <span class="text-base">🥩</span>
+                <span class="text-sm font-medium">{{ ess_stats.alles }}</span>
+                <span class="text-xs text-base-content/40">ohne Einschränkung</span>
+            </div>
+            {% endif %}
+            {% if ess_stats.vegetarisch %}
+            <div class="flex items-center gap-2 bg-base-100 border border-lime-200 rounded-lg px-3 py-2">
+                <span class="text-base">🥗</span>
+                <span class="text-sm font-medium text-lime-700">{{ ess_stats.vegetarisch }}</span>
+                <span class="text-xs text-base-content/40">Vegetarisch</span>
+            </div>
+            {% endif %}
+            {% if ess_stats.vegan %}
+            <div class="flex items-center gap-2 bg-base-100 border border-green-200 rounded-lg px-3 py-2">
+                <span class="text-base">🌱</span>
+                <span class="text-sm font-medium text-green-700">{{ ess_stats.vegan }}</span>
+                <span class="text-xs text-base-content/40">Vegan</span>
+            </div>
+            {% endif %}
+            {% if ess_stats.keine_angabe %}
+            <div class="flex items-center gap-2 bg-base-100 border border-base-300 rounded-lg px-3 py-2">
+                <span class="text-base">❓</span>
+                <span class="text-sm font-medium text-base-content/40">{{ ess_stats.keine_angabe }}</span>
+                <span class="text-xs text-base-content/40">ohne Angabe</span>
+            </div>
+            {% endif %}
+        </div>
 
-            <div class="space-y-2 mt-3">
+        <!-- Ess-Übersicht der Crew -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Crew-Übersicht</h2>
+            <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+                <div class="divide-y divide-base-200">
+                    {% for t in crew_bestaetigt %}
+                    <div class="flex items-start gap-3 px-4 py-3">
+                        <div class="w-8 h-8 rounded-full bg-base-300 flex items-center justify-center shrink-0 text-xs font-bold text-base-content/60 mt-0.5">
+                            {{ t.user.first_name|first }}{{ t.user.last_name|first }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium">{{ t.user.first_name }} {{ t.user.last_name }}</p>
+                            <div class="flex flex-wrap gap-2 mt-1">
+                                {% if t.essgewohnheiten %}
+                                <span class="badge badge-sm badge-outline
+                                    {% if t.essgewohnheiten == 'vegan' %}badge-success
+                                    {% elif t.essgewohnheiten == 'vegetarisch' %}border-lime-500 text-lime-600
+                                    {% endif %}">
+                                    {{ t.get_essgewohnheiten_display }}
+                                </span>
+                                {% else %}
+                                <span class="badge badge-sm badge-ghost opacity-40">keine Angabe</span>
+                                {% endif %}
+                                {% if t.lebensmittelunvertraeglichkeiten %}
+                                <span class="badge badge-sm badge-warning badge-outline">
+                                    ⚠ {{ t.lebensmittelunvertraeglichkeiten }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="px-4 py-4 text-sm text-base-content/30 text-center">Noch keine Crew zugeteilt.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
 
-            <!-- ADD -->
+        <!-- Mahlzeitenplaner -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Mahlzeitenplan</h2>
+
+            <!-- Neue Mahlzeit hinzufügen (nur Skipper) -->
             {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
-            <div class="flex gap-2 mb-3">
-
-                <input id="boot-new-name"
-                    placeholder="Neuer Gegenstand"
-                    class="input input-sm input-bordered w-full">
-
-                <input id="boot-new-menge"
-                    type="number"
-                    value="1"
-                    min="1"
-                    class="input input-sm input-bordered w-20">
-
-                <button onclick="addBootItem()"
-                        class="btn btn-sm btn-primary">
-                    +
-                </button>
-
+            <div class="bg-base-100 border border-base-300 rounded-xl p-4 mb-4">
+                <p class="text-sm font-medium mb-3">Mahlzeit hinzufügen</p>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <input type="date" id="mz-datum"
+                        value="{{ toern.startdatum|date:'Y-m-d' }}"
+                        class="input input-sm input-bordered col-span-2">
+                    <select id="mz-typ" class="select select-sm select-bordered">
+                        <option value="fruehstueck">Frühstück</option>
+                        <option value="mittag">Mittagessen</option>
+                        <option value="abend" selected>Abendessen</option>
+                        <option value="snack">Snack</option>
+                    </select>
+                    <select id="mz-koch" class="select select-sm select-bordered">
+                        <option value="">– Wer kocht? –</option>
+                        {% for t in crew_bestaetigt %}
+                        <option value="{{ t.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" id="mz-name" placeholder="z.B. Pasta Napoli"
+                        class="input input-sm input-bordered col-span-2">
+                </div>
+                <button onclick="addMahlzeit()" class="btn btn-sm btn-primary w-full">+ Eintragen</button>
             </div>
             {% endif %}
 
-            <!-- LISTE -->
-            {% for g in gegenstaende %}
-            <div class="bg-base-200 p-3 rounded space-y-2">
-
-                <!-- HEADER -->
-                <div class="flex justify-between items-center">
-
-                    <div class="font-medium">
-                        {{ g.name }}
-                        <span class="text-xs opacity-60">
-                            ({{ g.vergeben }}/{{ g.menge }})
-                        </span>
+            <!-- Liste nach Datum gruppiert -->
+            {% regroup mahlzeiten by datum as tage %}
+            {% if tage %}
+            <div class="space-y-4">
+                {% for tag in tage %}
+                <div>
+                    <p class="text-xs font-semibold text-base-content/40 mb-2">{{ tag.grouper|date:"D, d. M." }}</p>
+                    <div class="flex flex-col gap-2">
+                        {% for m in tag.list %}
+                        <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-xl px-4 py-3">
+                            <div class="shrink-0 w-20">
+                                <span class="badge badge-sm badge-outline">{{ m.get_typ_display }}</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm font-medium truncate">{{ m.name }}</p>
+                                {% if m.kochverantwortlich %}
+                                <p class="text-xs text-base-content/40">
+                                    👨‍🍳 {{ m.kochverantwortlich.user.first_name }} {{ m.kochverantwortlich.user.last_name }}
+                                </p>
+                                {% endif %}
+                            </div>
+                            {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
+                            <button onclick="deleteMahlzeit({{ m.id }})" class="btn btn-ghost btn-xs text-error shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
                     </div>
-
-                    {% if g.offen == 0 %}
-                        <span class="badge badge-success">Erledigt</span>
-                    {% endif %}
                 </div>
-
-                <!-- MITBRINGER -->
-                <div class="flex gap-1 text-xs flex-wrap">
-                    {% for m in g.mitbringer.all %}
-                        <span class="badge badge-outline">
-                            {{ m.participation.user.first_name }} ({{ m.menge }})
-                        </span>
-                    {% empty %}
-                        <span class="opacity-50">niemand</span>
-                    {% endfor %}
-                </div>
-
-                <!-- ACTION -->
-                {% if g.offen > 0 %}
-                <div class="flex gap-2 items-center">
-
-                    <input type="number"
-                        id="take-{{ g.id }}"
-                        min="1"
-                        max="{{ g.offen }}"
-                        value="1"
-                        class="input input-xs input-bordered w-16">
-
-                    <button onclick="takeItem({{ g.id }})"
-                            class="btn btn-xs btn-primary">
-                        Mitnehmen
-                    </button>
-
-                </div>
-                {% endif %}
-                {% for m in g.mitbringer.all %}
-                    {% if m.participation == teilnahme %}
-                    <div class="flex gap-2 items-center mt-1">
-
-                        <input type="number"
-                            id="reduce-{{ g.id }}"
-                            min="1"
-                            max="{{ m.menge }}"
-                            value="1"
-                            class="input input-xs input-bordered w-16">
-
-                        <button onclick="reduceItem({{ g.id }})"
-                                class="btn btn-xs btn-warning">
-                            Weniger
-                        </button>
-
-                        <button onclick="removeAll({{ g.id }})"
-                                class="btn btn-xs btn-error">
-                            Entfernen
-                        </button>
-
-                    </div>
-                    {% endif %}
                 {% endfor %}
-                <!-- EDIT (nur Skipper) -->
-                {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
-                <div class="flex gap-1">
-
-                    <input type="text"
-                        value="{{ g.name }}"
-                        id="boot-name-{{ g.id }}"
-                        class="input input-xs input-bordered w-full max-w-37.5">
-
-                    <input type="number"
-                        value="{{ g.menge }}"
-                        id="boot-menge-{{ g.id }}"
-                        class="input input-xs input-bordered w-16">
-
-                    <button onclick="updateBootItem({{ g.id }})"
-                            class="btn btn-xs btn-primary">💾</button>
-
-                    <button onclick="deleteBootItem({{ g.id }})"
-                            class="btn btn-xs btn-error">🗑</button>
-
-                </div>
-                {% endif %}
-
             </div>
-            {% endfor %}
+            {% else %}
+            <div class="text-center py-8 text-base-content/30 text-sm border border-dashed border-base-300 rounded-xl">
+                Noch keine Mahlzeiten geplant.
             </div>
+            {% endif %}
         </div>
+
+        <!-- Einkaufsliste -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Einkaufsliste</h2>
+            {% if einkaufsliste %}
+            <div class="flex flex-col gap-2">
+                {% for e in einkaufsliste %}
+                <div class="flex items-center gap-3 px-4 py-3 rounded-xl border
+                    {% if e.erledigt %}bg-success/5 border-success/20{% else %}bg-base-100 border-base-300{% endif %}">
+                    <span class="flex-1 text-sm {% if e.erledigt %}line-through text-base-content/30{% endif %}">
+                        {{ e.name }}
+                    </span>
+                    {% if e.menge %}<span class="text-xs text-base-content/40">{{ e.menge }}</span>{% endif %}
+                    {% if e.verantwortlich %}
+                    <span class="badge badge-outline badge-xs">{{ e.verantwortlich.user.first_name }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-6 text-base-content/30 text-sm border border-dashed border-base-300 rounded-xl">
+                Noch keine Einkaufsposten.
+            </div>
+            {% endif %}
+        </div>
+
     </div>
 
-    <!-- ========================= -->
-    <!-- BOOTSKASSE -->
-    <!-- ========================= -->
-    <div class="card bg-base-100 shadow">
-        <div class="card-body">
+    <!-- ========================= TAB: BOOTSKASSE ========================= -->
+    <div id="tab-kasse" class="space-y-5 hidden">
 
-            <div class="flex justify-between items-center">
-
-                <h2 class="card-title">💰 Bootskasse</h2>
-
-                <a href="#" class="btn btn-sm btn-primary">
-                    Zum Finanzbereich →
-                </a>
-
+        <div class="bg-base-100 border border-base-300 rounded-xl p-5">
+            <div class="grid grid-cols-3 gap-4 text-center">
+                <div>
+                    <p class="text-2xl font-bold">0 €</p>
+                    <p class="text-xs text-base-content/40 mt-0.5">Gesamt</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold text-warning">0 €</p>
+                    <p class="text-xs text-base-content/40 mt-0.5">Offen</p>
+                </div>
+                <div>
+                    <p class="text-2xl font-bold">0 €</p>
+                    <p class="text-xs text-base-content/40 mt-0.5">Pro Person</p>
+                </div>
             </div>
-
-            <div class="grid grid-cols-3 gap-4 mt-4 text-center">
-
-                <div>
-                    <div class="text-xs opacity-60">Gesamt</div>
-                    <div class="font-bold">0 €</div>
-                </div>
-
-                <div>
-                    <div class="text-xs opacity-60">Offen</div>
-                    <div class="font-bold">0 €</div>
-                </div>
-
-                <div>
-                    <div class="text-xs opacity-60">Pro Person</div>
-                    <div class="font-bold">0 €</div>
-                </div>
-
-            </div>
-
         </div>
+
+        <div class="bg-base-200/60 border border-base-300 rounded-xl p-5 text-center">
+            <p class="text-sm text-base-content/40">Der Finanzbereich wird bald verfügbar sein.</p>
+        </div>
+
     </div>
 
 </div>
 
-<!-- ========================= -->
-<!-- JS -->
-<!-- ========================= -->
+<!-- ========================= JS ========================= -->
 <script>
+// Tab-Navigation
+document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll(".tab-btn").forEach(b => {
+            b.classList.remove("border-primary", "text-primary");
+            b.classList.add("border-transparent", "text-base-content/50");
+        });
+        btn.classList.add("border-primary", "text-primary");
+        btn.classList.remove("border-transparent", "text-base-content/50");
+        document.querySelectorAll("[id^='tab-']").forEach(t => t.classList.add("hidden"));
+        document.getElementById(`tab-${tab}`).classList.remove("hidden");
+    });
+});
+
+// URL-Tab beim Laden
+(function() {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab) {
+        const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
+        if (btn) btn.click();
+    }
+})();
+
 function getCSRFToken() {
-    return document.cookie
-        .split('; ')
-        .find(row => row.startsWith('csrftoken='))
-        ?.split('=')[1];
+    return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1];
 }
 
 function toggleDone(id) {
-
     fetch(`/toern/packitem/${id}/toggle/`, {
         method: "POST",
-        headers: {
-            "X-CSRFToken": getCSRFToken()
-        }
+        headers: { "X-CSRFToken": getCSRFToken() }
     })
     .then(res => res.json())
     .then(data => {
-
         const item = document.getElementById(`item-${id}`);
         const nameInput = document.getElementById(`name-${id}`);
         const mengeInput = document.getElementById(`menge-${id}`);
-
         if (data.done) {
-
-            if (nameInput) {
-                nameInput.classList.add("line-through", "text-success", "opacity-60");
-            }
-
-            if (mengeInput) {
-                mengeInput.classList.add("text-success", "opacity-60");
-            }
-
-            item.classList.add("bg-success/10");
-
+            item.classList.replace("bg-base-100", "bg-success/5");
+            item.classList.replace("border-base-300", "border-success/20");
+            nameInput?.classList.add("line-through", "text-base-content/30");
+            mengeInput?.classList.add("text-base-content/30");
         } else {
-
-            if (nameInput) {
-                nameInput.classList.remove("line-through", "text-success", "opacity-60");
-            }
-
-            if (mengeInput) {
-                mengeInput.classList.remove("text-success", "opacity-60");
-            }
-
-            item.classList.remove("bg-success/10");
+            item.classList.replace("bg-success/5", "bg-base-100");
+            item.classList.replace("border-success/20", "border-base-300");
+            nameInput?.classList.remove("line-through", "text-base-content/30");
+            mengeInput?.classList.remove("text-base-content/30");
         }
-
-        // 🔥 DAS IST DER FIX
         updateProgress();
-
-    })
+    });
 }
 
 function deleteItem(id) {
     fetch(`/toern/packitem/${id}/delete/`, {
         method: "POST",
-        headers: {
-            "X-CSRFToken": getCSRFToken()
-        }
+        headers: { "X-CSRFToken": getCSRFToken() }
     }).then(() => location.reload());
 }
 
 function addItem() {
-
-    const name = document.getElementById("new-name").value;
+    const name = document.getElementById("new-name").value.trim();
     const menge = document.getElementById("new-menge").value;
-
+    if (!name) return;
     fetch(`/toern/{{ toern.id }}/packitem/add/`, {
         method: "POST",
         headers: {
             "X-CSRFToken": getCSRFToken(),
             "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: `name=${name}&menge=${menge}`
-    })
-    .then(() => location.reload());
+        body: `name=${encodeURIComponent(name)}&menge=${menge}`
+    }).then(() => location.reload());
 }
 
 function updateItem(id) {
-
-    const name = document.getElementById(`name-${id}`).value;
-    const menge = document.getElementById(`menge-${id}`).value;
-
+    const name = document.getElementById(`name-${id}`)?.value;
+    const menge = document.getElementById(`menge-${id}`)?.value;
+    if (!name) return;
     fetch(`/toern/packitem/${id}/update/`, {
         method: "POST",
         headers: {
             "X-CSRFToken": getCSRFToken(),
             "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: `name=${name}&menge=${menge}`
-    })
+        body: `name=${encodeURIComponent(name)}&menge=${menge}`
+    });
 }
+
 function addBootItem() {
-
-    const name = document.getElementById("boot-new-name").value;
+    const name = document.getElementById("boot-new-name").value.trim();
     const menge = document.getElementById("boot-new-menge").value;
-
+    if (!name) return;
     fetch(`/toern/{{ toern.id }}/bootitem/add/`, {
         method: "POST",
         headers: {
             "X-CSRFToken": getCSRFToken(),
             "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: `name=${name}&menge=${menge}`
-    }).then(() => location.reload());
+        body: `name=${encodeURIComponent(name)}&menge=${menge}`
+    }).then(() => location.href = "?tab=bootspackliste");
 }
 
 function updateBootItem(id) {
+    const nameInput = document.getElementById(`boot-name-${id}`);
+    const mengeInput = document.getElementById(`boot-menge-${id}`);
+    const btn = document.getElementById(`boot-save-btn-${id}`);
+    const name = nameInput.value.trim();
+    const menge = parseInt(mengeInput.value) || 1;
 
-    const name = document.getElementById(`boot-name-${id}`).value;
-    const menge = document.getElementById(`boot-menge-${id}`).value;
+    if (!name) {
+        nameInput.classList.add("input-error");
+        nameInput.focus();
+        return;
+    }
+    nameInput.classList.remove("input-error");
+
+    // Loading-State
+    btn.disabled = true;
+    btn.innerHTML = `<span class="loading loading-spinner loading-xs"></span>`;
 
     fetch(`/toern/bootitem/${id}/update/`, {
         method: "POST",
@@ -552,23 +657,49 @@ function updateBootItem(id) {
             "X-CSRFToken": getCSRFToken(),
             "Content-Type": "application/x-www-form-urlencoded"
         },
-        body: `name=${name}&menge=${menge}`
+        body: `name=${encodeURIComponent(name)}&menge=${menge}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === "ok") {
+            // Display im Header aktualisieren
+            const displayName = document.getElementById(`boot-display-name-${id}`);
+            const displayMenge = document.getElementById(`boot-display-menge-${id}`);
+            if (displayName) displayName.textContent = name;
+            if (displayMenge) {
+                const vergeben = displayMenge.textContent.split("/")[0];
+                displayMenge.textContent = `${vergeben}/${menge}`;
+            }
+            // Erfolgs-Feedback
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+            btn.classList.add("text-success");
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.classList.remove("text-success");
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+            }, 1500);
+        } else {
+            throw new Error("Fehler beim Speichern");
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>`;
+        setTimeout(() => {
+            btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`;
+        }, 2000);
     });
 }
 
 function deleteBootItem(id) {
-
     fetch(`/toern/bootitem/${id}/delete/`, {
         method: "POST",
-        headers: {
-            "X-CSRFToken": getCSRFToken()
-        }
-    }).then(() => location.reload());
+        headers: { "X-CSRFToken": getCSRFToken() }
+    }).then(() => location.href = "?tab=bootspackliste");
 }
+
 function takeItem(id) {
-
     const menge = document.getElementById(`take-${id}`).value;
-
     fetch(`/toern/gegenstand/${id}/take/`, {
         method: "POST",
         headers: {
@@ -576,13 +707,11 @@ function takeItem(id) {
             "Content-Type": "application/x-www-form-urlencoded"
         },
         body: `menge=${menge}`
-    })
-    .then(() => location.reload());
+    }).then(() => location.href = "?tab=bootspackliste");
 }
+
 function reduceItem(id) {
-
     const menge = document.getElementById(`reduce-${id}`).value;
-
     fetch(`/toern/gegenstand/${id}/reduce/`, {
         method: "POST",
         headers: {
@@ -590,12 +719,10 @@ function reduceItem(id) {
             "Content-Type": "application/x-www-form-urlencoded"
         },
         body: `menge=${menge}`
-    })
-    .then(() => location.reload());
+    }).then(() => location.href = "?tab=bootspackliste");
 }
 
 function removeAll(id) {
-
     fetch(`/toern/gegenstand/${id}/reduce/`, {
         method: "POST",
         headers: {
@@ -603,24 +730,51 @@ function removeAll(id) {
             "Content-Type": "application/x-www-form-urlencoded"
         },
         body: `menge=9999`
-    })
-    .then(() => location.reload());
+    }).then(() => location.href = "?tab=bootspackliste");
 }
+
 function updateProgress() {
-
-    const checkboxes = document.querySelectorAll('#packliste input[type="checkbox"]');
-
+    const checkboxes = document.querySelectorAll('#packliste input[type="checkbox"], #packliste-boot input[type="checkbox"]');
     const total = checkboxes.length;
     const done = [...checkboxes].filter(cb => cb.checked).length;
-
     const percent = total > 0 ? Math.round((done / total) * 100) : 0;
-
-    // UI updaten
-    document.getElementById("progress-bar").value = percent;
-    document.getElementById("progress-text").innerText = `${done}/${total}`;
-    
+    const bar = document.getElementById("progress-bar");
+    const text = document.getElementById("progress-text");
+    if (bar) bar.value = percent;
+    if (text) text.innerText = `${done}/${total}`;
 }
+
 document.addEventListener("DOMContentLoaded", updateProgress);
+
+// ── Mahlzeiten ──
+function addMahlzeit() {
+    const datum = document.getElementById("mz-datum").value;
+    const typ   = document.getElementById("mz-typ").value;
+    const name  = document.getElementById("mz-name").value.trim();
+    const koch  = document.getElementById("mz-koch").value;
+
+    if (!datum || !name) {
+        document.getElementById("mz-name").classList.add("input-error");
+        return;
+    }
+    document.getElementById("mz-name").classList.remove("input-error");
+
+    fetch(`/toern/{{ toern.id }}/mahlzeit/add/`, {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": getCSRFToken(),
+            "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: `datum=${datum}&typ=${typ}&name=${encodeURIComponent(name)}&kochverantwortlich=${koch}`
+    }).then(() => location.href = "?tab=bordkueche");
+}
+
+function deleteMahlzeit(id) {
+    fetch(`/toern/mahlzeit/${id}/delete/`, {
+        method: "POST",
+        headers: { "X-CSRFToken": getCSRFToken() }
+    }).then(() => location.href = "?tab=bordkueche");
+}
 </script>
 
 {% endblock %}
