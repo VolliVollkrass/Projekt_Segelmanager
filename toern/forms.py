@@ -261,8 +261,9 @@ class TeilnahmeDetailForm(forms.ModelForm):
             "notfallkontakt_name",
             "notfallkontakt_telefon",
             "notfallkontakt_email",
-            "allergien",
             "essgewohnheiten",
+            "lebensmittelunvertraeglichkeiten",
+            "allergien",
             "tshirt_groesse",
         ]
 
@@ -275,10 +276,17 @@ class TeilnahmeDetailForm(forms.ModelForm):
 
             "allergien": forms.Textarea(attrs={
                 "class": "textarea textarea-bordered w-full",
-                "rows": 3
+                "rows": 2,
+                "placeholder": "z.B. Bienen, Medikamente o.ä."
             }),
 
-            "essgewohnheiten": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
+            "essgewohnheiten": forms.Select(attrs={"class": "select select-bordered w-full"}),
+
+            "lebensmittelunvertraeglichkeiten": forms.Textarea(attrs={
+                "class": "textarea textarea-bordered w-full",
+                "rows": 2,
+                "placeholder": "z.B. laktosefrei, glutenfrei …"
+            }),
 
             "tshirt_groesse": forms.Select(attrs={"class": "select select-bordered w-full"}),
         }

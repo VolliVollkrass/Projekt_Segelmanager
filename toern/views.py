@@ -4,7 +4,7 @@ from django.shortcuts import render, get_object_or_404, redirect
 
 from boote.models import Boot, Kabine
 from config import settings
-from logistik.models import Einkaufspunkt, Gegenstand, Mitbringer, PersönlicherGegenstand
+from logistik.models import Einkaufspunkt, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
@@ -1583,12 +1583,32 @@ def boot_dashboard(request, toern_id):
 
     gegenstaende = sorted(gegenstaende, key=lambda g: g.offen == 0)
 
+    # 🍽️ Mahlzeiten
+    mahlzeiten = Mahlzeit.objects.filter(
+        boot=boot, toern=toern
+    ).select_related("kochverantwortlich__user")
+
+    # Crew-Mitglieder für Kochverantwortlichen-Dropdown + Ess-Statistik
+    crew_bestaetigt = Teilnahme.objects.filter(
+        toern=toern, boot=boot, status="bestaetigt"
+    ).select_related("user")
+
+    ess_stats = {
+        "alles": crew_bestaetigt.filter(essgewohnheiten="alles").count(),
+        "vegetarisch": crew_bestaetigt.filter(essgewohnheiten="vegetarisch").count(),
+        "vegan": crew_bestaetigt.filter(essgewohnheiten="vegan").count(),
+        "keine_angabe": crew_bestaetigt.filter(essgewohnheiten="").count(),
+    }
+
     context = {
         "toern": toern,
         "boot": boot,
         "kabinen_data": kabinen_data,
         "gegenstaende": gegenstaende,
         "einkaufsliste": einkaufsliste,
+        "mahlzeiten": mahlzeiten,
+        "crew_bestaetigt": crew_bestaetigt,
+        "ess_stats": ess_stats,
         "teilnahme": teilnahme,
         "progress": progress,
         "done_items": done_items,
@@ -2165,3 +2185,46 @@ def vorlage_anwenden(request, toern_id):
             added['boot'] += len(to_create)
 
     return JsonResponse({'status': 'ok', 'added': added})
+
+# ========================= MAHLZEITEN =========================
+
+@login_required
+@require_POST
+def add_mahlzeit(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern).first()
+    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    datum = request.POST.get("datum")
+    typ = request.POST.get("typ")
+    name = request.POST.get("name", "").strip()
+    kochverantwortlich_id = request.POST.get("kochverantwortlich") or None
+
+    if not datum or not typ or not name:
+        return JsonResponse({"status": "error", "message": "Pflichtfelder fehlen"}, status=400)
+
+    koch = None
+    if kochverantwortlich_id:
+        koch = Teilnahme.objects.filter(id=kochverantwortlich_id, toern=toern).first()
+
+    Mahlzeit.objects.create(
+        boot=teilnahme.boot,
+        toern=toern,
+        datum=datum,
+        typ=typ,
+        name=name,
+        kochverantwortlich=koch,
+    )
+    return JsonResponse({"status": "ok"})
+
+
+@login_required
+@require_POST
+def delete_mahlzeit(request, mahlzeit_id):
+    mahlzeit = get_object_or_404(Mahlzeit, id=mahlzeit_id)
+    teilnahme = Teilnahme.objects.filter(user=request.user, toern=mahlzeit.toern).first()
+    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+    mahlzeit.delete()
+    return JsonResponse({"status": "ok"})
