@@ -1,0 +1,30 @@
+services:
+  segelmanager:
+    build: .
+    image: segelmanager:latest
+    container_name: segelmanager
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Media-Files persistent (Profilbilder, Dokumente etc.)
+      - ./media:/app/media
+    networks:
+      - traefik-proxy
+    labels:
+      - "traefik.enable=true"
+      # Routing
+      - "traefik.http.routers.segelmanager.rule=Host(`segelmanager.undmeererleben.de`)"
+      - "traefik.http.routers.segelmanager.entrypoints=websecure"
+      - "traefik.http.routers.segelmanager.tls.certresolver=letsencrypt"
+      # HTTP → HTTPS Redirect
+      - "traefik.http.routers.segelmanager-http.rule=Host(`segelmanager.undmeererleben.de`)"
+      - "traefik.http.routers.segelmanager-http.entrypoints=web"
+      - "traefik.http.routers.segelmanager-http.middlewares=redirect-to-https"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      # App-Port
+      - "traefik.http.services.segelmanager.loadbalancer.server.port=8000"
+
+networks:
+  traefik-proxy:
+    external: true

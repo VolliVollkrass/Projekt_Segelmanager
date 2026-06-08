@@ -1,27 +1,21 @@
 #!/bin/bash
+set -e
 
-echo "🚀 Starte Deployment..."
+echo "🚀 Starte Deployment Segelmanager..."
 
-# Zum Projekt wechseln
-cd /home/Blechmettl/segelmanager/Projekt_Segelmanager || exit
-
-# Virtualenv aktivieren
-source venv/bin/activate
+# Zum Projektverzeichnis wechseln
+cd ~/docker/segelmanager
 
 echo "📥 Hole neuesten Code..."
-git fetch origin
-git reset --hard origin/main
+git pull origin main
 
-echo "📦 Installiere neue Pakete..."
-pip install -r requirements.txt
+echo "🔨 Baue Docker-Image..."
+docker compose build
 
-echo "🗄️ Migrationen..."
-python manage.py migrate
+echo "🔁 Container neu starten..."
+docker compose up -d
 
-echo "📁 Static Files..."
-python manage.py collectstatic --noinput
+echo "🧹 Alte Images aufräumen..."
+docker image prune -f
 
-echo "🔁 Reload Web App..."
-touch /var/www/blechmettl_pythonanywhere_com_wsgi.py
-
-echo "✅ Deployment fertig!"
+echo "✅ Deployment fertig! Läuft unter https://segelmanager.undmeererleben.de"
