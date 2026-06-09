@@ -13,12 +13,24 @@ services:
       - traefik-proxy
     labels:
       - "traefik.enable=true"
-      # Routing
+
+      # --- Haupt-App: segelmanager.undmeererleben.de ---
       - "traefik.http.routers.segelmanager.rule=Host(`segelmanager.undmeererleben.de`)"
       - "traefik.http.routers.segelmanager.entrypoints=websecure"
       - "traefik.http.routers.segelmanager.tls.certresolver=le"
       # App-Port (HTTP→HTTPS Redirect läuft global über Traefik-Entrypoint)
       - "traefik.http.services.segelmanager.loadbalancer.server.port=8000"
+
+      # --- Temporärer Redirect: undmeererleben.de + www → segelmanager ---
+      # Zukünftig: diesen Block entfernen und durch eigenen Landingpage-Container ersetzen
+      - "traefik.http.routers.root-redirect.rule=Host(`undmeererleben.de`) || Host(`www.undmeererleben.de`)"
+      - "traefik.http.routers.root-redirect.entrypoints=websecure"
+      - "traefik.http.routers.root-redirect.tls.certresolver=le"
+      - "traefik.http.routers.root-redirect.service=segelmanager"
+      - "traefik.http.routers.root-redirect.middlewares=root-to-segelmanager"
+      - "traefik.http.middlewares.root-to-segelmanager.redirectregex.regex=^https://(www\\.)?undmeererleben\\.de(.*)"
+      - "traefik.http.middlewares.root-to-segelmanager.redirectregex.replacement=https://segelmanager.undmeererleben.de$${2}"
+      - "traefik.http.middlewares.root-to-segelmanager.redirectregex.permanent=true"
 
 networks:
   traefik-proxy:

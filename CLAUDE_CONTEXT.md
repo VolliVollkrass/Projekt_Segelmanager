@@ -50,6 +50,17 @@ Eine Django-Webapp zur Verwaltung von Segeltörns. Anbieter erstellen Törns, Cr
 - HTTP→HTTPS Redirect läuft **global** über Traefik-Entrypoint
 - Kein separater HTTP-Router in docker-compose nötig
 
+### Root-Domain Redirect (temporär)
+`undmeererleben.de` und `www.undmeererleben.de` leiten per 301 auf `segelmanager.undmeererleben.de` weiter.
+Konfiguriert über `redirectregex`-Middleware in `docker-compose.yml` (Router: `root-redirect`).
+
+**DNS-Voraussetzungen** (beim Domain-Anbieter prüfen):
+- `undmeererleben.de` → A-Record → Server-IP
+- `www.undmeererleben.de` → A-Record → Server-IP (oder CNAME auf `undmeererleben.de`)
+
+**Zukünftig**: Wenn eine eigene Landingpage entsteht, den `root-redirect`-Block aus `docker-compose.yml`
+entfernen und einen eigenen Container für `undmeererleben.de` / `www.undmeererleben.de` anlegen.
+
 ### PostgreSQL-Zugangsdaten (Segelmanager)
 - Host: `postgres` (Docker-interner Hostname)
 - Datenbank: `segelmanager`
