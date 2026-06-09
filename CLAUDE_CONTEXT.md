@@ -25,8 +25,8 @@ Eine Django-Webapp zur Verwaltung von Segeltörns. Anbieter erstellen Törns, Cr
 ## Infrastruktur (Hetzner VPS)
 
 ### Server-Details
-- **IP**: 46.224.226.138
-- **User**: volker (sudo)
+- **IP**: siehe `.env` / persönliche Notizen (nicht im öffentlichen Repo)
+- **User**: siehe persönliche Notizen
 - **Domain**: undmeererleben.de
 - **App-URL**: https://segelmanager.undmeererleben.de
 
@@ -54,7 +54,7 @@ Eine Django-Webapp zur Verwaltung von Segeltörns. Anbieter erstellen Törns, Cr
 - Host: `postgres` (Docker-interner Hostname)
 - Datenbank: `segelmanager`
 - User: `segelmanager_user`
-- Superuser des PG-Containers: `admin`
+- Passwort + Superuser: siehe `.env` auf dem Server / persönliche Notizen
 
 ### Deployment-Befehl (vom Mac aus)
 ```bash
@@ -64,8 +64,8 @@ git add static/css/src/output.css
 git commit -m "..."
 git push origin main
 
-# Auf Server deployen
-ssh volker@46.224.226.138 "cd ~/docker/segelmanager && git pull origin main && docker compose build && docker compose up -d"
+# Auf Server deployen (IP + User aus persönlichen Notizen)
+ssh USER@SERVER-IP "cd ~/docker/segelmanager && git pull origin main && docker compose build && docker compose up -d"
 ```
 
 ### deploy.sh (liegt im Repo, auf Server ausführen)
