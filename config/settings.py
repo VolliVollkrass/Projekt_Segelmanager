@@ -54,8 +54,11 @@ INSTALLED_APPS = [
     'toern',
     'logistik',
     'finance',
-    'schema_viewer',
 ]
+
+# schema_viewer nur lokal (zeigt DB-Schema — nie in Production!)
+if DEBUG:
+    INSTALLED_APPS += ['schema_viewer']
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -80,8 +83,6 @@ AXES_RESET_ON_SUCCESS = True
 AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
 AXES_LOCKOUT_TEMPLATE = "accounts/lockout.html"
 
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
 ROOT_URLCONF = 'config.urls'
@@ -177,6 +178,7 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 # CSRF für HTTPS-Domain freischalten (Django 4+)
 CSRF_TRUSTED_ORIGINS = env.list(
