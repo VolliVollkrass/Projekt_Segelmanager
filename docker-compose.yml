@@ -16,7 +16,7 @@ services:
       # Routing
       - "traefik.http.routers.segelmanager.rule=Host(`segelmanager.undmeererleben.de`)"
       - "traefik.http.routers.segelmanager.entrypoints=websecure"
-      - "traefik.http.routers.segelmanager.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.segelmanager.tls.certresolver=le"
       # HTTP → HTTPS Redirect
       - "traefik.http.routers.segelmanager-http.rule=Host(`segelmanager.undmeererleben.de`)"
       - "traefik.http.routers.segelmanager-http.entrypoints=web"
