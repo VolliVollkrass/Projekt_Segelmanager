@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'anymail',
     'axes',
     'home',
     'accounts',
@@ -198,12 +199,11 @@ LOGIN_URL = "/accounts/login/"
 # --- E-Mail-Backend ---
 EMAIL_BACKEND = env(
     'EMAIL_BACKEND',
-    default='django.core.mail.backends.smtp.EmailBackend'
+    default='anymail.backends.brevo.EmailBackend'
 )
-EMAIL_HOST = env('EMAIL_HOST', default='smtp-relay.brevo.com')
-EMAIL_PORT = env.int('EMAIL_PORT', default=587)
-EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
-EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@undmeererleben.de')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+ANYMAIL = {
+    'BREVO_API_KEY': env('BREVO_API_KEY', default=''),
+}
