@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from django.core.mail import send_mail
+from django.core.mail import EmailMessage
 from django.conf import settings
 
 
@@ -12,14 +12,18 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         empfaenger = options['empfaenger']
         self.stdout.write(f'Sende Test-Mail an {empfaenger} ...')
-        self.stdout.write(f'Backend: {settings.EMAIL_BACKEND}')
-        self.stdout.write(f'From:    {settings.DEFAULT_FROM_EMAIL}')
+        self.stdout.write(f'Backend:  {settings.EMAIL_BACKEND}')
+        self.stdout.write(f'From:     {settings.DEFAULT_FROM_EMAIL}')
+        self.stdout.write(f'Reply-To: {settings.REPLY_TO_EMAIL or "(nicht gesetzt)"}')
 
-        send_mail(
+        reply_to = [settings.REPLY_TO_EMAIL] if settings.REPLY_TO_EMAIL else []
+
+        email = EmailMessage(
             subject='Meer erleben — Test-E-Mail',
-            message='Diese E-Mail bestätigt, dass der Mailversand korrekt konfiguriert ist.',
+            body='Diese E-Mail bestätigt, dass der Mailversand korrekt konfiguriert ist.',
             from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[empfaenger],
-            fail_silently=False,
+            to=[empfaenger],
+            reply_to=reply_to,
         )
-        self.stdout.write(self.style.SUCCESS('Mail erfolgreich gesendet (oder im Terminal ausgegeben).'))
+        email.send(fail_silently=False)
+        self.stdout.write(self.style.SUCCESS('Mail erfolgreich gesendet.'))

@@ -203,6 +203,7 @@ EMAIL_BACKEND = env(
 )
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='noreply@undmeererleben.de')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+REPLY_TO_EMAIL = env('REPLY_TO_EMAIL', default='')
 
 ANYMAIL = {
     'BREVO_API_KEY': env('BREVO_API_KEY', default=''),
