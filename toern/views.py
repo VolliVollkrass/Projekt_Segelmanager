@@ -10,6 +10,7 @@ from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag
+from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from utils.permissions import anbieter_required, is_owner
@@ -1447,6 +1448,14 @@ def zuteilung_fixieren(request, toern_id):
         boot__isnull=False
     ).update(status="bestaetigt")
 
+    # Info-Mails an alle bestätigten Crew-Mitglieder
+    bestaetigt = Teilnahme.objects.filter(
+        toern=toern,
+        status="bestaetigt",
+    ).select_related("user", "boot", "kabine")
+    for t in bestaetigt:
+        mail_zuteilung_fixiert(t, request)
+
     messages.success(request, "Zuteilung wurde abgeschlossen. Crew hat jetzt Zugriff auf ihr Boot.")
 
     return redirect("skipper_dashboard", toern_id=toern.id)
@@ -1466,6 +1475,7 @@ def teilnehmer_bestaetigen(request, teilnahme_id):
 
     teilnahme.status = "bestaetigt"
     teilnahme.save()
+    mail_teilnahme_bestaetigt(teilnahme, request)
 
     messages.success(request, "Teilnehmer bestätigt")
 
@@ -1488,6 +1498,7 @@ def teilnehmer_ablehnen(request, teilnahme_id):
     teilnahme.boot = None
     teilnahme.kabine = None
     teilnahme.save()
+    mail_teilnahme_abgelehnt(teilnahme, request)
 
     messages.info(request, "Teilnehmer abgelehnt")
 
