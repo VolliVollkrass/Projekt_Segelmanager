@@ -20,6 +20,10 @@ urlpatterns = [
     path("lizenz-loeschen/<int:pk>/", views.lizenz_loeschen, name="lizenz_loeschen"),
     path("onboarding/", views.onboarding, name="onboarding"),
 
+    # E-Mail-Verifikation
+    path("email-verifizieren/<uuid:token>/", views.verify_email, name="verify_email"),
+    path("email-bestaetigung/erneut/", views.resend_verification, name="resend_verification"),
+
     # Passwort-Reset
     path("passwort-reset/", PasswordResetView.as_view(
         template_name="accounts/password_reset_form.html",

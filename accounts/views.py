@@ -3,10 +3,35 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash, authenticate, login
 from django.contrib.auth.views import LoginView
+from django.core.mail import EmailMessage
+from django.conf import settings
 from django_ratelimit.decorators import ratelimit
 
 from .forms import RegisterForm, LoginForm, AccountEditForm, LizenzForm, OnboardingForm
-from .models import Lizenz
+from .models import Lizenz, EmailVerificationToken
+
+
+def send_verification_email(user, request):
+    token_obj, _ = EmailVerificationToken.objects.get_or_create(user=user)
+    verify_url = request.build_absolute_uri(f"/accounts/email-verifizieren/{token_obj.token}/")
+    reply_to = [settings.REPLY_TO_EMAIL] if settings.REPLY_TO_EMAIL else []
+
+    body = (
+        f"Hallo {user.first_name},\n\n"
+        "willkommen bei Meer erleben! Bitte bestätige deine E-Mail-Adresse:\n\n"
+        f"{verify_url}\n\n"
+        "Der Link ist 24 Stunden gültig.\n\n"
+        "Bis bald an Bord,\n"
+        "Das Meer erleben Team"
+    )
+
+    EmailMessage(
+        subject="E-Mail-Adresse bestätigen – Meer erleben",
+        body=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+        reply_to=reply_to,
+    ).send(fail_silently=True)
 
 @ratelimit(key='ip', rate='5/h', block=True)
 @ratelimit(key='post:email', rate='3/h', block=True)
@@ -28,6 +53,7 @@ def register(request):
 
             if user is not None:
                 login(request, user)
+                send_verification_email(user, request)
                 return redirect("onboarding")
 
             messages.error(request, "Login nach Registrierung fehlgeschlagen.")
@@ -175,3 +201,34 @@ def lizenz_loeschen(request, pk):
         messages.success(request, "Lizenz gelöscht.")
 
     return redirect("my_account")
+
+
+def verify_email(request, token):
+    token_obj = get_object_or_404(EmailVerificationToken, token=token)
+
+    if token_obj.is_expired():
+        token_obj.delete()
+        messages.error(request, "Dieser Verifikationslink ist abgelaufen. Bitte fordere einen neuen an.")
+        return redirect("resend_verification")
+
+    user = token_obj.user
+    user.email_verified = True
+    user.save(update_fields=["email_verified"])
+    token_obj.delete()
+
+    messages.success(request, "E-Mail-Adresse erfolgreich bestätigt!")
+    return redirect("my_account")
+
+
+@login_required
+def resend_verification(request):
+    if request.user.email_verified:
+        return redirect("my_account")
+
+    if request.method == "POST":
+        EmailVerificationToken.objects.filter(user=request.user).delete()
+        send_verification_email(request.user, request)
+        messages.success(request, "Bestätigungs-Mail wurde erneut verschickt.")
+        return redirect("my_account")
+
+    return render(request, "accounts/resend_verification.html")
