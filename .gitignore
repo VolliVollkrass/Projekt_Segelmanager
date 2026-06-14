@@ -26,6 +26,9 @@ dist/
 # Static files (optional je nach Setup)
 staticfiles/
 
+# Claude Code
+.claude/
+
 # Sonstiges
 *.bak
 *.tmp
