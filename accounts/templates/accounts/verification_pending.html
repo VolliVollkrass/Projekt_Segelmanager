@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}E-Mail bestätigen{% endblock %}
+
+{% block content %}
+<div class="min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center px-4 py-10">
+    <div class="w-full max-w-sm text-center">
+
+        <img src="{% static 'medien/Logo_Meer_erleben.png' %}" alt="Logo" class="h-12 mx-auto mb-6">
+
+        <div class="text-6xl mb-4">📬</div>
+        <h1 class="text-2xl font-bold mb-2">Fast geschafft!</h1>
+        <p class="text-base-content/60 text-sm mb-6">
+            Wir haben eine Bestätigungs-Mail an <strong>{{ user.email }}</strong> geschickt.
+            Bitte klicke auf den Link in der Mail, um dein Konto freizuschalten.
+        </p>
+
+        <div class="card bg-base-200 rounded-xl p-4 text-sm text-left mb-6 space-y-2">
+            <p class="font-medium">Keine Mail erhalten?</p>
+            <ul class="text-base-content/60 space-y-1 list-disc list-inside">
+                <li>Schau in deinen Spam-Ordner</li>
+                <li>Warte bis zu 2 Minuten</li>
+                <li>Fordere unten einen neuen Link an</li>
+            </ul>
+        </div>
+
+        <form method="post" action="{% url 'resend_verification' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary w-full mb-3">
+                Neuen Bestätigungslink senden
+            </button>
+        </form>
+
+        <a href="{% url 'logout' %}" class="btn btn-ghost w-full btn-sm text-base-content/50">
+            Abmelden
+        </a>
+
+    </div>
+</div>
+{% endblock %}

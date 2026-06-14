@@ -203,6 +203,13 @@ def lizenz_loeschen(request, pk):
     return redirect("my_account")
 
 
+@login_required
+def verification_pending(request):
+    if request.user.email_verified:
+        return redirect("index")
+    return render(request, "accounts/verification_pending.html")
+
+
 def verify_email(request, token):
     token_obj = get_object_or_404(EmailVerificationToken, token=token)
 

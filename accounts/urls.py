@@ -22,6 +22,7 @@ urlpatterns = [
 
     # E-Mail-Verifikation
     path("email-verifizieren/<uuid:token>/", views.verify_email, name="verify_email"),
+    path("email-bestaetigung/warten/", views.verification_pending, name="verification_pending"),
     path("email-bestaetigung/erneut/", views.resend_verification, name="resend_verification"),
 
     # Passwort-Reset
