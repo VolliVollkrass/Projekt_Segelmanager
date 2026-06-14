@@ -268,3 +268,21 @@ class PacklisteVorlageEintrag(models.Model):
 
     def __str__(self):
         return f"{self.menge}x {self.name}"
+
+
+class ErinnerungsMailLog(models.Model):
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="erinnerungsmails")
+    empfaenger = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="erinnerungsmails_erhalten",
+    )
+    gesendet_am = models.DateTimeField(auto_now_add=True)
+    fehlende_felder = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-gesendet_am"]
+
+    def __str__(self):
+        return f"{self.empfaenger} — {self.toern} ({self.gesendet_am:%d.%m.%Y %H:%M})"

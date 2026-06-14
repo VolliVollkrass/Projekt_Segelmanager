@@ -271,6 +271,25 @@
     <!-- ========================= TAB: CREW ========================= -->
     <div id="tab-crew" class="hidden space-y-5">
 
+        <!-- Erinnerungsmail Button -->
+        <div class="bg-base-200 rounded-xl p-4">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <p class="font-semibold text-sm">Crewdaten-Erinnerung senden</p>
+                    <p class="text-xs text-base-content/50 mt-0.5">Sendet eine Mail an alle Crewmitglieder, die noch fehlende Angaben für die Crewliste haben.</p>
+                </div>
+                <form method="post" action="{% url 'send_reminder_toern' toern.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary btn-sm shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        Erinnerung senden
+                    </button>
+                </form>
+            </div>
+        </div>
+
         <!-- Crewliste mit Fortschritt -->
         <div>
             <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Alle Crewmitglieder</h2>
@@ -350,6 +369,33 @@
             <p class="text-sm text-base-content/40">Keine Konflikte gemeldet.</p>
         </div>
         {% endif %}
+
+        <!-- Erinnerungsmail-Log -->
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Versendete Erinnerungsmails</h2>
+            {% if reminder_logs %}
+            <div class="flex flex-col gap-2">
+                {% for log in reminder_logs %}
+                <div class="flex items-start gap-3 bg-base-100 border border-base-300 rounded-xl px-4 py-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/30 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium">{{ log.empfaenger.first_name }} {{ log.empfaenger.last_name }}</p>
+                        <p class="text-xs text-base-content/40">{{ log.gesendet_am|date:"d.m.Y H:i" }} Uhr</p>
+                        {% if log.fehlende_felder %}
+                        <p class="text-xs text-base-content/30 mt-0.5 truncate">Fehlte: {{ log.fehlende_felder }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="text-center py-6 bg-base-200/50 rounded-xl">
+                <p class="text-sm text-base-content/40">Noch keine Erinnerungsmails versendet.</p>
+            </div>
+            {% endif %}
+        </div>
 
     </div>
 

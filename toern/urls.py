@@ -42,4 +42,5 @@ urlpatterns = [
     path("<int:toern_id>/vorlage/anwenden/", vorlage_anwenden, name="vorlage_anwenden"),
     path("<int:toern_id>/mahlzeit/add/", add_mahlzeit, name="add_mahlzeit"),
     path("mahlzeit/<int:mahlzeit_id>/delete/", delete_mahlzeit, name="delete_mahlzeit"),
+    path("<int:toern_id>/erinnerung/senden/", send_reminder_toern, name="send_reminder_toern"),
 ]

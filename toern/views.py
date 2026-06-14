@@ -9,8 +9,9 @@ from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE
-from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag
-from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt
+from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog
+from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_crew_daten_erinnerung
+from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from utils.permissions import anbieter_required, is_owner
@@ -829,6 +830,9 @@ def skipper_dashboard(request, toern_id):
         "count_angemeldet": count_angemeldet,
         "count_warteliste": warteliste.count(),
         "count_unassigned": len(unassigned),
+
+        # Erinnerungsmail-Log
+        "reminder_logs": ErinnerungsMailLog.objects.filter(toern=toern).select_related("empfaenger")[:50],
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)
@@ -2239,3 +2243,40 @@ def delete_mahlzeit(request, mahlzeit_id):
         raise PermissionDenied
     mahlzeit.delete()
     return JsonResponse({"status": "ok"})
+
+
+@login_required
+@require_POST
+def send_reminder_toern(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+
+    teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern).first()
+    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+        raise PermissionDenied
+
+    empfaenger_teilnahmen = Teilnahme.objects.filter(
+        toern=toern,
+        status__in=["angemeldet", "bestaetigt"],
+        user__email_verified=True,
+    ).select_related("user")
+
+    versandt = 0
+    for t in empfaenger_teilnahmen:
+        fehlend = fehlende_crew_felder(t.user)
+        if not fehlend:
+            continue
+
+        mail_crew_daten_erinnerung(t.user, toern, fehlend, request)
+        ErinnerungsMailLog.objects.create(
+            toern=toern,
+            empfaenger=t.user,
+            fehlende_felder=", ".join(fehlend),
+        )
+        versandt += 1
+
+    if versandt:
+        messages.success(request, f"{versandt} Erinnerungsmail(s) versendet.")
+    else:
+        messages.info(request, "Alle Crewmitglieder haben ihre Daten vollstaendig angegeben.")
+
+    return redirect("skipper_dashboard", toern_id=toern_id)

@@ -45,17 +45,46 @@ def mail_teilnahme_bestaetigt(teilnahme, request):
     toern = teilnahme.toern
     user = teilnahme.user
     dashboard_url = request.build_absolute_uri(f"/toern/{toern.id}/crew/")
+    profil_url = request.build_absolute_uri("/accounts/account-edit/")
 
     body = (
         f"Hallo {user.first_name},\n\n"
-        f'deine Teilnahme am Toern "{toern.titel}" wurde bestaetigt.\n\n'
+        f'deine Teilnahme am Toern \"{toern.titel}\" wurde bestaetigt.\n\n'
         f"Dein Crew-Dashboard:\n{dashboard_url}\n\n"
+        "---\n"
+        "Damit der Skipper alle noetigen Daten fuer die Crewliste hat, stelle bitte sicher,\n"
+        "dass dein Profil vollstaendig ausgefuellt ist (Vorname, Nachname, Geburtsdatum,\n"
+        "Geburtsort, Geburtsland, Nationalitaet, Ausweis-/Passnummer, Adresse, Telefon).\n\n"
+        f"Jetzt Profil vervollstaendigen:\n{profil_url}\n"
+        "---\n\n"
         "Bis bald an Bord,\n"
         "Das Meer erleben Team"
     )
 
     _send(
         subject=f"Teilnahme bestaetigt - {toern.titel}",
+        body=body,
+        recipient=user.email,
+    )
+
+
+def mail_crew_daten_erinnerung(user, toern, fehlende_felder, request):
+    profil_url = request.build_absolute_uri("/accounts/account-edit/")
+    fehlend_str = "\n".join(f"  - {f}" for f in fehlende_felder)
+
+    body = (
+        f"Hallo {user.first_name or user.email},\n\n"
+        f'du bist fuer den Toern \"{toern.titel}\" angemeldet.\n\n'
+        "Fuer die Crewliste fehlen noch folgende Angaben in deinem Profil:\n\n"
+        f"{fehlend_str}\n\n"
+        f"Bitte vervollstaendige dein Profil jetzt:\n{profil_url}\n\n"
+        "Das dauert nur wenige Minuten!\n\n"
+        "Viele Gruesse,\n"
+        "Das Meer erleben Team"
+    )
+
+    _send(
+        subject=f"Bitte vervollstaendige deine Crewdaten - {toern.titel}",
         body=body,
         recipient=user.email,
     )
