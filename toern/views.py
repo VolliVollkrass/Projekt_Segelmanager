@@ -154,9 +154,7 @@ def toern_anmeldung(request, pk):
                 messages.warning(request, "Der Törn ist aktuell voll – du stehst auf der Warteliste.")
 
             teilnahme.save()
-
-            #messages.success(request, "Erfolgreich angemeldet!")  Ich glaube das wird nicht mehr benötigt, da die Meldungen jetzt direkt in der Logik oben gesetzt werden. 
-            #return redirect("toern_detail", pk=toern.pk)
+            return redirect("toern_detail", pk=toern.pk)
 
     else:
         form = TeilnahmeForm()

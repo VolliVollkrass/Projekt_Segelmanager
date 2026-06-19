@@ -20,9 +20,15 @@
             <div class="card bg-base-300 shadow-xl overflow-hidden flex flex-col w-full">
 
                 <figure>
-                    <img src="{{ toern.bild_toern.url }}" 
-                         alt="{{ toern.titel }}"
-                         class="w-full h-64 sm:h-72 object-cover">
+                    {% if toern.bild_toern %}
+                        <img src="{{ toern.bild_toern.url }}"
+                             alt="{{ toern.titel }}"
+                             class="w-full h-64 sm:h-72 object-cover">
+                    {% else %}
+                        <img src="{% static 'medien/Segeln_dummy.jpeg' %}"
+                             alt="{{ toern.titel }}"
+                             class="w-full h-64 sm:h-72 object-cover">
+                    {% endif %}
                 </figure>
 
                 <div class="card-body flex flex-col justify-between space-y-4">
