@@ -166,8 +166,8 @@ def toern_anmeldung(request, pk):
                 .order_by("-toern__startdatum")
                 .first()
             )
-            if letzte and letzte.gesegelte_meilen:
-                initial["gesegelte_meilen"] = letzte.gesegelte_meilen
+            if letzte and letzte.individuelle_meilen:
+                initial["individuelle_meilen"] = letzte.individuelle_meilen
         form = TeilnahmeForm(initial=initial)
 
     boote = toern.boote.all()
@@ -217,7 +217,8 @@ def toern_create(request):
 @login_required
 @login_required
 @login_required
-def toern_abschliessen(request, pk):
+@require_POST
+def toern_status_abschliessen(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
     is_anbieter = toern.anbieter == request.user
     is_skipper_coskipper = Teilnahme.objects.filter(
@@ -226,56 +227,20 @@ def toern_abschliessen(request, pk):
     if not is_anbieter and not is_skipper_coskipper:
         raise PermissionDenied
 
-    teilnahmen = (
-        Teilnahme.objects
-        .filter(toern=toern, status="bestaetigt")
-        .select_related("user", "boot")
-        .order_by("boot__name", "user__last_name", "user__first_name")
-    )
+    war_bereits_abgeschlossen = toern.status == "ABGESCHLOSSEN"
+    toern.status = "ABGESCHLOSSEN"
+    toern.save(update_fields=["status"])
 
-    if request.method == "POST":
-        for t in teilnahmen:
-            try:
-                t.gesegelte_meilen = max(0, int(request.POST.get(f"meilen_{t.id}", 0) or 0))
-                t.save(update_fields=["gesegelte_meilen"])
-            except (ValueError, TypeError):
-                pass
+    if not war_bereits_abgeschlossen:
+        bestaetigt = Teilnahme.objects.filter(
+            toern=toern, status="bestaetigt"
+        ).select_related("user", "boot")
+        mail_toern_abgeschlossen(toern, bestaetigt, request)
+        messages.success(request, f'Törn "{toern.titel}" wurde abgeschlossen – alle Crew-Mitglieder wurden informiert.')
+    else:
+        messages.success(request, f'Törn "{toern.titel}" ist bereits abgeschlossen.')
 
-        toern.fotogalerie_link = request.POST.get("fotogalerie_link", "").strip()
-
-        if "logbuch_pdf" in request.FILES:
-            toern.logbuch_pdf = request.FILES["logbuch_pdf"]
-
-        war_bereits_abgeschlossen = toern.status == "ABGESCHLOSSEN"
-        toern.status = "ABGESCHLOSSEN"
-        toern.save()
-
-        if not war_bereits_abgeschlossen:
-            bestaetigt = Teilnahme.objects.filter(
-                toern=toern, status="bestaetigt"
-            ).select_related("user", "boot")
-            mail_toern_abgeschlossen(toern, bestaetigt, request)
-
-        messages.success(request, f'Törn "{toern.titel}" wurde erfolgreich abgeschlossen.')
-        if is_anbieter:
-            return redirect("anbieter_dashboard")
-        return redirect("skipper_dashboard", pk=toern.id)
-
-    # Teilnahmen nach Boot gruppieren für das Template
-    boote_dict = {}
-    for t in teilnahmen:
-        key = (t.boot.id if t.boot else None, t.boot.name if t.boot else "Ohne Boot-Zuweisung")
-        if key not in boote_dict:
-            boote_dict[key] = {"boot_name": key[1], "teilnahmen": []}
-        boote_dict[key]["teilnahmen"].append(t)
-
-    ctx = {
-        "toern": toern,
-        "boote_gruppen": list(boote_dict.values()),
-        "teilnahmen_gesamt": teilnahmen.count(),
-        "toern_noch_aktiv": toern.enddatum > now(),
-    }
-    return render(request, "toern/toern_abschliessen.html", ctx)
+    return redirect("skipper_dashboard", toern_id=toern.id)
 
 
 @anbieter_required
@@ -971,19 +936,49 @@ def boot_abschluss_update(request, boot_id):
     if not is_anbieter and not is_boot_skipper:
         raise PermissionDenied
 
+    # Boot-spezifisch: Standard-Seemeilen + Logbuch
     try:
         boot.skipper_meilen = max(0, int(request.POST.get("skipper_meilen", 0) or 0))
     except (ValueError, TypeError):
         pass
 
-    boot.foto_upload_link = request.POST.get("foto_upload_link", "").strip()
-    boot.foto_download_link = request.POST.get("foto_download_link", "").strip()
-
     if "logbuch_pdf" in request.FILES:
         boot.logbuch_pdf = request.FILES["logbuch_pdf"]
 
     boot.save()
-    messages.success(request, f'Informationen für "{boot.name}" gespeichert.')
+
+    # Individuelle Meilen pro Teilnahme (optionale Ausnahmen)
+    crew = Teilnahme.objects.filter(toern=toern, boot=boot, status="bestaetigt")
+    for t in crew:
+        raw = request.POST.get(f"individuelle_meilen_{t.id}", "").strip()
+        if raw:
+            try:
+                t.individuelle_meilen = max(0, int(raw))
+            except (ValueError, TypeError):
+                t.individuelle_meilen = None
+        else:
+            t.individuelle_meilen = None
+        t.save(update_fields=["individuelle_meilen"])
+
+    messages.success(request, f'Daten für "{boot.name}" gespeichert.')
+    return redirect("skipper_dashboard", toern_id=toern.id)
+
+
+@login_required
+@require_POST
+def toern_foto_links_update(request, pk):
+    toern = get_object_or_404(Toern, pk=pk)
+    is_anbieter = toern.anbieter == request.user
+    is_skipper_coskipper = Teilnahme.objects.filter(
+        toern=toern, user=request.user, rolle__in=("skipper", "coskipper")
+    ).exists()
+    if not is_anbieter and not is_skipper_coskipper:
+        raise PermissionDenied
+
+    toern.foto_upload_link = request.POST.get("foto_upload_link", "").strip()
+    toern.foto_download_link = request.POST.get("foto_download_link", "").strip()
+    toern.save(update_fields=["foto_upload_link", "foto_download_link"])
+    messages.success(request, "Foto-Links gespeichert.")
     return redirect("skipper_dashboard", toern_id=toern.id)
 
 

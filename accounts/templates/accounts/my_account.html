@@ -234,23 +234,19 @@
                 </a>
 
                 <!-- Seemeilen + Links -->
-                {% if t.boot and t.boot.skipper_meilen or t.gesegelte_meilen or t.boot and t.boot.foto_download_link or t.boot and t.boot.logbuch_pdf %}
+                {% with meilen=t.individuelle_meilen|default:t.boot.skipper_meilen %}
+                {% if meilen or t.toern.foto_download_link or t.boot and t.boot.logbuch_pdf %}
                 <div class="flex flex-wrap gap-2 pl-14">
-                    {% if t.boot and t.boot.skipper_meilen %}
+                    {% if meilen %}
                     <span class="inline-flex items-center gap-1 text-xs bg-secondary/10 text-secondary rounded-full px-2.5 py-1 font-medium">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
                         </svg>
-                        {{ t.boot.skipper_meilen }} sm
+                        {{ meilen }} sm{% if t.individuelle_meilen %} *{% endif %}
                     </span>
                     {% endif %}
-                    {% if t.gesegelte_meilen %}
-                    <span class="inline-flex items-center gap-1 text-xs bg-base-200 text-base-content/50 rounded-full px-2.5 py-1" title="Eigene Angabe">
-                        {{ t.gesegelte_meilen }} sm (eigene Angabe)
-                    </span>
-                    {% endif %}
-                    {% if t.boot and t.boot.foto_download_link %}
-                    <a href="{{ t.boot.foto_download_link }}" target="_blank" rel="noopener"
+                    {% if t.toern.foto_download_link %}
+                    <a href="{{ t.toern.foto_download_link }}" target="_blank" rel="noopener"
                        class="inline-flex items-center gap-1 text-xs text-primary hover:underline rounded-full px-2.5 py-1 bg-primary/5">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
@@ -269,6 +265,7 @@
                     {% endif %}
                 </div>
                 {% endif %}
+                {% endwith %}
 
             </div>
             {% endfor %}

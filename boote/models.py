@@ -32,8 +32,6 @@ class Boot(models.Model):
     preis = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     bild_boot = models.ImageField(upload_to='boote/bilder/', blank=True, null=True)
     skipper_meilen = models.PositiveIntegerField(default=0)
-    foto_upload_link = models.URLField(blank=True)
-    foto_download_link = models.URLField(blank=True)
     logbuch_pdf = models.FileField(upload_to='boote/logbuch/', blank=True, null=True)
 
     def save(self, *args, **kwargs):

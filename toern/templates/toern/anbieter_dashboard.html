@@ -152,12 +152,6 @@
                 </form>
 
                 <div class="flex flex-wrap gap-2">
-                    {% if toern.status != "ABGESCHLOSSEN" and toern.status != "DRAFT" %}
-                    <a href="{% url 'toern_abschliessen' toern.id %}" class="btn btn-sm btn-success">Abschließen</a>
-                    {% endif %}
-                    {% if toern.status == "ABGESCHLOSSEN" %}
-                    <a href="{% url 'toern_abschliessen' toern.id %}" class="btn btn-sm btn-outline">Bearbeiten</a>
-                    {% endif %}
                     <a href="{% url 'skipper_dashboard' toern.id %}" class="btn btn-sm btn-outline">Skipper Dashboard</a>
                     <a href="{% url 'toern_detail' toern.id %}" class="btn btn-sm btn-ghost">Details</a>
                     <form method="post" action="{% url 'toern_delete' toern.id %}" onsubmit="return confirm('Törn \'{{ toern.titel }}\' wirklich löschen? Alle Anmeldungen werden ebenfalls gelöscht.')">

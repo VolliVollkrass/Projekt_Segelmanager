@@ -37,7 +37,8 @@ class Toern(models.Model):
     beschreibung = models.TextField(blank=True)
     kurzbeschreibung = models.CharField(max_length=500, blank=True)
     bild_toern = models.ImageField(upload_to='toern/bilder/', blank=True, null=True)
-    fotogalerie_link = models.URLField(blank=True)
+    foto_upload_link = models.URLField(blank=True)
+    foto_download_link = models.URLField(blank=True)
     logbuch_pdf = models.FileField(upload_to='toern/logbuch/', blank=True, null=True)
 
     def save(self, *args, **kwargs):
@@ -145,7 +146,7 @@ class Teilnahme(models.Model):
     kabine = models.ForeignKey(Kabine, null=True, blank=True, on_delete=models.SET_NULL, related_name="teilnahmen")
     wunschpartner = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="wunschpartner_teilnahmen")
     ausschlussliste = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="ausgeschlossen_teilnahmen")
-    gesegelte_meilen = models.PositiveIntegerField(default=0)  # optionales Feld für die Anzahl gesegelter Meilen
+    individuelle_meilen = models.PositiveIntegerField(null=True, blank=True)
     seglerische_erfahrung = models.CharField(max_length=30, choices=SEGELERFAHRUNG_CHOICES, default="1")
     notizen = models.TextField(blank=True)  # private Notizen für Skipper/Admin
     teilnahmebedingungen_akzeptiert = models.BooleanField(default=False)

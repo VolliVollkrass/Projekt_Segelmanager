@@ -120,17 +120,14 @@ def my_account(request):
         delta = naechste.toern.startdatum - jetzt
         tage_bis_naechster = max(0, delta.days)
 
-    # Törn-Seemeilen (offiziell vom Skipper eingetragen)
-    toern_meilen = (
-        Boot.objects
-        .filter(
-            teilnahmen__user=request.user,
-            teilnahmen__status="bestaetigt",
-            skipper_meilen__gt=0,
-        )
-        .distinct()
-        .aggregate(total=Sum("skipper_meilen"))["total"] or 0
-    )
+    # Törn-Seemeilen: individuelle Angabe hat Vorrang, sonst Boot-Standard
+    toern_meilen = 0
+    for t in teilnahmen:
+        if t.status == "bestaetigt":
+            if t.individuelle_meilen:
+                toern_meilen += t.individuelle_meilen
+            elif t.boot and t.boot.skipper_meilen:
+                toern_meilen += t.boot.skipper_meilen
 
     # Manuelle Seemeilen (außerhalb der App)
     manuelle_eintraege = ManuellerSeemeilenEintrag.objects.filter(user=request.user)

@@ -496,12 +496,37 @@
 
     <!-- ========================= TAB: ABSCHLUSS ========================= -->
     {% if abschluss_data %}
-    <div id="tab-abschluss" class="hidden space-y-6">
+    <div id="tab-abschluss" class="hidden space-y-5">
 
-        <p class="text-sm text-base-content/50">
-            Trage hier die gesegelten Seemeilen für dein Boot ein – der Wert gilt für alle Crew-Mitglieder des Boots. Außerdem kannst du einen Link zum Foto-Upload/-Download und ein Logbuch-PDF hinterlegen.
-        </p>
+        <!-- Globale Foto-Links (einmalig für den ganzen Törn) -->
+        <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-base-200">
+                <h2 class="font-semibold">Foto-Links (gilt für alle Boote)</h2>
+                <p class="text-xs text-base-content/40 mt-0.5">Upload- und Download-Link zur gemeinsamen Fotogalerie</p>
+            </div>
+            <form method="post" action="{% url 'toern_foto_links_update' toern.id %}" class="p-5 space-y-3">
+                {% csrf_token %}
+                <div class="space-y-1.5">
+                    <label class="text-sm font-medium">Upload-Link</label>
+                    <p class="text-xs text-base-content/40">Hier können Crew-Mitglieder ihre Fotos hochladen (z.B. Synology, Google Drive)</p>
+                    <input type="url" name="foto_upload_link"
+                           value="{{ toern.foto_upload_link }}"
+                           class="input input-bordered input-sm w-full"
+                           placeholder="https://...">
+                </div>
+                <div class="space-y-1.5">
+                    <label class="text-sm font-medium">Download-Link / Galerie</label>
+                    <p class="text-xs text-base-content/40">Link zum Ansehen und Herunterladen der Fotos</p>
+                    <input type="url" name="foto_download_link"
+                           value="{{ toern.foto_download_link }}"
+                           class="input input-bordered input-sm w-full"
+                           placeholder="https://...">
+                </div>
+                <button type="submit" class="btn btn-outline btn-sm w-full">Foto-Links speichern</button>
+            </form>
+        </div>
 
+        <!-- Pro Boot: Seemeilen + Logbuch + individuelle Ausnahmen -->
         {% for eintrag in abschluss_data %}
         <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
 
@@ -511,70 +536,62 @@
                     <p class="text-xs text-base-content/40 mt-0.5">{{ eintrag.crew|length }} bestätigte Crew-Mitglieder</p>
                 </div>
                 {% if eintrag.boot.skipper_meilen > 0 %}
-                <span class="badge badge-success badge-sm">{{ eintrag.boot.skipper_meilen }} sm</span>
+                <span class="badge badge-secondary badge-sm font-semibold">{{ eintrag.boot.skipper_meilen }} sm</span>
                 {% endif %}
             </div>
 
             <form method="post" action="{% url 'boot_abschluss_update' eintrag.boot.id %}" enctype="multipart/form-data" class="p-5 space-y-5">
                 {% csrf_token %}
 
-                <!-- Seemeilen -->
+                <!-- Standard-Seemeilen für alle auf diesem Boot -->
                 <div class="space-y-2">
-                    <label class="text-sm font-medium">Gesegelten Seemeilen (gilt für alle unten gelisteten Crew-Mitglieder)</label>
+                    <label class="text-sm font-medium">Standard-Seemeilen (gilt für alle Crew-Mitglieder)</label>
                     <div class="flex items-center gap-2">
                         <input type="number" name="skipper_meilen"
                                value="{{ eintrag.boot.skipper_meilen }}"
                                min="0" max="99999"
                                class="input input-bordered w-36 text-right text-lg font-semibold"
                                placeholder="0">
-                        <span class="text-sm text-base-content/50">Seemeilen</span>
+                        <span class="text-sm text-base-content/50">sm</span>
                     </div>
+                </div>
 
-                    {% if eintrag.crew %}
-                    <div class="bg-base-200 rounded-xl px-4 py-3 mt-2">
-                        <p class="text-xs text-base-content/40 mb-2 font-medium uppercase tracking-wide">Crew erhält diese Seemeilen</p>
-                        <div class="flex flex-wrap gap-2">
-                            {% for t in eintrag.crew %}
-                            <div class="flex items-center gap-1.5 bg-base-100 rounded-full px-3 py-1">
+                <!-- Individuelle Ausnahmen pro Person -->
+                {% if eintrag.crew %}
+                <div class="space-y-2">
+                    <label class="text-sm font-medium">Individuelle Anpassung (optional)</label>
+                    <p class="text-xs text-base-content/40">Nur ausfüllen wenn jemand abweichende Seemeilen hat (z.B. frühere Abreise)</p>
+                    <div class="space-y-2">
+                        {% for t in eintrag.crew %}
+                        <div class="flex items-center gap-3 bg-base-200 rounded-xl px-3 py-2.5">
+                            <div class="flex items-center gap-2 flex-1 min-w-0">
                                 {% if t.user.profilbild %}
-                                    <img src="{{ t.user.profilbild.url }}" class="w-5 h-5 rounded-full object-cover">
+                                    <img src="{{ t.user.profilbild.url }}" class="w-7 h-7 rounded-full object-cover shrink-0">
                                 {% else %}
-                                    <div class="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                                    <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
                                         {{ t.user.first_name|first|upper }}
                                     </div>
                                 {% endif %}
-                                <span class="text-xs font-medium">{{ t.user.first_name }} {{ t.user.last_name }}</span>
-                                {% if t.rolle != "crew" %}
-                                <span class="text-xs text-base-content/40">({{ t.get_rolle_display }})</span>
-                                {% endif %}
+                                <div class="min-w-0">
+                                    <p class="text-sm font-medium truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
+                                    {% if t.rolle != "crew" %}
+                                    <p class="text-xs text-base-content/40">{{ t.get_rolle_display }}</p>
+                                    {% endif %}
+                                </div>
                             </div>
-                            {% endfor %}
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <input type="number" name="individuelle_meilen_{{ t.id }}"
+                                       value="{{ t.individuelle_meilen|default:'' }}"
+                                       min="0" max="99999"
+                                       class="input input-bordered input-sm w-24 text-right"
+                                       placeholder="{{ eintrag.boot.skipper_meilen|default:'Standard' }}">
+                                <span class="text-xs text-base-content/40">sm</span>
+                            </div>
                         </div>
-                    </div>
-                    {% else %}
-                    <p class="text-xs text-base-content/30 italic">Noch keine bestätigten Crew-Mitglieder für dieses Boot.</p>
-                    {% endif %}
-                </div>
-
-                <!-- Foto-Links -->
-                <div class="grid grid-cols-1 gap-3">
-                    <div class="space-y-1.5">
-                        <label class="text-sm font-medium">Foto-Upload Link</label>
-                        <p class="text-xs text-base-content/40">Link, auf den die Crew ihre Fotos hochladen kann (z.B. Google Drive, WeTransfer)</p>
-                        <input type="url" name="foto_upload_link"
-                               value="{{ eintrag.boot.foto_upload_link }}"
-                               class="input input-bordered input-sm w-full"
-                               placeholder="https://drive.google.com/...">
-                    </div>
-                    <div class="space-y-1.5">
-                        <label class="text-sm font-medium">Foto-Download Link</label>
-                        <p class="text-xs text-base-content/40">Link, über den die Crew die Fotos ansehen/herunterladen kann</p>
-                        <input type="url" name="foto_download_link"
-                               value="{{ eintrag.boot.foto_download_link }}"
-                               class="input input-bordered input-sm w-full"
-                               placeholder="https://photos.google.com/...">
+                        {% endfor %}
                     </div>
                 </div>
+                {% endif %}
 
                 <!-- Logbuch PDF -->
                 <div class="space-y-2">
@@ -584,7 +601,7 @@
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        <span class="truncate flex-1 text-xs">Aktuell hinterlegt</span>
+                        <span class="truncate flex-1 text-xs">Logbuch hinterlegt</span>
                         <a href="{{ eintrag.boot.logbuch_pdf.url }}" target="_blank" class="text-primary text-xs hover:underline shrink-0">Öffnen</a>
                     </div>
                     {% endif %}
@@ -595,12 +612,39 @@
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                     </svg>
-                    Speichern
+                    Daten für {{ eintrag.boot.name }} speichern
                 </button>
             </form>
 
         </div>
         {% endfor %}
+
+        <!-- Törn abschließen -->
+        {% if toern.status != "ABGESCHLOSSEN" %}
+        <div class="bg-warning/5 border border-warning/20 rounded-2xl p-5 space-y-3">
+            <div>
+                <p class="font-semibold text-sm">Törn abschließen</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Setzt den Status auf "Abgeschlossen" und benachrichtigt alle Crew-Mitglieder per E-Mail.</p>
+            </div>
+            <form method="post" action="{% url 'toern_status_abschliessen' toern.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-warning btn-sm w-full"
+                        onclick="return confirm('Törn wirklich abschließen? Alle Crew-Mitglieder erhalten eine Benachrichtigung.')">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Törn jetzt abschließen
+                </button>
+            </form>
+        </div>
+        {% else %}
+        <div class="bg-success/5 border border-success/20 rounded-2xl px-5 py-4 flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-success shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p class="text-sm text-success font-medium">Törn ist abgeschlossen – Daten können weiterhin angepasst werden.</p>
+        </div>
+        {% endif %}
 
     </div>
     {% endif %}

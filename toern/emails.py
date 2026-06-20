@@ -142,17 +142,11 @@ def mail_toern_abgeschlossen(toern, teilnahmen, request):
         user = t.user
         boot = t.boot
 
-        meilen_zeile = ""
-        if boot and boot.skipper_meilen:
-            meilen_zeile = f"Gesegelten Seemeilen: {boot.skipper_meilen} sm\n"
+        meilen = t.individuelle_meilen or (boot.skipper_meilen if boot else None)
+        meilen_zeile = f"Gesegelten Seemeilen: {meilen} sm\n" if meilen else ""
 
-        foto_upload_zeile = ""
-        if boot and boot.foto_upload_link:
-            foto_upload_zeile = f"Fotos hochladen: {boot.foto_upload_link}\n"
-
-        foto_download_zeile = ""
-        if boot and boot.foto_download_link:
-            foto_download_zeile = f"Fotos ansehen: {boot.foto_download_link}\n"
+        foto_upload_zeile = f"Fotos hochladen: {toern.foto_upload_link}\n" if toern.foto_upload_link else ""
+        foto_download_zeile = f"Fotos ansehen: {toern.foto_download_link}\n" if toern.foto_download_link else ""
 
         logbuch_zeile = ""
         if boot and boot.logbuch_pdf:
