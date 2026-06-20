@@ -10,7 +10,7 @@ from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog
-from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung
+from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
 from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
@@ -242,8 +242,15 @@ def toern_abschliessen(request, pk):
         if "logbuch_pdf" in request.FILES:
             toern.logbuch_pdf = request.FILES["logbuch_pdf"]
 
+        war_bereits_abgeschlossen = toern.status == "ABGESCHLOSSEN"
         toern.status = "ABGESCHLOSSEN"
         toern.save()
+
+        if not war_bereits_abgeschlossen:
+            bestaetigt = Teilnahme.objects.filter(
+                toern=toern, status="bestaetigt"
+            ).select_related("user", "boot")
+            mail_toern_abgeschlossen(toern, bestaetigt, request)
 
         messages.success(request, f'Törn "{toern.titel}" wurde erfolgreich abgeschlossen.')
         return redirect("anbieter_dashboard")
@@ -260,6 +267,7 @@ def toern_abschliessen(request, pk):
         "toern": toern,
         "boote_gruppen": list(boote_dict.values()),
         "teilnahmen_gesamt": teilnahmen.count(),
+        "toern_noch_aktiv": toern.enddatum > now(),
     }
     return render(request, "toern/toern_abschliessen.html", ctx)
 
@@ -376,7 +384,7 @@ def crew_dashboard(request, toern_id):
     teilnahme = Teilnahme.objects.filter(
         user=request.user,
         toern=toern
-    ).first()
+    ).select_related("boot").first()
 
     if not teilnahme:
         return render(request, "403.html")
@@ -508,6 +516,9 @@ def crew_dashboard(request, toern_id):
         # Präferenzen
         "exclude_ids": exclude_ids,
         "avoid_ids": avoid_ids,
+
+        # Abschluss-Daten (Boot des Crew-Mitglieds)
+        "abschluss_boot": teilnahme.boot,
     }
 
     return render(request, "crew/crew_dashboard.html", context)

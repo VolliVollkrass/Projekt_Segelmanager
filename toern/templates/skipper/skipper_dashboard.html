@@ -69,6 +69,19 @@
             </div>
         </div>
 
+        {% if toern.status == "ABGESCHLOSSEN" %}
+        <!-- Abgeschlossen-Hinweis -->
+        <div class="bg-success/5 border border-success/20 rounded-xl px-4 py-3 flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-success shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <div>
+                <p class="text-sm font-semibold text-success">Törn abgeschlossen</p>
+                <p class="text-xs text-base-content/50 mt-0.5">Seemeilen und Dokumente im Tab "Abschluss" anpassen.</p>
+            </div>
+        </div>
+        {% else %}
+
         <!-- Warteliste -->
         {% if warteliste %}
         <div>
@@ -158,6 +171,8 @@
                 </button>
             </form>
         </div>
+
+        {% endif %}{# end toern.status != ABGESCHLOSSEN #}
 
     </div>
 
