@@ -27,6 +27,7 @@ urlpatterns = [
     path("teilnehmer/ablehnen/<int:teilnahme_id>/", teilnehmer_ablehnen, name="teilnehmer_ablehnen"),
     path("<int:toern_id>/absagen/", teilnahme_absagen, name="teilnahme_absagen"),
     path("<int:pk>/loeschen/", toern_delete, name="toern_delete"),
+    path("<int:pk>/abschliessen/", toern_abschliessen, name="toern_abschliessen"),
     path("<int:toern_id>/boot/", boot_dashboard, name="boot_dashboard"),
     path("gegenstand/<int:gegenstand_id>/take/", take_gegenstand, name="take_gegenstand"),
     path("<int:toern_id>/packitem/add/", add_packitem, name="add_packitem"),
