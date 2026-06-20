@@ -18,6 +18,11 @@
                 <h1 class="text-2xl font-bold leading-tight">{{ toern.titel }}</h1>
                 <p class="text-base-content/50 text-sm mt-0.5">Skipper-Dashboard</p>
             </div>
+            {% if toern.status != "ABGESCHLOSSEN" %}
+            <a href="{% url 'toern_abschliessen' toern.id %}" class="btn btn-sm btn-outline shrink-0">
+                Abschließen
+            </a>
+            {% endif %}
         </div>
     </div>
 

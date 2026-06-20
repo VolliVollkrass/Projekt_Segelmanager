@@ -216,10 +216,14 @@ def toern_create(request):
 
 @login_required
 @login_required
-@anbieter_required
+@login_required
 def toern_abschliessen(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
-    if toern.anbieter != request.user:
+    is_anbieter = toern.anbieter == request.user
+    is_skipper_coskipper = Teilnahme.objects.filter(
+        toern=toern, user=request.user, rolle__in=("skipper", "coskipper")
+    ).exists()
+    if not is_anbieter and not is_skipper_coskipper:
         raise PermissionDenied
 
     teilnahmen = (
@@ -253,7 +257,9 @@ def toern_abschliessen(request, pk):
             mail_toern_abgeschlossen(toern, bestaetigt, request)
 
         messages.success(request, f'Törn "{toern.titel}" wurde erfolgreich abgeschlossen.')
-        return redirect("anbieter_dashboard")
+        if is_anbieter:
+            return redirect("anbieter_dashboard")
+        return redirect("skipper_dashboard", pk=toern.id)
 
     # Teilnahmen nach Boot gruppieren für das Template
     boote_dict = {}
