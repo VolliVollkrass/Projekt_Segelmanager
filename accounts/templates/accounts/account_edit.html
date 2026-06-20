@@ -48,6 +48,21 @@
         <div class="grid md:grid-cols-2 gap-4">
 
           <div class="form-control">
+            <label class="label"><span class="label-text">Vorname</span></label>
+            {{ form.first_name }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Nachname</span></label>
+            {{ form.last_name }}
+          </div>
+
+          <div class="form-control">
+            <label class="label"><span class="label-text">Geschlecht</span></label>
+            {{ form.geschlecht }}
+          </div>
+
+          <div class="form-control">
             <label class="label"><span class="label-text">Telefonnummer</span></label>
             {{ form.telefonnummer }}
           </div>

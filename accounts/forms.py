@@ -166,6 +166,8 @@ class AccountEditForm(forms.ModelForm):
     class Meta:
         model = User
         fields = [
+            "first_name",
+            "last_name",
             "email",
             "telefonnummer",
             "geburtsdatum",
@@ -181,6 +183,8 @@ class AccountEditForm(forms.ModelForm):
         ]
 
         widgets = {
+            "first_name": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
+            "last_name": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
             "telefonnummer": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
             "geburtsort": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
             "nationalitaet": forms.TextInput(attrs={"class": "input input-bordered w-full"}),

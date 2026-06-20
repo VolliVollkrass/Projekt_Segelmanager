@@ -23,40 +23,36 @@
             <form method="POST" class="space-y-8">
                 {% csrf_token %}
 
-                <!-- 👤 FIXE DATEN -->
+                <!-- 👤 PERSÖNLICHE DATEN -->
                 <div>
                     <h2 class="card-title mb-4">Persönliche Daten</h2>
 
-                    <div class="grid md:grid-cols-2 gap-4 text-sm mb-4">
+                    <div class="grid md:grid-cols-2 gap-4 mb-4">
 
-                        <div>
-                            <p class="text-base-content/60">Vorname</p>
-                            <p class="font-medium">{{ user.first_name }}</p>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Vorname</span></label>
+                            {{ form.first_name }}
                         </div>
 
-                        <div>
-                            <p class="text-base-content/60">Nachname</p>
-                            <p class="font-medium">{{ user.last_name }}</p>
+                        <div class="form-control">
+                            <label class="label"><span class="label-text">Nachname</span></label>
+                            {{ form.last_name }}
                         </div>
 
-                        <div>
-                            <p class="text-base-content/60">E-Mail</p>
-                            <p class="font-medium">{{ user.email }}</p>
-                        </div>
-
-                        <div>
-                            <p class="text-base-content/60">Geschlecht</p>
-                            <p class="font-medium">
-                                {% if user.geschlecht == "m" %}Männlich
-                                {% elif user.geschlecht == "w" %}Weiblich
-                                {% else %}Divers
-                                {% endif %}
-                            </p>
+                        <div class="form-control md:col-span-2">
+                            <label class="label"><span class="label-text">Geschlecht</span></label>
+                            {{ form.geschlecht }}
                         </div>
 
                     </div>
 
-                    <!-- ✏️ EDITIERBAR -->
+                    <div class="form-control mb-4">
+                        <label class="label"><span class="label-text">E-Mail</span></label>
+                        <input type="email" value="{{ user.email }}" disabled
+                               class="input input-bordered w-full bg-base-200 cursor-not-allowed">
+                    </div>
+
+                    <!-- ✏️ WEITERE DATEN -->
                     <div class="grid md:grid-cols-2 gap-4">
 
                         <div class="form-control">

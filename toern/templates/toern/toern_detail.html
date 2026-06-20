@@ -125,7 +125,11 @@
     <div class="sticky bottom-20 lg:static lg:bottom-auto">
         {% if user_teilnahme %}
             {% if user_teilnahme.status == "warteliste" %}
-                <button class="btn btn-warning w-full" disabled>Auf der Warteliste</button>
+                <button class="btn btn-warning w-full h-14 text-base" disabled>Auf der Warteliste</button>
+            {% elif user_teilnahme.status == "abgesagt" %}
+                <button class="btn btn-disabled w-full h-14 text-base" disabled>Teilnahme abgesagt</button>
+            {% elif user_teilnahme.status == "abgelehnt" %}
+                <button class="btn btn-disabled w-full h-14 text-base" disabled>Teilnahme abgelehnt</button>
             {% else %}
                 <a href="{% url 'crew_dashboard' toern.pk %}" class="btn btn-success w-full h-14 text-base">
                     Zum Crew Dashboard

@@ -188,6 +188,25 @@ class TeilnahmeForm(forms.ModelForm):
 class TeilnahmeDetailForm(forms.ModelForm):
 
     # 👤 USER FELDER
+    first_name = forms.CharField(
+        label="Vorname",
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
+    last_name = forms.CharField(
+        label="Nachname",
+        required=False,
+        widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
+    )
+
+    geschlecht = forms.ChoiceField(
+        label="Geschlecht",
+        choices=[("", "---"), ("m", "Männlich"), ("w", "Weiblich"), ("d", "Divers")],
+        required=False,
+        widget=forms.Select(attrs={"class": "select select-bordered w-full"})
+    )
+
     telefonnummer = forms.CharField(
         required=False,
         widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})

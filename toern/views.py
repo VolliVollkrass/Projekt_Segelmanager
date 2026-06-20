@@ -154,7 +154,7 @@ def toern_anmeldung(request, pk):
                 messages.warning(request, "Der Törn ist aktuell voll – du stehst auf der Warteliste.")
 
             teilnahme.save()
-            return redirect("toern_detail", pk=toern.pk)
+            return redirect("crew_dashboard", toern_id=toern.pk)
 
     else:
         form = TeilnahmeForm()
@@ -276,6 +276,8 @@ def crew_overview(request):
             kommende_teilnahmen.append(t)
         else:
             vergangene_teilnahmen.append(t)
+
+    vergangene_teilnahmen.sort(key=lambda t: t.toern.startdatum, reverse=True)
 
     naechste_teilnahme = kommende_teilnahmen[0] if kommende_teilnahmen else None
 
@@ -623,7 +625,8 @@ def skipper_dashboard(request, toern_id):
         toern=toern
     ).first()
 
-    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+    is_toern_anbieter = toern.anbieter == request.user
+    if not is_toern_anbieter and (not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]):
         raise PermissionDenied
 
     # =========================
@@ -1379,6 +1382,9 @@ def teilnahme_daten_edit(request, toern_id):
             teilnahme = form.save()
 
             # 👉 USER speichern
+            user.first_name = form.cleaned_data.get("first_name") or user.first_name
+            user.last_name = form.cleaned_data.get("last_name") or user.last_name
+            user.geschlecht = form.cleaned_data.get("geschlecht") or user.geschlecht
             user.telefonnummer = form.cleaned_data.get("telefonnummer")
             user.geburtsdatum = form.cleaned_data.get("geburtsdatum")
             user.geburtsort = form.cleaned_data.get("geburtsort")
@@ -1404,6 +1410,9 @@ def teilnahme_daten_edit(request, toern_id):
 
         # 🔥 Prefill USER Daten
         form.initial.update({
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+            "geschlecht": user.geschlecht,
             "telefonnummer": user.telefonnummer,
             "geburtsdatum": user.geburtsdatum.strftime("%Y-%m-%d") if user.geburtsdatum else "",
             "geburtsort": user.geburtsort,

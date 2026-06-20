@@ -102,7 +102,11 @@ def my_account(request):
     )
 
     kommende = [t for t in teilnahmen if t.toern.startdatum >= jetzt]
-    vergangene = [t for t in teilnahmen if t.toern.startdatum < jetzt]
+    vergangene = sorted(
+        [t for t in teilnahmen if t.toern.startdatum < jetzt],
+        key=lambda t: t.toern.startdatum,
+        reverse=True
+    )
 
     naechste = kommende[0] if kommende else None
     tage_bis_naechster = None
