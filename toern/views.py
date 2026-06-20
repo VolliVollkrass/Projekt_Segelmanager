@@ -1493,6 +1493,17 @@ def zuteilung_fixieren(request, toern_id):
     for t in bestaetigt:
         mail_zuteilung_fixiert(t, request)
 
+    # Erinnerung an alle mit unvollständigen Crewdaten
+    erinnerung_count = 0
+    for t in bestaetigt:
+        fehlend = fehlende_crew_felder(t.user)
+        if fehlend:
+            mail_crew_daten_erinnerung(t.user, toern, fehlend, request)
+            erinnerung_count += 1
+
+    if erinnerung_count:
+        messages.warning(request, f"{erinnerung_count} Crew-Mitglied(er) wurden an fehlende Profildaten erinnert.")
+
     messages.success(request, "Zuteilung wurde abgeschlossen. Crew hat jetzt Zugriff auf ihr Boot.")
 
     return redirect("skipper_dashboard", toern_id=toern.id)
