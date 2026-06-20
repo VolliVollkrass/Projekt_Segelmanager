@@ -295,35 +295,51 @@
             <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Alle Crewmitglieder</h2>
             <div class="flex flex-col gap-2">
                 {% for t in teilnahmen %}
-                <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-xl px-4 py-3">
-                    <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-semibold text-primary">
-                        {{ t.user.first_name|first }}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center justify-between gap-2">
-                            <p class="font-medium text-sm truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
-                            <span class="badge badge-xs shrink-0
-                                {% if t.status == 'bestaetigt' %}badge-success
-                                {% elif t.status == 'angemeldet' %}badge-warning
-                                {% elif t.status == 'warteliste' %}badge-ghost
-                                {% else %}badge-error{% endif %}">
-                                {% if t.status == 'bestaetigt' %}Bestätigt
-                                {% elif t.status == 'angemeldet' %}Angemeldet
-                                {% elif t.status == 'warteliste' %}Warteliste
-                                {% elif t.status == 'abgesagt' %}Abgesagt
-                                {% else %}{{ t.status }}{% endif %}
-                            </span>
+                <div class="bg-base-100 border rounded-xl px-4 py-3
+                    {% if t.status == 'angemeldet' %}border-warning/40{% elif t.status == 'bestaetigt' %}border-base-300{% else %}border-base-300{% endif %}">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-semibold text-primary">
+                            {{ t.user.first_name|first }}
                         </div>
-                        <div class="flex items-center gap-2 mt-1">
-                            <progress class="progress h-1.5 flex-1
-                                {% if t.fortschritt < 40 %}progress-error
-                                {% elif t.fortschritt < 80 %}progress-warning
-                                {% else %}progress-success{% endif %}"
-                                value="{{ t.fortschritt|default:0 }}" max="100"></progress>
-                            <span class="text-xs text-base-content/40 shrink-0">{{ t.fortschritt|default:0 }}%</span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between gap-2">
+                                <p class="font-medium text-sm truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
+                                <span class="badge badge-xs shrink-0
+                                    {% if t.status == 'bestaetigt' %}badge-success
+                                    {% elif t.status == 'angemeldet' %}badge-warning
+                                    {% elif t.status == 'warteliste' %}badge-ghost
+                                    {% else %}badge-error{% endif %}">
+                                    {% if t.status == 'bestaetigt' %}Bestätigt
+                                    {% elif t.status == 'angemeldet' %}Angemeldet
+                                    {% elif t.status == 'warteliste' %}Warteliste
+                                    {% elif t.status == 'abgesagt' %}Abgesagt
+                                    {% elif t.status == 'abgelehnt' %}Abgelehnt
+                                    {% else %}{{ t.status }}{% endif %}
+                                </span>
+                            </div>
+                            <div class="flex items-center gap-2 mt-1">
+                                <progress class="progress h-1.5 flex-1
+                                    {% if t.fortschritt < 40 %}progress-error
+                                    {% elif t.fortschritt < 80 %}progress-warning
+                                    {% else %}progress-success{% endif %}"
+                                    value="{{ t.fortschritt|default:0 }}" max="100"></progress>
+                                <span class="text-xs text-base-content/40 shrink-0">{{ t.fortschritt|default:0 }}%</span>
+                            </div>
+                            <p class="text-xs text-base-content/30 mt-0.5">{{ t.rolle }}</p>
                         </div>
-                        <p class="text-xs text-base-content/30 mt-0.5">{{ t.rolle }}</p>
                     </div>
+                    {% if t.status == 'angemeldet' %}
+                    <div class="flex gap-2 mt-3 pt-3 border-t border-base-200">
+                        <form method="POST" action="{% url 'teilnehmer_bestaetigen' t.id %}" class="flex-1">
+                            {% csrf_token %}
+                            <button class="btn btn-success btn-sm w-full">Bestätigen</button>
+                        </form>
+                        <form method="POST" action="{% url 'teilnehmer_ablehnen' t.id %}" class="flex-1">
+                            {% csrf_token %}
+                            <button class="btn btn-error btn-outline btn-sm w-full">Ablehnen</button>
+                        </form>
+                    </div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
