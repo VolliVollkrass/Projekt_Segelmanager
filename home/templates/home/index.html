@@ -55,7 +55,9 @@
                     <span class="font-bold text-primary">{{ toern.preis_pro_person }} €</span>
                     <div class="flex gap-2">
                         <a href="{% url 'toern_detail' pk=toern.pk %}" class="btn btn-outline btn-xs">Details</a>
-                        {% if user.is_authenticated %}
+                        {% if toern.pk in user_toern_ids %}
+                            <a href="{% url 'crew_dashboard' toern.pk %}" class="btn btn-success btn-xs">Zum Törn</a>
+                        {% elif user.is_authenticated %}
                             <a href="{% url 'toern_anmeldung' pk=toern.pk %}" class="btn btn-primary btn-xs">Anmelden</a>
                         {% else %}
                             <a href="{% url 'login' %}" class="btn btn-primary btn-xs">Anmelden</a>

@@ -34,14 +34,15 @@ def index(request):
         .order_by('startdatum')
     )
 
-    user_teilnahme = None
+    user_toern_ids = set()
     if request.user.is_authenticated:
-        user_teilnahme = Teilnahme.objects.filter(
-            user=request.user,
-            toern__in=toerns
-        ).first()
+        user_toern_ids = set(
+            Teilnahme.objects
+            .filter(user=request.user, toern__in=toerns)
+            .values_list('toern_id', flat=True)
+        )
 
     return render(request, 'home/index.html', {
         'toerns': toerns,
-        'user_teilnahme': user_teilnahme,
+        'user_toern_ids': user_toern_ids,
     })
