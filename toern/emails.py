@@ -91,22 +91,35 @@ def mail_crew_daten_erinnerung(user, toern, fehlende_felder, request):
 
 
 def mail_teilnahme_abgesagt(teilnahme, request):
+    from toern.models import Teilnahme as _Teilnahme
     toern = teilnahme.toern
     user = teilnahme.user
     anbieter = toern.anbieter
 
-    body_anbieter = (
-        f"Hallo {anbieter.first_name},\n\n"
+    body_info = (
         f"{user.first_name} {user.last_name} hat die Teilnahme am Toern \"{toern.titel}\" abgesagt.\n\n"
         f"Datum: {toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')}\n\n"
         "Viele Gruesse,\n"
         "Das Meer erleben Team"
     )
+
     _send(
         subject=f"Absage: {user.first_name} {user.last_name} – {toern.titel}",
-        body=body_anbieter,
+        body=f"Hallo {anbieter.first_name},\n\n" + body_info,
         recipient=anbieter.email,
     )
+
+    skipper_qs = _Teilnahme.objects.filter(
+        toern=toern,
+        rolle__in=("skipper", "coskipper"),
+    ).exclude(user=anbieter).select_related("user")
+
+    for s in skipper_qs:
+        _send(
+            subject=f"Absage: {user.first_name} {user.last_name} – {toern.titel}",
+            body=f"Hallo {s.user.first_name},\n\n" + body_info,
+            recipient=s.user.email,
+        )
 
     body_user = (
         f"Hallo {user.first_name},\n\n"
