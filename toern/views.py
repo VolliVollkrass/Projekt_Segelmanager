@@ -215,6 +215,55 @@ def toern_create(request):
     })
 
 @login_required
+@login_required
+@anbieter_required
+def toern_abschliessen(request, pk):
+    toern = get_object_or_404(Toern, pk=pk)
+    if toern.anbieter != request.user:
+        raise PermissionDenied
+
+    teilnahmen = (
+        Teilnahme.objects
+        .filter(toern=toern, status="bestaetigt")
+        .select_related("user", "boot")
+        .order_by("boot__name", "user__last_name", "user__first_name")
+    )
+
+    if request.method == "POST":
+        for t in teilnahmen:
+            try:
+                t.gesegelte_meilen = max(0, int(request.POST.get(f"meilen_{t.id}", 0) or 0))
+                t.save(update_fields=["gesegelte_meilen"])
+            except (ValueError, TypeError):
+                pass
+
+        toern.fotogalerie_link = request.POST.get("fotogalerie_link", "").strip()
+
+        if "logbuch_pdf" in request.FILES:
+            toern.logbuch_pdf = request.FILES["logbuch_pdf"]
+
+        toern.status = "ABGESCHLOSSEN"
+        toern.save()
+
+        messages.success(request, f'Törn "{toern.titel}" wurde erfolgreich abgeschlossen.')
+        return redirect("anbieter_dashboard")
+
+    # Teilnahmen nach Boot gruppieren für das Template
+    boote_dict = {}
+    for t in teilnahmen:
+        key = (t.boot.id if t.boot else None, t.boot.name if t.boot else "Ohne Boot-Zuweisung")
+        if key not in boote_dict:
+            boote_dict[key] = {"boot_name": key[1], "teilnahmen": []}
+        boote_dict[key]["teilnahmen"].append(t)
+
+    ctx = {
+        "toern": toern,
+        "boote_gruppen": list(boote_dict.values()),
+        "teilnahmen_gesamt": teilnahmen.count(),
+    }
+    return render(request, "toern/toern_abschliessen.html", ctx)
+
+
 @anbieter_required
 @require_POST
 def toern_delete(request, pk):

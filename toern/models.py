@@ -37,6 +37,8 @@ class Toern(models.Model):
     beschreibung = models.TextField(blank=True)
     kurzbeschreibung = models.CharField(max_length=500, blank=True)
     bild_toern = models.ImageField(upload_to='toern/bilder/', blank=True, null=True)
+    fotogalerie_link = models.URLField(blank=True)
+    logbuch_pdf = models.FileField(upload_to='toern/logbuch/', blank=True, null=True)
 
     def save(self, *args, **kwargs):
         self.update_status_by_deadline()
@@ -48,6 +50,9 @@ class Toern(models.Model):
 
         if old and old.bild_toern != self.bild_toern:
             delete_file(old.bild_toern)
+
+        if old and old.logbuch_pdf != self.logbuch_pdf:
+            delete_file(old.logbuch_pdf)
 
         if self.bild_toern and (not old or old.bild_toern != self.bild_toern):
             optimized = optimize_image(self.bild_toern)
