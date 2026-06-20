@@ -886,6 +886,26 @@ def skipper_dashboard(request, toern_id):
     count_bestaetigt = teilnahmen.filter(status="bestaetigt").count()
     count_angemeldet = teilnahmen.filter(status="angemeldet").count()
 
+    # =========================
+    # 8. Abschluss-Daten (je Boot)
+    # =========================
+    if is_toern_anbieter:
+        abschluss_boote_qs = boote
+    else:
+        user_boot_ids = Teilnahme.objects.filter(
+            user=request.user,
+            toern=toern,
+            rolle__in=["skipper", "coskipper"]
+        ).values_list("boot_id", flat=True)
+        abschluss_boote_qs = boote.filter(id__in=user_boot_ids)
+
+    abschluss_data = []
+    for boot in abschluss_boote_qs:
+        crew = Teilnahme.objects.filter(
+            toern=toern, boot=boot, status="bestaetigt"
+        ).select_related("user").order_by("user__last_name", "user__first_name")
+        abschluss_data.append({"boot": boot, "crew": list(crew)})
+
     context = {
         "toern": toern,
 
@@ -909,9 +929,46 @@ def skipper_dashboard(request, toern_id):
 
         # Erinnerungsmail-Log
         "reminder_logs": ErinnerungsMailLog.objects.filter(toern=toern).select_related("empfaenger")[:50],
+
+        # Abschluss
+        "abschluss_data": abschluss_data,
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)
+
+
+@login_required
+@require_POST
+def boot_abschluss_update(request, boot_id):
+    boot = get_object_or_404(Boot, id=boot_id)
+    toern = boot.toern
+
+    is_anbieter = toern.anbieter == request.user
+    is_boot_skipper = Teilnahme.objects.filter(
+        user=request.user,
+        toern=toern,
+        boot=boot,
+        rolle__in=["skipper", "coskipper"]
+    ).exists()
+
+    if not is_anbieter and not is_boot_skipper:
+        raise PermissionDenied
+
+    try:
+        boot.skipper_meilen = max(0, int(request.POST.get("skipper_meilen", 0) or 0))
+    except (ValueError, TypeError):
+        pass
+
+    boot.foto_upload_link = request.POST.get("foto_upload_link", "").strip()
+    boot.foto_download_link = request.POST.get("foto_download_link", "").strip()
+
+    if "logbuch_pdf" in request.FILES:
+        boot.logbuch_pdf = request.FILES["logbuch_pdf"]
+
+    boot.save()
+    messages.success(request, f'Informationen für "{boot.name}" gespeichert.')
+    return redirect("skipper_dashboard", toern_id=toern.id)
+
 
 @login_required
 @require_POST
