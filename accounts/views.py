@@ -93,6 +93,8 @@ def my_account(request):
     from django.utils.timezone import now
     from utils.user_profil_fortschritt import user_profil_fortschritt
 
+    from django.db.models import Sum
+
     jetzt = now()
     teilnahmen = (
         Teilnahme.objects
@@ -114,12 +116,19 @@ def my_account(request):
         delta = naechste.toern.startdatum - jetzt
         tage_bis_naechster = max(0, delta.days)
 
+    gesegelte_meilen = (
+        Teilnahme.objects
+        .filter(user=request.user, gesegelte_meilen__gt=0)
+        .aggregate(total=Sum("gesegelte_meilen"))["total"] or 0
+    )
+
     return render(request, "accounts/my_account.html", {
         "kommende_teilnahmen": kommende,
         "vergangene_teilnahmen": vergangene,
         "naechste_teilnahme": naechste,
         "tage_bis_naechster": tage_bis_naechster,
         "profil_prozent": user_profil_fortschritt(request.user),
+        "gesegelte_meilen": gesegelte_meilen,
     })
 
 

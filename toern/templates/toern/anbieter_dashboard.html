@@ -63,7 +63,13 @@
                             <p class="text-xs text-base-content/50">{{ boot.typ }} · {{ boot.charterunternehmen }}</p>
                             <p class="text-xs text-base-content/40 mt-0.5">{{ boot.kabinen.count }} Kabinen · {{ boot.anzahl_betten_boot }} Betten</p>
                         </div>
-                        <a href="{% url 'boot_update' boot.id %}" class="btn btn-xs btn-outline">Bearbeiten</a>
+                        <div class="flex gap-1.5">
+                            <a href="{% url 'boot_update' boot.id %}" class="btn btn-xs btn-outline">Bearbeiten</a>
+                            <form method="post" action="{% url 'boot_delete' boot.id %}" onsubmit="return confirm('Boot \'{{ boot.name }}\' wirklich löschen?')">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-xs btn-error btn-outline">Löschen</button>
+                            </form>
+                        </div>
                     </div>
 
                     <!-- Aktuelle Skipper-Zuteilung -->
@@ -123,9 +129,13 @@
                     {% endif %}
                 </form>
 
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
                     <a href="{% url 'skipper_dashboard' toern.id %}" class="btn btn-sm btn-outline">Skipper Dashboard</a>
                     <a href="{% url 'toern_detail' toern.id %}" class="btn btn-sm btn-ghost">Details</a>
+                    <form method="post" action="{% url 'toern_delete' toern.id %}" onsubmit="return confirm('Törn \'{{ toern.titel }}\' wirklich löschen? Alle Anmeldungen werden ebenfalls gelöscht.')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-error btn-outline">Löschen</button>
+                    </form>
                 </div>
             </div>
 

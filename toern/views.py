@@ -10,7 +10,7 @@ from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog
-from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_crew_daten_erinnerung
+from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung
 from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
@@ -157,11 +157,24 @@ def toern_anmeldung(request, pk):
             return redirect("crew_dashboard", toern_id=toern.pk)
 
     else:
-        form = TeilnahmeForm()
+        initial = {}
+        if request.user.is_authenticated:
+            letzte = (
+                Teilnahme.objects
+                .filter(user=request.user)
+                .exclude(toern=toern)
+                .order_by("-toern__startdatum")
+                .first()
+            )
+            if letzte and letzte.gesegelte_meilen:
+                initial["gesegelte_meilen"] = letzte.gesegelte_meilen
+        form = TeilnahmeForm(initial=initial)
 
+    boote = toern.boote.all()
     return render(request, "toern/toern_anmeldung.html", {
         "toern": toern,
-        "form": form
+        "form": form,
+        "boote": boote,
     })
 
 @login_required
@@ -200,6 +213,19 @@ def toern_create(request):
         "form": form,
         "title": "Neuen Törn erstellen"
     })
+
+@login_required
+@anbieter_required
+@require_POST
+def toern_delete(request, pk):
+    toern = get_object_or_404(Toern, pk=pk)
+    if toern.anbieter != request.user:
+        raise PermissionDenied
+    titel = toern.titel
+    toern.delete()
+    messages.success(request, f'Törn "{titel}" wurde gelöscht.')
+    return redirect("anbieter_dashboard")
+
 
 @login_required
 @anbieter_required
@@ -1528,6 +1554,26 @@ def teilnehmer_ablehnen(request, teilnahme_id):
     messages.info(request, "Teilnehmer abgelehnt")
 
     return redirect("skipper_dashboard", toern_id=teilnahme.toern.id)
+
+@login_required
+@require_POST
+def teilnahme_absagen(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    teilnahme = get_object_or_404(Teilnahme, toern=toern, user=request.user)
+
+    if teilnahme.rolle in ("skipper", "coskipper"):
+        messages.error(request, "Als Skipper/Co-Skipper kannst du nicht über diesen Weg absagen. Bitte wende dich direkt an den Anbieter.")
+        return redirect("crew_dashboard", toern_id=toern_id)
+
+    teilnahme.status = "abgesagt"
+    teilnahme.boot = None
+    teilnahme.kabine = None
+    teilnahme.save()
+    mail_teilnahme_abgesagt(teilnahme, request)
+
+    messages.info(request, "Deine Teilnahme wurde abgesagt.")
+    return redirect("crew_overview")
+
 
 @login_required
 def boot_dashboard(request, toern_id):

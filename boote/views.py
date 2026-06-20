@@ -1,4 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
+from django.views.decorators.http import require_POST
+from django.contrib import messages
 from .models import Boot
 from .forms import BootForm, KabineFormSet
 from toern.models import Toern
@@ -78,3 +80,16 @@ def boot_update(request, pk):
         "formset": formset,
         "boot": boot
     })
+
+
+@login_required
+@anbieter_required
+@require_POST
+def boot_delete(request, pk):
+    boot = get_object_or_404(Boot, pk=pk)
+    if request.user != boot.toern.anbieter and not request.user.is_superuser:
+        raise PermissionDenied
+    name = boot.name
+    boot.delete()
+    messages.success(request, f'Boot "{name}" wurde gelöscht.')
+    return redirect("anbieter_dashboard")

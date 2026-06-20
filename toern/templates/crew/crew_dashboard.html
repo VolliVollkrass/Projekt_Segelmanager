@@ -23,8 +23,15 @@
             </span>
         </div>
 
-        {% if is_skipper or is_coskipper %}
         <div class="flex flex-wrap gap-2 mt-3">
+            <a href="{% url 'toern_detail' toern.id %}" class="btn btn-outline btn-sm">Törn-Details</a>
+            {% if teilnahme.status != "abgesagt" and teilnahme.status != "abgelehnt" and teilnahme.rolle != "skipper" and teilnahme.rolle != "coskipper" %}
+            <button onclick="document.getElementById('modal-absagen').showModal()" class="btn btn-error btn-outline btn-sm">Absagen</button>
+            {% endif %}
+        </div>
+
+        {% if is_skipper or is_coskipper %}
+        <div class="flex flex-wrap gap-2 mt-2">
             <a href="{% url 'skipper_dashboard' toern.id %}" class="btn btn-secondary btn-sm">
                 Skipper-Bereich
             </a>
@@ -379,6 +386,27 @@
     </div>
 
 </div>
+
+<!-- Modal: Teilnahme absagen -->
+<dialog id="modal-absagen" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg">Törn absagen?</h3>
+        <p class="py-4 text-sm text-base-content/70">
+            Bist du sicher, dass du deine Teilnahme an <strong>{{ toern.titel }}</strong> absagen möchtest?
+            Der Anbieter wird per E-Mail benachrichtigt.
+        </p>
+        <div class="modal-action gap-2">
+            <form method="dialog">
+                <button class="btn btn-ghost">Abbrechen</button>
+            </form>
+            <form method="post" action="{% url 'teilnahme_absagen' toern.id %}">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-error">Ja, absagen</button>
+            </form>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 <!-- Tab-Switching Script -->
 <script>

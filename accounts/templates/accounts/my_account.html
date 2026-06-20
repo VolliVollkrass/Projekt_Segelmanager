@@ -59,7 +59,7 @@
     {% endif %}
 
     <!-- ===================== STATS ===================== -->
-    <div class="grid grid-cols-3 gap-3">
+    <div class="grid grid-cols-2 gap-3">
         <div class="bg-base-100 border border-base-300 rounded-xl p-4 text-center">
             <p class="text-2xl font-bold text-primary">{{ kommende_teilnahmen|length }}</p>
             <p class="text-xs text-base-content/50 mt-0.5 leading-tight">Kommende Törns</p>
@@ -76,6 +76,10 @@
                 <p class="text-2xl font-bold text-base-content/20">–</p>
                 <p class="text-xs text-base-content/50 mt-0.5 leading-tight">Kein Törn geplant</p>
             {% endif %}
+        </div>
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4 text-center">
+            <p class="text-2xl font-bold text-secondary">{{ gesegelte_meilen }}</p>
+            <p class="text-xs text-base-content/50 mt-0.5 leading-tight">Seemeilen gesegelt</p>
         </div>
     </div>
 
