@@ -105,15 +105,25 @@
             <input type="file" name="logbuch_pdf" accept=".pdf" class="file-input file-input-bordered w-full">
         </div>
 
-        <!-- Hinweis + Abschicken -->
-        <div class="bg-warning/10 border border-warning/30 rounded-2xl p-4 text-sm text-warning-content/80">
-            <p class="font-medium text-warning">Hinweis</p>
-            <p class="mt-0.5">Nach dem Abschließen wird der Status auf <strong>Abgeschlossen</strong> gesetzt. Die eingetragenen Seemeilen werden sofort im Profil der Teilnehmer sichtbar.</p>
+        <!-- Warnhinweis wenn Törn noch läuft -->
+        {% if toern_noch_aktiv %}
+        <div class="bg-error/10 border border-error/30 rounded-2xl p-4 text-sm">
+            <p class="font-semibold text-error mb-1">Törn noch nicht beendet</p>
+            <p class="text-base-content/70">Der Törn läuft noch bis <strong>{{ toern.enddatum|date:"d. M. Y" }}</strong>. Du kannst ihn trotzdem jetzt abschließen – bitte bestätige das:</p>
+            <label class="flex items-center gap-2 mt-3 cursor-pointer">
+                <input type="checkbox" id="confirm-fruehzeitig" class="checkbox checkbox-error checkbox-sm">
+                <span class="text-sm">Ich möchte den Törn vorzeitig abschließen</span>
+            </label>
         </div>
+        {% else %}
+        <div class="bg-base-200 border border-base-300 rounded-2xl p-4 text-sm text-base-content/60">
+            Nach dem Abschließen wird der Status auf <strong>Abgeschlossen</strong> gesetzt. Die Seemeilen werden sofort im Profil der Teilnehmer sichtbar, alle Crew-Mitglieder erhalten eine E-Mail.
+        </div>
+        {% endif %}
 
         <div class="flex gap-3">
             <a href="{% url 'anbieter_dashboard' %}" class="btn btn-ghost flex-1">Abbrechen</a>
-            <button type="submit" class="btn btn-primary flex-1">
+            <button type="submit" id="submit-btn" {% if toern_noch_aktiv %}disabled{% endif %} class="btn btn-primary flex-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
                 </svg>
@@ -124,4 +134,12 @@
     </form>
 
 </div>
+
+{% if toern_noch_aktiv %}
+<script>
+document.getElementById('confirm-fruehzeitig').addEventListener('change', function() {
+    document.getElementById('submit-btn').disabled = !this.checked;
+});
+</script>
+{% endif %}
 {% endblock %}

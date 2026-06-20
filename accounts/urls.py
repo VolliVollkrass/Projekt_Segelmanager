@@ -18,6 +18,8 @@ urlpatterns = [
     path("account-edit/", views.account_edit, name="account_edit"),
     path("lizenz-hinzufuegen/", views.lizenz_hinzufuegen, name="lizenz_hinzufuegen"),
     path("lizenz-loeschen/<int:pk>/", views.lizenz_loeschen, name="lizenz_loeschen"),
+    path("seemeilen/hinzufuegen/", views.manueller_seemeileneintrag_hinzufuegen, name="seemeilen_hinzufuegen"),
+    path("seemeilen/loeschen/<int:pk>/", views.manueller_seemeileneintrag_loeschen, name="seemeilen_loeschen"),
     path("onboarding/", views.onboarding, name="onboarding"),
 
     # E-Mail-Verifikation

@@ -229,6 +229,24 @@ class EmailVerificationToken(models.Model):
 
 
 # --------------------------------------------------
+# Manueller Seemeilen-Eintrag (außerhalb der App)
+# --------------------------------------------------
+
+class ManuellerSeemeilenEintrag(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="manuelle_seemeilen")
+    beschreibung = models.CharField(max_length=200)
+    meilen = models.PositiveIntegerField()
+    datum = models.DateField()
+    revier = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        ordering = ["-datum"]
+
+    def __str__(self):
+        return f"{self.beschreibung} – {self.meilen} sm ({self.datum.year})"
+
+
+# --------------------------------------------------
 # Alte Bilder löschen beim Update
 # --------------------------------------------------
 

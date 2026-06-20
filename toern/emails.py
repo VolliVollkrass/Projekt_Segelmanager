@@ -135,6 +135,56 @@ def mail_teilnahme_abgesagt(teilnahme, request):
     )
 
 
+def mail_toern_abgeschlossen(toern, teilnahmen, request):
+    dashboard_base = request.build_absolute_uri(f"/toern/{toern.id}/crew/")
+
+    for t in teilnahmen:
+        user = t.user
+        boot = t.boot
+
+        meilen_zeile = ""
+        if boot and boot.skipper_meilen:
+            meilen_zeile = f"Gesegelten Seemeilen: {boot.skipper_meilen} sm\n"
+
+        foto_upload_zeile = ""
+        if boot and boot.foto_upload_link:
+            foto_upload_zeile = f"Fotos hochladen: {boot.foto_upload_link}\n"
+
+        foto_download_zeile = ""
+        if boot and boot.foto_download_link:
+            foto_download_zeile = f"Fotos ansehen: {boot.foto_download_link}\n"
+
+        logbuch_zeile = ""
+        if boot and boot.logbuch_pdf:
+            logbuch_url = request.build_absolute_uri(boot.logbuch_pdf.url)
+            logbuch_zeile = f"Logbuch-PDF: {logbuch_url}\n"
+
+        extras = meilen_zeile + foto_upload_zeile + foto_download_zeile + logbuch_zeile
+
+        body = (
+            f"Hallo {user.first_name},\n\n"
+            f'der Toern "{toern.titel}" ist offiziell abgeschlossen!\n\n'
+            f"Revier: {toern.revier}\n"
+            f"Zeitraum: {toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')}\n"
+        )
+
+        if extras:
+            body += f"\n{extras}"
+
+        body += (
+            f"\nDein Crew-Dashboard:\n{dashboard_base}\n\n"
+            "Vielen Dank fuer eine tolle Zeit an Bord!\n\n"
+            "Bis zum naechsten Toern,\n"
+            "Das Meer erleben Team"
+        )
+
+        _send(
+            subject=f'Toern abgeschlossen: "{toern.titel}"',
+            body=body,
+            recipient=user.email,
+        )
+
+
 def mail_teilnahme_abgelehnt(teilnahme, request):
     toern = teilnahme.toern
     user = teilnahme.user

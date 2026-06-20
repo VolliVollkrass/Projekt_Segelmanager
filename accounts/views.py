@@ -6,9 +6,10 @@ from django.contrib.auth.views import LoginView
 from django.core.mail import EmailMessage
 from django.conf import settings
 from django_ratelimit.decorators import ratelimit
+from django.views.decorators.http import require_POST
 
 from .forms import RegisterForm, LoginForm, AccountEditForm, LizenzForm, OnboardingForm
-from .models import Lizenz, EmailVerificationToken
+from .models import Lizenz, EmailVerificationToken, ManuellerSeemeilenEintrag
 
 
 def send_verification_email(user, request):
@@ -96,6 +97,7 @@ def my_account(request):
     from django.db.models import Sum
 
     from boote.models import Boot
+    from .models import ManuellerSeemeilenEintrag
 
     jetzt = now()
     teilnahmen = (
@@ -118,8 +120,8 @@ def my_account(request):
         delta = naechste.toern.startdatum - jetzt
         tage_bis_naechster = max(0, delta.days)
 
-    # Gesamt-Seemeilen = Skipper-eingetragene Boot-Seemeilen (offizielle Werte)
-    gesegelte_meilen = (
+    # Törn-Seemeilen (offiziell vom Skipper eingetragen)
+    toern_meilen = (
         Boot.objects
         .filter(
             teilnahmen__user=request.user,
@@ -130,6 +132,12 @@ def my_account(request):
         .aggregate(total=Sum("skipper_meilen"))["total"] or 0
     )
 
+    # Manuelle Seemeilen (außerhalb der App)
+    manuelle_eintraege = ManuellerSeemeilenEintrag.objects.filter(user=request.user)
+    manuelle_meilen = manuelle_eintraege.aggregate(total=Sum("meilen"))["total"] or 0
+
+    gesegelte_meilen = toern_meilen + manuelle_meilen
+
     return render(request, "accounts/my_account.html", {
         "kommende_teilnahmen": kommende,
         "vergangene_teilnahmen": vergangene,
@@ -137,6 +145,9 @@ def my_account(request):
         "tage_bis_naechster": tage_bis_naechster,
         "profil_prozent": user_profil_fortschritt(request.user),
         "gesegelte_meilen": gesegelte_meilen,
+        "manuelle_eintraege": manuelle_eintraege,
+        "toern_meilen": toern_meilen,
+        "manuelle_meilen": manuelle_meilen,
     })
 
 
@@ -260,3 +271,39 @@ def resend_verification(request):
         return redirect("my_account")
 
     return render(request, "accounts/resend_verification.html")
+
+
+@login_required
+@require_POST
+def manueller_seemeileneintrag_hinzufuegen(request):
+    beschreibung = request.POST.get("beschreibung", "").strip()
+    revier = request.POST.get("revier", "").strip()
+    try:
+        meilen = max(1, int(request.POST.get("meilen", 0) or 0))
+        datum = request.POST.get("datum", "").strip()
+        from datetime import date as _date
+        datum_obj = _date.fromisoformat(datum)
+    except (ValueError, TypeError):
+        messages.error(request, "Ungültige Eingabe.")
+        return redirect("my_account")
+
+    if beschreibung:
+        ManuellerSeemeilenEintrag.objects.create(
+            user=request.user,
+            beschreibung=beschreibung,
+            meilen=meilen,
+            datum=datum_obj,
+            revier=revier,
+        )
+        messages.success(request, f"{meilen} Seemeilen eingetragen.")
+
+    return redirect("my_account")
+
+
+@login_required
+@require_POST
+def manueller_seemeileneintrag_loeschen(request, pk):
+    eintrag = get_object_or_404(ManuellerSeemeilenEintrag, pk=pk, user=request.user)
+    eintrag.delete()
+    messages.success(request, "Eintrag gelöscht.")
+    return redirect("my_account")
