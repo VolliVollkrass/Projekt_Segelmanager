@@ -209,3 +209,5 @@ REPLY_TO_EMAIL = env('REPLY_TO_EMAIL', default='')
 ANYMAIL = {
     'BREVO_API_KEY': env('BREVO_API_KEY', default=''),
 }
+
+ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
