@@ -2527,6 +2527,11 @@ def toern_beschreibung_generieren(request):
             messages=[{"role": "user", "content": prompt}],
         )
         raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
         result = json.loads(raw)
         beschreibung = result.get("beschreibung", "")
         kurzbeschreibung = result.get("kurzbeschreibung", "")[:500]
