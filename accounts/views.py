@@ -95,11 +95,13 @@ def my_account(request):
 
     from django.db.models import Sum
 
+    from boote.models import Boot
+
     jetzt = now()
     teilnahmen = (
         Teilnahme.objects
         .filter(user=request.user)
-        .select_related("toern")
+        .select_related("toern", "boot")
         .order_by("toern__startdatum")
     )
 
@@ -116,10 +118,16 @@ def my_account(request):
         delta = naechste.toern.startdatum - jetzt
         tage_bis_naechster = max(0, delta.days)
 
+    # Gesamt-Seemeilen = Skipper-eingetragene Boot-Seemeilen (offizielle Werte)
     gesegelte_meilen = (
-        Teilnahme.objects
-        .filter(user=request.user, gesegelte_meilen__gt=0)
-        .aggregate(total=Sum("gesegelte_meilen"))["total"] or 0
+        Boot.objects
+        .filter(
+            teilnahmen__user=request.user,
+            teilnahmen__status="bestaetigt",
+            skipper_meilen__gt=0,
+        )
+        .distinct()
+        .aggregate(total=Sum("skipper_meilen"))["total"] or 0
     )
 
     return render(request, "accounts/my_account.html", {
