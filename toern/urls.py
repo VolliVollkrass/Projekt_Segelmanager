@@ -23,6 +23,7 @@ urlpatterns = [
     path("warteliste/ablehnen/<int:teilnahme_id>/", warteliste_ablehnen, name="warteliste_ablehnen"),
     path("<int:toern_id>/daten/", teilnahme_daten_edit, name="teilnahme_daten_edit"),
     path("teilnehmer/bestaetigen/<int:teilnahme_id>/", teilnehmer_bestaetigen, name="teilnehmer_bestaetigen"),
+    path("teilnehmer/zuruecksetzen/<int:teilnahme_id>/", teilnehmer_zuruecksetzen, name="teilnehmer_zuruecksetzen"),
     path("teilnehmer/ablehnen/<int:teilnahme_id>/", teilnehmer_ablehnen, name="teilnehmer_ablehnen"),
     path("<int:toern_id>/boot/", boot_dashboard, name="boot_dashboard"),
     path("gegenstand/<int:gegenstand_id>/take/", take_gegenstand, name="take_gegenstand"),

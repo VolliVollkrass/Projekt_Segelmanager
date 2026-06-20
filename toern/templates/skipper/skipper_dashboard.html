@@ -339,6 +339,17 @@
                             <button class="btn btn-error btn-outline btn-sm w-full">Ablehnen</button>
                         </form>
                     </div>
+                    {% elif t.status == 'bestaetigt' and t.rolle == 'crew' %}
+                    <div class="flex gap-2 mt-3 pt-3 border-t border-base-200">
+                        <form method="POST" action="{% url 'teilnehmer_zuruecksetzen' t.id %}" class="flex-1">
+                            {% csrf_token %}
+                            <button class="btn btn-warning btn-outline btn-sm w-full">Zurücksetzen</button>
+                        </form>
+                        <form method="POST" action="{% url 'teilnehmer_ablehnen' t.id %}" class="flex-1">
+                            {% csrf_token %}
+                            <button class="btn btn-error btn-outline btn-sm w-full">Ablehnen</button>
+                        </form>
+                    </div>
                     {% endif %}
                 </div>
                 {% endfor %}

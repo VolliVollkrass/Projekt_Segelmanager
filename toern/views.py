@@ -1471,17 +1471,19 @@ def zuteilung_fixieren(request, toern_id):
 
     return redirect("skipper_dashboard", toern_id=toern.id)
 
+def _hat_skipper_berechtigung(request, toern):
+    if toern.anbieter == request.user:
+        return True
+    t = Teilnahme.objects.filter(user=request.user, toern=toern).first()
+    return t and t.rolle in ["skipper", "coskipper"]
+
+
 @login_required
 @require_POST
 def teilnehmer_bestaetigen(request, teilnahme_id):
     teilnahme = get_object_or_404(Teilnahme, id=teilnahme_id)
 
-    skipper = Teilnahme.objects.filter(
-        user=request.user,
-        toern=teilnahme.toern
-    ).first()
-
-    if not skipper or skipper.rolle not in ["skipper", "coskipper"]:
+    if not _hat_skipper_berechtigung(request, teilnahme.toern):
         raise PermissionDenied
 
     teilnahme.status = "bestaetigt"
@@ -1492,17 +1494,29 @@ def teilnehmer_bestaetigen(request, teilnahme_id):
 
     return redirect("skipper_dashboard", toern_id=teilnahme.toern.id)
 
+
+@login_required
+@require_POST
+def teilnehmer_zuruecksetzen(request, teilnahme_id):
+    teilnahme = get_object_or_404(Teilnahme, id=teilnahme_id)
+
+    if not _hat_skipper_berechtigung(request, teilnahme.toern):
+        raise PermissionDenied
+
+    teilnahme.status = "angemeldet"
+    teilnahme.save()
+
+    messages.info(request, f"{teilnahme.user.get_full_name()} auf 'Angemeldet' zurückgesetzt")
+
+    return redirect("skipper_dashboard", toern_id=teilnahme.toern.id)
+
+
 @login_required
 @require_POST
 def teilnehmer_ablehnen(request, teilnahme_id):
     teilnahme = get_object_or_404(Teilnahme, id=teilnahme_id)
 
-    skipper = Teilnahme.objects.filter(
-        user=request.user,
-        toern=teilnahme.toern
-    ).first()
-
-    if not skipper or skipper.rolle not in ["skipper", "coskipper"]:
+    if not _hat_skipper_berechtigung(request, teilnahme.toern):
         raise PermissionDenied
 
     teilnahme.status = "abgelehnt"
