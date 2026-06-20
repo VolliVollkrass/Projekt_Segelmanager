@@ -2476,3 +2476,62 @@ def send_reminder_toern(request, toern_id):
         messages.info(request, "Alle Crewmitglieder haben ihre Daten vollstaendig angegeben.")
 
     return redirect("skipper_dashboard", toern_id=toern_id)
+
+
+# =========================
+# KI-TEXTGENERATOR
+# =========================
+@login_required
+@require_POST
+def toern_beschreibung_generieren(request):
+    from django.conf import settings as django_settings
+    import anthropic
+
+    if not request.user.is_anbieter:
+        return JsonResponse({"error": "Keine Berechtigung."}, status=403)
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Ungültige JSON-Daten."}, status=400)
+
+    stichpunkte = data.get("stichpunkte", "").strip()
+    revier = data.get("revier", "").strip()
+    startdatum = data.get("startdatum", "").strip()
+    enddatum = data.get("enddatum", "").strip()
+
+    if not stichpunkte:
+        return JsonResponse({"error": "Bitte Stichpunkte eingeben."}, status=400)
+
+    api_key = django_settings.ANTHROPIC_API_KEY
+    if not api_key:
+        return JsonResponse({"error": "Kein API-Key konfiguriert. Bitte ANTHROPIC_API_KEY in der .env setzen."}, status=503)
+
+    zeitraum = f"{startdatum} – {enddatum}" if startdatum and enddatum else "unbekannt"
+
+    prompt = (
+        f"Erstelle aus diesen Stichpunkten zwei Texte:\n"
+        f"1. Eine ausführliche Beschreibung (3-4 Absätze, maritime Sprache, einladend)\n"
+        f"2. Eine Kurzbeschreibung (max. 480 Zeichen, prägnant)\n\n"
+        f"Revier: {revier or 'nicht angegeben'}, Zeitraum: {zeitraum}\n"
+        f"Stichpunkte: {stichpunkte}\n\n"
+        f'Antworte ausschließlich als JSON ohne Markdown-Codeblöcke: {{"beschreibung": "...", "kurzbeschreibung": "..."}}'
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            system="Du bist ein erfahrener Redakteur für Segelreise-Beschreibungen. Schreibe ansprechende, enthusiastische Texte für Crew-Mitglieder die mitsegeln wollen.",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = message.content[0].text.strip()
+        result = json.loads(raw)
+        beschreibung = result.get("beschreibung", "")
+        kurzbeschreibung = result.get("kurzbeschreibung", "")[:500]
+        return JsonResponse({"beschreibung": beschreibung, "kurzbeschreibung": kurzbeschreibung})
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Claude hat kein gültiges JSON zurückgegeben."}, status=500)
+    except Exception as e:
+        return JsonResponse({"error": f"API-Fehler: {str(e)}"}, status=500)

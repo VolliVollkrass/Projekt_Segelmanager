@@ -55,11 +55,42 @@
             {{ form.nebenkosten }}
           </div>
 
-          <div class="form-control md:col-span-2">
-            <label class="label"><span class="label-text">Kurzbeschreibung</span></label>
-            {{ form.kurzbeschreibung }}
-          </div>
+        </div>
 
+        <!-- KI-Assistent -->
+        <div class="card bg-base-200 mt-6 mb-2">
+          <div class="card-body p-4">
+            <h3 class="font-semibold text-sm flex items-center gap-2">
+              ✨ KI-Assistent — Beschreibung generieren
+            </h3>
+            <div class="form-control mt-2">
+              <label class="label">
+                <span class="label-text text-xs">Stichpunkte zum Törn (wird nicht gespeichert)</span>
+              </label>
+              <textarea
+                id="ki-stichpunkte"
+                rows="3"
+                placeholder="z.B. Ostsee, Inselhopping, 8 Crew, gemütliches Tempo, Sonnenuntergänge, Grillabende an Bord …"
+                class="textarea textarea-bordered w-full text-sm"
+              ></textarea>
+            </div>
+            <div class="flex items-center gap-3 mt-3">
+              <button type="button" id="ki-generieren-btn" class="btn btn-secondary btn-sm gap-2">
+                <span id="ki-spinner" class="loading loading-spinner loading-xs hidden"></span>
+                ✨ Beschreibung generieren
+              </button>
+              <span id="ki-error" class="text-error text-xs hidden"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Kurzbeschreibung -->
+        <div class="form-control mt-4">
+          <label class="label">
+            <span class="label-text">Kurzbeschreibung</span>
+            <span class="label-text-alt text-xs" id="kurz-counter"></span>
+          </label>
+          {{ form.kurzbeschreibung }}
         </div>
 
         <!-- Beschreibung -->
@@ -102,5 +133,77 @@
   </div>
 
 </div>
+
+<script>
+(function () {
+  const btn = document.getElementById('ki-generieren-btn');
+  const spinner = document.getElementById('ki-spinner');
+  const errorEl = document.getElementById('ki-error');
+  const stichpunkteEl = document.getElementById('ki-stichpunkte');
+  const kurzEl = document.querySelector('[name="kurzbeschreibung"]');
+  const beschEl = document.querySelector('[name="beschreibung"]');
+  const kurzCounter = document.getElementById('kurz-counter');
+
+  function updateCounter() {
+    if (!kurzEl || !kurzCounter) return;
+    kurzCounter.textContent = `${kurzEl.value.length}/500`;
+  }
+  if (kurzEl) {
+    kurzEl.addEventListener('input', updateCounter);
+    updateCounter();
+  }
+
+  btn.addEventListener('click', async function () {
+    errorEl.classList.add('hidden');
+    errorEl.textContent = '';
+    const stichpunkte = stichpunkteEl.value.trim();
+    if (!stichpunkte) {
+      errorEl.textContent = 'Bitte Stichpunkte eingeben.';
+      errorEl.classList.remove('hidden');
+      return;
+    }
+
+    const revierEl = document.querySelector('[name="revier"]');
+    const startEl = document.querySelector('[name="startdatum"]');
+    const endEl = document.querySelector('[name="enddatum"]');
+
+    btn.disabled = true;
+    spinner.classList.remove('hidden');
+
+    try {
+      const resp = await fetch('{% url "toern_beschreibung_generieren" %}', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+        body: JSON.stringify({
+          stichpunkte: stichpunkte,
+          revier: revierEl ? revierEl.value : '',
+          startdatum: startEl ? startEl.value : '',
+          enddatum: endEl ? endEl.value : '',
+        }),
+      });
+      const data = await resp.json();
+      if (data.error) {
+        errorEl.textContent = data.error;
+        errorEl.classList.remove('hidden');
+      } else {
+        if (beschEl) beschEl.value = data.beschreibung || '';
+        if (kurzEl) {
+          kurzEl.value = data.kurzbeschreibung || '';
+          updateCounter();
+        }
+      }
+    } catch (e) {
+      errorEl.textContent = 'Netzwerkfehler. Bitte erneut versuchen.';
+      errorEl.classList.remove('hidden');
+    } finally {
+      btn.disabled = false;
+      spinner.classList.add('hidden');
+    }
+  });
+})();
+</script>
 
 {% endblock %}
