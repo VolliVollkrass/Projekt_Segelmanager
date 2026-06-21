@@ -41,6 +41,7 @@ urlpatterns = [
     path("bootitem/<int:item_id>/delete/", delete_boot_item, name="delete_boot_item"),
     path("gegenstand/<int:gegenstand_id>/reduce/", reduce_gegenstand, name="reduce_gegenstand"),
     path("crewlist/<int:boot_id>/pdf/", crewlist_pdf, name="crewlist_pdf"),
+    path("<int:toern_id>/teilnehmerliste/pdf/", teilnehmerliste_pdf, name="teilnehmerliste_pdf"),
     path("<int:toern_id>/vorlage/<str:revier_typ>/<str:typ>/", vorlage_items_get, name="vorlage_items_get"),
     path("<int:toern_id>/vorlage/item/add/", vorlage_item_add, name="vorlage_item_add"),
     path("<int:toern_id>/vorlage/item/<int:item_id>/update/", vorlage_item_update, name="vorlage_item_update"),

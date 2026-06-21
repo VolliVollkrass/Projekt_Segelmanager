@@ -2079,13 +2079,14 @@ def reduce_gegenstand(request, gegenstand_id):
     return JsonResponse({"status": "ok"})
 
 
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image, KeepTogether
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import landscape, A4
+from reportlab.lib.pagesizes import landscape, A4, portrait
 from django.http import HttpResponse
 from datetime import date
 from reportlab.platypus import Paragraph
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
 
 def crewlist_pdf(request, boot_id):
 
@@ -2283,6 +2284,165 @@ def crewlist_pdf(request, boot_id):
     
     doc.build(elements)
 
+    return response
+
+
+@login_required
+def teilnehmerliste_pdf(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+
+    teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern).first()
+    is_anbieter = toern.anbieter == request.user
+    if not is_anbieter and (not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]):
+        raise PermissionDenied
+
+    teilnahmen = (
+        Teilnahme.objects
+        .filter(toern=toern, status__in=["angemeldet", "bestaetigt"])
+        .select_related("user", "boot")
+        .order_by("boot__name", "rolle", "user__last_name")
+    )
+
+    # Boots-Gruppen aufbauen; ohne Boot am Ende
+    boots_order = list(toern.boote.order_by("name"))
+    gruppen = {b.id: {"boot": b, "crew": []} for b in boots_order}
+    ohne_boot = []
+
+    def rolle_sort(t):
+        return {"skipper": 0, "coskipper": 1}.get(t.rolle, 2)
+
+    for t in teilnahmen:
+        if t.boot_id and t.boot_id in gruppen:
+            gruppen[t.boot_id]["crew"].append(t)
+        else:
+            ohne_boot.append(t)
+
+    for g in gruppen.values():
+        g["crew"].sort(key=rolle_sort)
+    ohne_boot.sort(key=rolle_sort)
+
+    # Essgewohnheiten-Übersicht
+    ess_counts = {"alles": 0, "vegetarisch": 0, "vegan": 0, "": 0}
+    for t in teilnahmen:
+        ess_counts[t.essgewohnheiten if t.essgewohnheiten in ess_counts else ""] += 1
+
+    # PDF aufbauen
+    response = HttpResponse(content_type="application/pdf")
+    filename = f"teilnehmerliste_{toern.titel.replace(' ', '_')}.pdf"
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+
+    doc = SimpleDocTemplate(
+        response,
+        pagesize=portrait(A4),
+        rightMargin=15 * mm,
+        leftMargin=15 * mm,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    xs = ParagraphStyle("xs", fontSize=7, leading=9)
+    sm = ParagraphStyle("sm", fontSize=8, leading=10)
+    bold_sm = ParagraphStyle("bold_sm", fontSize=8, leading=10, fontName="Helvetica-Bold")
+    section_header = ParagraphStyle("section_header", fontSize=9, leading=11, fontName="Helvetica-Bold")
+
+    elements = []
+    col_w = [180 - 15, 180 - 15]  # Seitenbreite A4 = 210mm - 30mm Rand = 180mm
+
+    # === TITEL ===
+    elements.append(Paragraph(
+        f"<b>Teilnehmerliste — {toern.titel}</b>",
+        ParagraphStyle("title", fontSize=13, leading=16, fontName="Helvetica-Bold")
+    ))
+    elements.append(Spacer(1, 2 * mm))
+    elements.append(Paragraph(
+        f"{toern.revier} &nbsp;|&nbsp; {toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')}",
+        ParagraphStyle("sub", fontSize=9, leading=11, textColor=colors.HexColor("#666666"))
+    ))
+    elements.append(Spacer(1, 4 * mm))
+
+    # === ÜBERSICHT ESSGEWOHNHEITEN ===
+    ess_labels = {"alles": "Kein Fleischverzicht", "vegetarisch": "Vegetarisch", "vegan": "Vegan", "": "Keine Angabe"}
+    ess_parts = [
+        f"{ess_labels[k]}: <b>{v}</b>"
+        for k, v in ess_counts.items() if v > 0
+    ]
+    elements.append(Paragraph(
+        "Essgewohnheiten: &nbsp;" + " &nbsp;·&nbsp; ".join(ess_parts),
+        ParagraphStyle("ess", fontSize=8, leading=10, backColor=colors.HexColor("#F3F4F6"),
+                       borderPadding=(4, 6, 4, 6))
+    ))
+    elements.append(Spacer(1, 6 * mm))
+
+    # === PRO BOOT ===
+    def crew_block(gruppe_label, crew_liste):
+        block = []
+        block.append(Paragraph(gruppe_label, section_header))
+        block.append(Spacer(1, 2 * mm))
+
+        header = [
+            Paragraph("<b>Name</b>", bold_sm),
+            Paragraph("<b>Kontakt</b>", bold_sm),
+            Paragraph("<b>Essen / Allergien</b>", bold_sm),
+            Paragraph("<b>Notfall / T-Shirt</b>", bold_sm),
+        ]
+        rows = [header]
+
+        for t in crew_liste:
+            u = t.user
+            rolle_str = {"skipper": "Skipper", "coskipper": "Co-Skipper", "crew": "Crew"}.get(t.rolle, t.rolle)
+
+            name_lines = f"<b>{u.last_name}, {u.first_name}</b><br/>{rolle_str}"
+            if u.geburtsdatum:
+                name_lines += f"<br/>* {u.geburtsdatum.strftime('%d.%m.%Y')}"
+            name_cell = Paragraph(name_lines, sm)
+
+            kontakt_lines = u.email or ""
+            if u.telefonnummer:
+                kontakt_lines += f"<br/>{u.telefonnummer}"
+            kontakt_cell = Paragraph(kontakt_lines, xs) if kontakt_lines else ""
+
+            ess_lines = ess_labels.get(t.essgewohnheiten, "") or "–"
+            if t.lebensmittelunvertraeglichkeiten:
+                ess_lines += f"<br/><i>Unvertr.: {t.lebensmittelunvertraeglichkeiten}</i>"
+            if t.allergien:
+                ess_lines += f"<br/><i>Allergie: {t.allergien}</i>"
+            ess_cell = Paragraph(ess_lines, xs)
+
+            notfall_lines = ""
+            if t.notfallkontakt_name:
+                notfall_lines = f"{t.notfallkontakt_name}"
+                if t.notfallkontakt_telefon:
+                    notfall_lines += f"<br/>{t.notfallkontakt_telefon}"
+            if t.tshirt_groesse:
+                notfall_lines += f"<br/>T-Shirt: {t.tshirt_groesse}"
+            notfall_cell = Paragraph(notfall_lines, xs) if notfall_lines else ""
+
+            rows.append([name_cell, kontakt_cell, ess_cell, notfall_cell])
+
+        PAGE_WIDTH = 180 * mm
+        col_widths = [PAGE_WIDTH * 0.27, PAGE_WIDTH * 0.28, PAGE_WIDTH * 0.26, PAGE_WIDTH * 0.19]
+        tbl = Table(rows, colWidths=col_widths, repeatRows=1)
+        tbl.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#CCCCCC")),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E5E7EB")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        block.append(tbl)
+        block.append(Spacer(1, 6 * mm))
+        return block
+
+    for g in gruppen.values():
+        if g["crew"]:
+            elements += crew_block(f"Boot: {g['boot'].name}", g["crew"])
+
+    if ohne_boot:
+        elements += crew_block("Ohne Boot-Zuteilung", ohne_boot)
+
+    doc.build(elements)
     return response
 
 
