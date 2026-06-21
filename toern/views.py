@@ -559,6 +559,11 @@ def user_has_accepted_partner(user, toern):
 @require_POST
 def kabinenpartner_anfragen(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
+
+    if toern.status in ("ZUTEILUNG_FIXIERT", "VEROEFFENTLICHT", "ABGESCHLOSSEN"):
+        messages.error(request, "Die Zuteilung ist abgeschlossen. Kabinenpartner-Anfragen sind nicht mehr möglich.")
+        return redirect(reverse("crew_dashboard", args=[toern_id]) + "?tab=crew")
+
     partner_id = request.POST.get("partner_id")
 
     if not partner_id:
@@ -599,6 +604,10 @@ def kabinenpartner_antwort(request, wunsch_id):
     if wunsch.to_user != request.user:
         raise PermissionDenied
 
+    if wunsch.toern.status in ("ZUTEILUNG_FIXIERT", "VEROEFFENTLICHT", "ABGESCHLOSSEN"):
+        messages.error(request, "Die Zuteilung ist abgeschlossen.")
+        return redirect(reverse("crew_dashboard", args=[wunsch.toern.id]) + "?tab=crew")
+
     action = request.POST.get("action")
 
     if action == "accept":
@@ -628,6 +637,10 @@ def kabinenpartner_antwort(request, wunsch_id):
 @require_POST
 def praeferenzen_speichern(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
+
+    if toern.status in ("ZUTEILUNG_FIXIERT", "VEROEFFENTLICHT", "ABGESCHLOSSEN"):
+        messages.error(request, "Die Zuteilung ist abgeschlossen. Präferenzen können nicht mehr geändert werden.")
+        return redirect(reverse("crew_dashboard", args=[toern_id]) + "?tab=crew")
 
     teilnahme = Teilnahme.objects.filter(
         user=request.user,
