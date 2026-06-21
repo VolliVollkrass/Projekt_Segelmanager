@@ -36,7 +36,7 @@ class BootForm(forms.ModelForm):
 
     class Meta:
         model = Boot
-        exclude = ["toern"]
+        exclude = ["toern", "skipper_meilen"]
 
         widgets = {
             "name": forms.TextInput(attrs={
@@ -168,6 +168,6 @@ KabineFormSet = inlineformset_factory(
     Boot,
     Kabine,
     form=KabineForm,
-    extra=1,
+    extra=0,
     can_delete=True
 )
