@@ -309,63 +309,95 @@
         <div>
             <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Kabinenpartner</h2>
 
-            {% if eigener_partner %}
+            {% if toern.status == "ZUTEILUNG_FIXIERT" or toern.status == "VEROEFFENTLICHT" %}
+
+                {% if eigener_partner %}
                 <div class="alert alert-success rounded-xl">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     <span class="text-sm">Du bist mit <strong>{{ eigener_partner.first_name }} {{ eigener_partner.last_name }}</strong> in einer Kabine.</span>
                 </div>
-
-            {% elif eigene_anfrage %}
-                <div class="alert alert-info rounded-xl">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                {% else %}
+                <div class="alert rounded-xl bg-base-200 border-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                     </svg>
-                    <span class="text-sm">Anfrage an <strong>{{ eigene_anfrage.to_user.first_name }}</strong> gesendet – wartet auf Antwort.</span>
+                    <span class="text-sm text-base-content/60">Die Zuteilung ist abgeschlossen. Der Skipper hat die Kabineneinteilung festgelegt.</span>
                 </div>
+                {% endif %}
 
             {% else %}
-                <form method="POST" action="{% url 'kabinenpartner_anfragen' toern.id %}" class="flex gap-2">
-                    {% csrf_token %}
-                    <select name="partner_id" class="select select-bordered select-sm flex-1">
-                        <option value="">Person wählen…</option>
-                        {% for t in teilnahmen_ohne_mich %}
-                            <option value="{{ t.user.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
-                        {% endfor %}
-                    </select>
-                    <button class="btn btn-primary btn-sm">Anfragen</button>
-                </form>
-            {% endif %}
 
-            <!-- Eingehende Anfragen -->
-            {% if anfragen %}
-            <div class="mt-3 space-y-2">
-                <p class="text-xs text-base-content/40 font-medium">Eingehende Anfragen</p>
-                {% for a in anfragen %}
-                <div class="flex items-center justify-between bg-base-200 rounded-xl p-3">
-                    <span class="text-sm"><strong>{{ a.from_user.first_name }}</strong> möchte mit dir in eine Kabine</span>
-                    <div class="flex gap-1.5 shrink-0 ml-2">
-                        <form method="POST" action="{% url 'kabinenpartner_antwort' a.id %}">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="accept">
-                            <button class="btn btn-success btn-xs">Ja</button>
-                        </form>
-                        <form method="POST" action="{% url 'kabinenpartner_antwort' a.id %}">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="reject">
-                            <button class="btn btn-error btn-xs">Nein</button>
-                        </form>
+                {% if eigener_partner %}
+                    <div class="alert alert-success rounded-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="text-sm">Du bist mit <strong>{{ eigener_partner.first_name }} {{ eigener_partner.last_name }}</strong> in einer Kabine.</span>
                     </div>
+
+                {% elif eigene_anfrage %}
+                    <div class="alert alert-info rounded-xl">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span class="text-sm">Anfrage an <strong>{{ eigene_anfrage.to_user.first_name }}</strong> gesendet – wartet auf Antwort.</span>
+                    </div>
+
+                {% else %}
+                    <form method="POST" action="{% url 'kabinenpartner_anfragen' toern.id %}" class="flex gap-2">
+                        {% csrf_token %}
+                        <select name="partner_id" class="select select-bordered select-sm flex-1">
+                            <option value="">Person wählen…</option>
+                            {% for t in teilnahmen_ohne_mich %}
+                                <option value="{{ t.user.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn btn-primary btn-sm">Anfragen</button>
+                    </form>
+                {% endif %}
+
+                <!-- Eingehende Anfragen -->
+                {% if anfragen %}
+                <div class="mt-3 space-y-2">
+                    <p class="text-xs text-base-content/40 font-medium">Eingehende Anfragen</p>
+                    {% for a in anfragen %}
+                    <div class="flex items-center justify-between bg-base-200 rounded-xl p-3">
+                        <span class="text-sm"><strong>{{ a.from_user.first_name }}</strong> möchte mit dir in eine Kabine</span>
+                        <div class="flex gap-1.5 shrink-0 ml-2">
+                            <form method="POST" action="{% url 'kabinenpartner_antwort' a.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="accept">
+                                <button class="btn btn-success btn-xs">Ja</button>
+                            </form>
+                            <form method="POST" action="{% url 'kabinenpartner_antwort' a.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="reject">
+                                <button class="btn btn-error btn-xs">Nein</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
-            </div>
+                {% endif %}
+
             {% endif %}
         </div>
 
         <!-- Crew-Präferenzen -->
         <div>
             <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-1">Crew-Präferenzen</h2>
+
+            {% if toern.status == "ZUTEILUNG_FIXIERT" or toern.status == "VEROEFFENTLICHT" %}
+            <div class="bg-base-200 rounded-xl px-4 py-3 flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/30 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+                <p class="text-sm text-base-content/50">Präferenzen können nach Abschluss der Zuteilung nicht mehr geändert werden.</p>
+            </div>
+
+            {% else %}
             <p class="text-xs text-base-content/40 mb-3">Vertraulich – hilft dem Skipper bei der Planung.</p>
 
             <form method="POST" action="{% url 'praeferenzen_speichern' toern.id %}" class="space-y-3">
@@ -403,6 +435,7 @@
                     <button class="btn btn-primary btn-sm">Speichern</button>
                 </div>
             </form>
+            {% endif %}
         </div>
 
     </div>
