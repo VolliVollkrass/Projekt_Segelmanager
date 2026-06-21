@@ -37,7 +37,7 @@ def boot_create(request, toern_id):
             formset.instance = boot
             formset.save()
 
-            return redirect("toern_detail", pk=toern.id)
+            return redirect("anbieter_dashboard")
 
     else:
         form = BootForm()
