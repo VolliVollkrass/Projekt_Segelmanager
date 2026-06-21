@@ -17,7 +17,6 @@ class Toern(models.Model):
         ("ANMELDUNG_GESCHLOSSEN", "Anmeldung geschlossen"),
         ("ZUTEILUNG_VORGESCHLAGEN", "Zuweisung vorgeschlagen"),
         ("ZUTEILUNG_FIXIERT", "Zuteilung abgeschlossen"),
-        ("VEROEFFENTLICHT", "Veröffentlicht"),
         ("ABGESCHLOSSEN", "Abgeschlossen"),
     ]
 

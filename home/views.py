@@ -26,7 +26,7 @@ def index(request):
 
     toerns = (
         Toern.objects
-        .filter(status__in=['ANMELDUNG_OFFEN', 'VEROEFFENTLICHT'])
+        .filter(status='ANMELDUNG_OFFEN')
         .annotate(
             _belegte_plaetze=Coalesce(Subquery(belegte_sq, output_field=IntegerField()), 0),
             _gesamtplaetze=Coalesce(Subquery(gesamtplaetze_sq, output_field=IntegerField()), 0),
