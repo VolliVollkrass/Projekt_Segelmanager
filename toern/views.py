@@ -2346,19 +2346,44 @@ def teilnehmerliste_pdf(request, toern_id):
     bold_sm = ParagraphStyle("bold_sm", fontSize=8, leading=10, fontName="Helvetica-Bold")
     section_header = ParagraphStyle("section_header", fontSize=9, leading=11, fontName="Helvetica-Bold")
 
-    elements = []
-    col_w = [180 - 15, 180 - 15]  # Seitenbreite A4 = 210mm - 30mm Rand = 180mm
+    logo_path = os.path.join(settings.BASE_DIR, "static/medien/Logo_Meer_erleben.png")
+    cake_path = os.path.join(settings.BASE_DIR, "static/medien/icons/cake.png")
 
-    # === TITEL ===
-    elements.append(Paragraph(
-        f"<b>Teilnehmerliste — {toern.titel}</b>",
-        ParagraphStyle("title", fontSize=13, leading=16, fontName="Helvetica-Bold")
-    ))
-    elements.append(Spacer(1, 2 * mm))
-    elements.append(Paragraph(
-        f"{toern.revier} &nbsp;|&nbsp; {toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')}",
-        ParagraphStyle("sub", fontSize=9, leading=11, textColor=colors.HexColor("#666666"))
-    ))
+    def has_birthday_in_toern(birthdate):
+        if not birthdate:
+            return False
+        start_d = toern.startdatum.date()
+        end_d = toern.enddatum.date()
+        try:
+            bday = birthdate.replace(year=start_d.year)
+        except ValueError:
+            return False
+        return start_d <= bday <= end_d
+
+    elements = []
+
+    # === KOPF: Titel links, Logo rechts ===
+    title_style = ParagraphStyle("title", fontSize=13, leading=16, fontName="Helvetica-Bold")
+    sub_style = ParagraphStyle("sub", fontSize=9, leading=12, textColor=colors.HexColor("#666666"))
+
+    title_cell = [
+        Paragraph(f"Teilnehmerliste — {toern.titel}", title_style),
+        Spacer(1, 2 * mm),
+        Paragraph(
+            f"{toern.revier} &nbsp;|&nbsp; {toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')}",
+            sub_style
+        ),
+    ]
+
+    logo_cell = Image(logo_path, width=35 * mm, height=35 * mm, kind="proportional") \
+        if os.path.exists(logo_path) else ""
+
+    header_tbl = Table([[title_cell, logo_cell]], colWidths=[130 * mm, 50 * mm])
+    header_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+    ]))
+    elements.append(header_tbl)
     elements.append(Spacer(1, 4 * mm))
 
     # === ÜBERSICHT ESSGEWOHNHEITEN ===
@@ -2394,7 +2419,11 @@ def teilnehmerliste_pdf(request, toern_id):
 
             name_lines = f"<b>{u.last_name}, {u.first_name}</b><br/>{rolle_str}"
             if u.geburtsdatum:
-                name_lines += f"<br/>* {u.geburtsdatum.strftime('%d.%m.%Y')}"
+                bday_str = u.geburtsdatum.strftime('%d.%m.%Y')
+                if has_birthday_in_toern(u.geburtsdatum) and os.path.exists(cake_path):
+                    name_lines += f'<br/>* {bday_str} &nbsp;<img src="{cake_path}" width="9" height="9"/>'
+                else:
+                    name_lines += f"<br/>* {bday_str}"
             name_cell = Paragraph(name_lines, sm)
 
             kontakt_lines = u.email or ""
