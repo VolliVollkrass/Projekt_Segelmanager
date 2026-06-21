@@ -1,6 +1,7 @@
 import os
 
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 
 from boote.models import Boot, Kabine
 from config import settings
@@ -9,7 +10,7 @@ from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE
-from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog
+from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog, PinnwandNachricht
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
 from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
@@ -490,6 +491,10 @@ def crew_dashboard(request, toern_id):
 
         # Abschluss-Daten (Boot des Crew-Mitglieds)
         "abschluss_boot": teilnahme.boot,
+
+        # Schwarzes Brett
+        "pinnwand_nachrichten": PinnwandNachricht.objects.filter(toern=toern).select_related("autor"),
+        "kann_pinnwand_posten": is_skipper or is_coskipper or (toern.anbieter == request.user),
     }
 
     return render(request, "crew/crew_dashboard.html", context)
@@ -2540,3 +2545,40 @@ def toern_beschreibung_generieren(request):
         return JsonResponse({"error": "Claude hat kein gültiges JSON zurückgegeben."}, status=500)
     except Exception as e:
         return JsonResponse({"error": f"API-Fehler: {str(e)}"}, status=500)
+
+
+@login_required
+@require_POST
+def pinnwand_nachricht_erstellen(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern).first()
+
+    ist_skipper_oder_coskipper = teilnahme and teilnahme.rolle in ("skipper", "coskipper")
+    ist_anbieter = toern.anbieter == request.user
+
+    if not (ist_skipper_oder_coskipper or ist_anbieter):
+        raise PermissionDenied
+
+    text = request.POST.get("text", "").strip()
+    if text:
+        PinnwandNachricht.objects.create(toern=toern, autor=request.user, text=text)
+        messages.success(request, "Nachricht gepostet.")
+    return redirect(reverse("crew_dashboard", args=[toern_id]) + "?tab=info")
+
+
+@login_required
+@require_POST
+def pinnwand_nachricht_loeschen(request, nachricht_id):
+    nachricht = get_object_or_404(PinnwandNachricht, id=nachricht_id)
+    toern = nachricht.toern
+
+    ist_autor = nachricht.autor == request.user
+    ist_anbieter = toern.anbieter == request.user
+
+    if not (ist_autor or ist_anbieter):
+        raise PermissionDenied
+
+    nachricht.delete()
+    messages.success(request, "Nachricht gelöscht.")
+    from django.urls import reverse
+    return redirect(reverse("crew_dashboard", args=[toern.id]) + "?tab=info")

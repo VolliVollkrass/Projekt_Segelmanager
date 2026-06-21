@@ -50,4 +50,6 @@ urlpatterns = [
     path("mahlzeit/<int:mahlzeit_id>/delete/", delete_mahlzeit, name="delete_mahlzeit"),
     path("<int:toern_id>/erinnerung/senden/", send_reminder_toern, name="send_reminder_toern"),
     path("beschreibung/generieren/", toern_beschreibung_generieren, name="toern_beschreibung_generieren"),
+    path("<int:toern_id>/pinnwand/add/", pinnwand_nachricht_erstellen, name="pinnwand_nachricht_erstellen"),
+    path("pinnwand/<int:nachricht_id>/loeschen/", pinnwand_nachricht_loeschen, name="pinnwand_nachricht_loeschen"),
 ]
