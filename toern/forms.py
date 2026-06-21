@@ -122,23 +122,6 @@ class TeilnahmeForm(forms.ModelForm):
         })
     )
 
-    gesegelte_meilen = forms.IntegerField(
-        required=False,
-        widget=forms.NumberInput(attrs={
-            "class": "input input-bordered w-full",
-            "placeholder": "z.B. 250",
-            "min": "0"
-        })
-    )
-
-    gesegelte_meilen = forms.IntegerField(
-        required=False,
-        widget=forms.NumberInput(attrs={
-            "class": "input input-bordered w-full",
-            "placeholder": "z.B. 250",
-            "min": "0"
-        })
-    )
     teilnahmebedingungen_akzeptiert = forms.BooleanField(
         required=True,
         widget=forms.CheckboxInput(attrs={
@@ -166,7 +149,6 @@ class TeilnahmeForm(forms.ModelForm):
     class Meta:
         model = Teilnahme
         fields = [
-            "gesegelte_meilen",
             "seglerische_erfahrung",
             "notizen",
             "teilnahmebedingungen_akzeptiert"
