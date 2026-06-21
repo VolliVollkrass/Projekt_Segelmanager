@@ -276,6 +276,23 @@ class PacklisteVorlageEintrag(models.Model):
         return f"{self.menge}x {self.name}"
 
 
+class PinnwandNachricht(models.Model):
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="pinnwand_nachrichten")
+    autor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="pinnwand_nachrichten"
+    )
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.autor.first_name} @ {self.toern.titel} ({self.created_at:%d.%m.%Y})"
+
+
 class ErinnerungsMailLog(models.Model):
     toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="erinnerungsmails")
     empfaenger = models.ForeignKey(
