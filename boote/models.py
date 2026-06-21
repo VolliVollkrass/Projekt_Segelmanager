@@ -1,3 +1,5 @@
+import os
+
 from django.db import models
 from django.forms import ValidationError
 from utils.image_optimizer import optimize_image
@@ -47,11 +49,11 @@ class Boot(models.Model):
             if old.logbuch_pdf != self.logbuch_pdf:
                 delete_file(old.logbuch_pdf)
 
-        if self.bild_boot:
+        if self.bild_boot and (not old or old.bild_boot != self.bild_boot):
             optimized = optimize_image(self.bild_boot)
-
+            filename = os.path.basename(self.bild_boot.name)
             self.bild_boot.save(
-                self.bild_boot.name,
+                filename,
                 optimized,
                 save=False
             )
