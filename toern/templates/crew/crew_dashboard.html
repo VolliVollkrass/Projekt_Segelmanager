@@ -63,6 +63,9 @@
                 <span class="ml-1 badge badge-warning badge-xs">!</span>
                 {% endif %}
             </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="mitfahrt">
+                Mitfahrt
+            </button>
             {% endif %}
         </div>
     </div>
@@ -545,6 +548,107 @@
 
     </div>
 
+    <!-- ========================= TAB: MITFAHRT ========================= -->
+    <div id="tab-mitfahrt" class="space-y-4 hidden">
+
+        <!-- Formular: neuen Eintrag erstellen -->
+        <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-base-300">
+                <p class="text-sm font-semibold">Eintrag erstellen</p>
+            </div>
+            <form method="POST" action="{% url 'mitfahrangebot_erstellen' toern.id %}" class="px-4 py-4 space-y-3">
+                {% csrf_token %}
+
+                <!-- Typ -->
+                <div class="flex gap-3">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="typ" value="angebot" class="radio radio-primary radio-sm" id="typ-angebot" required>
+                        <span class="text-sm">Ich biete Mitfahrt an</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="radio" name="typ" value="gesuch" class="radio radio-primary radio-sm" id="typ-gesuch">
+                        <span class="text-sm">Ich suche Mitfahrt</span>
+                    </label>
+                </div>
+
+                <!-- Abfahrtsort -->
+                <input type="text" name="abfahrtsort" placeholder="Abfahrtsort (z. B. München Hbf)" maxlength="200"
+                       class="input input-bordered input-sm w-full" required>
+
+                <!-- Datum/Zeit + freie Plätze (nur bei Angebot sichtbar) -->
+                <div id="angebot-felder" class="space-y-3 hidden">
+                    <input type="datetime-local" name="abfahrtszeit" class="input input-bordered input-sm w-full">
+                    <div class="flex items-center gap-2">
+                        <input type="number" name="freie_plaetze" min="1" max="9" placeholder="Freie Plätze"
+                               class="input input-bordered input-sm w-32">
+                        <span class="text-sm text-base-content/50">freie Plätze</span>
+                    </div>
+                </div>
+
+                <!-- Anmerkung -->
+                <textarea name="anmerkung" placeholder="Optionale Anmerkung…" maxlength="500" rows="2"
+                          class="textarea textarea-bordered textarea-sm w-full"></textarea>
+
+                <button type="submit" class="btn btn-primary btn-sm w-full">Eintrag hinzufügen</button>
+            </form>
+        </div>
+
+        <!-- Liste aller Einträge -->
+        {% if mitfahrangebote %}
+        <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden divide-y divide-base-200">
+            {% for eintrag in mitfahrangebote %}
+            <div class="px-4 py-3 flex items-start gap-3">
+                <div class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold mt-0.5
+                    {% if eintrag.typ == 'angebot' %}bg-success/10 text-success{% else %}bg-warning/10 text-warning{% endif %}">
+                    {% if eintrag.typ == 'angebot' %}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    {% else %}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    {% endif %}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 mb-0.5">
+                        <span class="text-xs font-semibold">{{ eintrag.user.first_name }} {{ eintrag.user.last_name }}</span>
+                        <span class="badge badge-xs {% if eintrag.typ == 'angebot' %}badge-success{% else %}badge-warning{% endif %}">
+                            {{ eintrag.get_typ_display }}
+                        </span>
+                        {% if eintrag.freie_plaetze %}
+                        <span class="text-xs text-base-content/40">{{ eintrag.freie_plaetze }} Platz{% if eintrag.freie_plaetze != 1 %}ätze{% endif %} frei</span>
+                        {% endif %}
+                    </div>
+                    <p class="text-sm font-medium">{{ eintrag.abfahrtsort }}</p>
+                    {% if eintrag.abfahrtszeit %}
+                    <p class="text-xs text-base-content/50">{{ eintrag.abfahrtszeit|date:"d.m.Y H:i" }} Uhr</p>
+                    {% endif %}
+                    {% if eintrag.anmerkung %}
+                    <p class="text-xs text-base-content/60 mt-0.5">{{ eintrag.anmerkung }}</p>
+                    {% endif %}
+                </div>
+                {% if eintrag.user == request.user %}
+                <form method="POST" action="{% url 'mitfahrangebot_loeschen' eintrag.id %}" class="shrink-0">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" title="Löschen">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="bg-base-100 border border-base-300 rounded-xl px-4 py-8 text-center">
+            <p class="text-sm text-base-content/40">Noch keine Einträge. Sei der Erste!</p>
+        </div>
+        {% endif %}
+
+    </div>
+
 </div>
 
 <!-- Modal: Teilnahme absagen -->
@@ -596,6 +700,21 @@
     const params = new URLSearchParams(location.search);
     const initial = params.get('tab') || location.hash.replace('#', '') || 'info';
     activate(initial);
+})();
+
+// Mitfahrt-Formular: Felder je nach Typ ein-/ausblenden
+(function () {
+    const radios = document.querySelectorAll('input[name="typ"]');
+    const angebotFelder = document.getElementById('angebot-felder');
+    if (!angebotFelder) return;
+
+    function updateFelder() {
+        const selected = document.querySelector('input[name="typ"]:checked');
+        angebotFelder.classList.toggle('hidden', !selected || selected.value !== 'angebot');
+    }
+
+    radios.forEach(r => r.addEventListener('change', updateFelder));
+    updateFelder();
 })();
 </script>
 

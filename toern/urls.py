@@ -53,4 +53,6 @@ urlpatterns = [
     path("beschreibung/generieren/", toern_beschreibung_generieren, name="toern_beschreibung_generieren"),
     path("<int:toern_id>/pinnwand/add/", pinnwand_nachricht_erstellen, name="pinnwand_nachricht_erstellen"),
     path("pinnwand/<int:nachricht_id>/loeschen/", pinnwand_nachricht_loeschen, name="pinnwand_nachricht_loeschen"),
+    path("<int:toern_id>/mitfahrt/add/", mitfahrangebot_erstellen, name="mitfahrangebot_erstellen"),
+    path("mitfahrt/<int:eintrag_id>/loeschen/", mitfahrangebot_loeschen, name="mitfahrangebot_loeschen"),
 ]
