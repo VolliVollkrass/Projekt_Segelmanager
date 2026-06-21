@@ -16,6 +16,24 @@ class BootForm(forms.ModelForm):
         })
     )
 
+    # CharField statt FloatField — verhindert dass Django "13,5" vor clean_ ablehnt
+    laenge = forms.CharField(
+        required=False,
+        label="Länge (m)",
+        widget=forms.TextInput(attrs={
+            "class": "input input-bordered w-full",
+            "placeholder": "z.B. 13,5"
+        })
+    )
+    tiefe = forms.CharField(
+        required=False,
+        label="Tiefe (m)",
+        widget=forms.TextInput(attrs={
+            "class": "input input-bordered w-full",
+            "placeholder": "z.B. 2,67"
+        })
+    )
+
     class Meta:
         model = Boot
         exclude = ["toern"]
@@ -49,16 +67,6 @@ class BootForm(forms.ModelForm):
                 "class": "input input-bordered w-full"
             }),
 
-            "laenge": forms.TextInput(attrs={
-                "class": "input input-bordered w-full",
-                "placeholder": "z.B. 13,5"
-            }),
-
-            "tiefe": forms.TextInput(attrs={
-                "class": "input input-bordered w-full",
-                "placeholder": "z.B. 2,67"
-            }),
-
             "preis": forms.NumberInput(attrs={
                 "class": "input input-bordered w-full"
             }),
@@ -68,15 +76,18 @@ class BootForm(forms.ModelForm):
             }),
         }
 
-    # 🔥 WICHTIG
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        # Charterunternehmen optional machen
         self.fields['charterunternehmen'].required = False
+        # Existierende Float-Werte als String vorbelegen damit das Formular beim Bearbeiten korrekt anzeigt
+        if self.instance and self.instance.pk:
+            if self.instance.laenge is not None:
+                self.initial['laenge'] = str(self.instance.laenge).replace(".", ",")
+            if self.instance.tiefe is not None:
+                self.initial['tiefe'] = str(self.instance.tiefe).replace(".", ",")
 
-    def _parse_dezimal(self, feldname):
-        wert = self.data.get(feldname, "").strip().replace(",", ".")
+    def _parse_dezimal(self, wert_str):
+        wert = (wert_str or "").strip().replace(",", ".")
         if not wert:
             return None
         try:
@@ -85,10 +96,10 @@ class BootForm(forms.ModelForm):
             raise forms.ValidationError("Bitte eine gültige Zahl eingeben (z.B. 13,5).")
 
     def clean_laenge(self):
-        return self._parse_dezimal("laenge")
+        return self._parse_dezimal(self.cleaned_data.get("laenge", ""))
 
     def clean_tiefe(self):
-        return self._parse_dezimal("tiefe")
+        return self._parse_dezimal(self.cleaned_data.get("tiefe", ""))
 
     def clean(self):
         cleaned_data = super().clean()
@@ -144,7 +155,7 @@ class KabineForm(forms.ModelForm):
     def clean_betten(self):
         betten = self.cleaned_data.get("betten")
 
-        if betten <= 0:
+        if betten is not None and betten <= 0:
             raise forms.ValidationError("Mindestens 1 Bett erforderlich.")
 
         return betten
