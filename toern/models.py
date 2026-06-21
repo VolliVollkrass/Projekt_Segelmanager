@@ -292,6 +292,28 @@ class PinnwandNachricht(models.Model):
         return f"{self.autor.first_name} @ {self.toern.titel} ({self.created_at:%d.%m.%Y})"
 
 
+class Mitfahrangebot(models.Model):
+    TYP_CHOICES = [
+        ("angebot", "Mitfahrangebot"),
+        ("gesuch", "Mitfahrgesuch"),
+    ]
+
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="mitfahrangebote")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="mitfahrangebote")
+    typ = models.CharField(max_length=10, choices=TYP_CHOICES)
+    abfahrtsort = models.CharField(max_length=200)
+    abfahrtszeit = models.DateTimeField(null=True, blank=True)
+    freie_plaetze = models.PositiveSmallIntegerField(null=True, blank=True)
+    anmerkung = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.get_typ_display()} von {self.user.first_name} ({self.abfahrtsort})"
+
+
 class ErinnerungsMailLog(models.Model):
     toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="erinnerungsmails")
     empfaenger = models.ForeignKey(

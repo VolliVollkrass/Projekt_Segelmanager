@@ -10,7 +10,7 @@ from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE
-from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog, PinnwandNachricht
+from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
 from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
@@ -495,6 +495,9 @@ def crew_dashboard(request, toern_id):
         # Schwarzes Brett
         "pinnwand_nachrichten": PinnwandNachricht.objects.filter(toern=toern).select_related("autor"),
         "kann_pinnwand_posten": is_skipper or is_coskipper or (toern.anbieter == request.user),
+
+        # Mitfahrgelegenheiten
+        "mitfahrangebote": Mitfahrangebot.objects.filter(toern=toern).select_related("user"),
     }
 
     return render(request, "crew/crew_dashboard.html", context)
@@ -2784,3 +2787,59 @@ def pinnwand_nachricht_loeschen(request, nachricht_id):
     messages.success(request, "Nachricht gelöscht.")
     from django.urls import reverse
     return redirect(reverse("crew_dashboard", args=[toern.id]) + "?tab=info")
+
+
+@login_required
+@require_POST
+def mitfahrangebot_erstellen(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern, status="bestaetigt").first()
+
+    if not teilnahme:
+        raise PermissionDenied
+
+    typ = request.POST.get("typ")
+    abfahrtsort = request.POST.get("abfahrtsort", "").strip()
+    abfahrtszeit_raw = request.POST.get("abfahrtszeit", "").strip()
+    freie_plaetze_raw = request.POST.get("freie_plaetze", "").strip()
+    anmerkung = request.POST.get("anmerkung", "").strip()
+
+    if not abfahrtsort or typ not in ("angebot", "gesuch"):
+        messages.error(request, "Bitte alle Pflichtfelder ausfüllen.")
+        return redirect(reverse("crew_dashboard", args=[toern_id]) + "?tab=mitfahrt")
+
+    from django.utils.dateparse import parse_datetime
+    abfahrtszeit = parse_datetime(abfahrtszeit_raw) if abfahrtszeit_raw else None
+
+    freie_plaetze = None
+    if typ == "angebot" and freie_plaetze_raw:
+        try:
+            freie_plaetze = int(freie_plaetze_raw)
+        except ValueError:
+            pass
+
+    Mitfahrangebot.objects.create(
+        toern=toern,
+        user=request.user,
+        typ=typ,
+        abfahrtsort=abfahrtsort,
+        abfahrtszeit=abfahrtszeit,
+        freie_plaetze=freie_plaetze,
+        anmerkung=anmerkung,
+    )
+    messages.success(request, "Eintrag hinzugefügt.")
+    return redirect(reverse("crew_dashboard", args=[toern_id]) + "?tab=mitfahrt")
+
+
+@login_required
+@require_POST
+def mitfahrangebot_loeschen(request, eintrag_id):
+    eintrag = get_object_or_404(Mitfahrangebot, id=eintrag_id)
+    toern = eintrag.toern
+
+    if eintrag.user != request.user:
+        raise PermissionDenied
+
+    eintrag.delete()
+    messages.success(request, "Eintrag gelöscht.")
+    return redirect(reverse("crew_dashboard", args=[toern.id]) + "?tab=mitfahrt")
