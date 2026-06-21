@@ -160,6 +160,11 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Logbuch-PDFs können groß sein (gescannte mehrseitige Dokumente)
+# None = kein Limit für den Content-Length-Check (nur authentifizierte Nutzer können hochladen)
+DATA_UPLOAD_MAX_MEMORY_SIZE = None
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760   # 10 MB (ab hier → temp-Datei statt RAM)
+
 # WhiteNoise: komprimierte Static Files mit Cache-Busting
 STORAGES = {
     "default": {
