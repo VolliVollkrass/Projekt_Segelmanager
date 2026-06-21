@@ -49,14 +49,14 @@ class BootForm(forms.ModelForm):
                 "class": "input input-bordered w-full"
             }),
 
-            "laenge": forms.NumberInput(attrs={
+            "laenge": forms.TextInput(attrs={
                 "class": "input input-bordered w-full",
-                "step": "0.01"
+                "placeholder": "z.B. 13,5"
             }),
 
-            "tiefe": forms.NumberInput(attrs={
+            "tiefe": forms.TextInput(attrs={
                 "class": "input input-bordered w-full",
-                "step": "0.01"
+                "placeholder": "z.B. 2,67"
             }),
 
             "preis": forms.NumberInput(attrs={
@@ -74,6 +74,21 @@ class BootForm(forms.ModelForm):
 
         # Charterunternehmen optional machen
         self.fields['charterunternehmen'].required = False
+
+    def _parse_dezimal(self, feldname):
+        wert = self.data.get(feldname, "").strip().replace(",", ".")
+        if not wert:
+            return None
+        try:
+            return float(wert)
+        except ValueError:
+            raise forms.ValidationError("Bitte eine gültige Zahl eingeben (z.B. 13,5).")
+
+    def clean_laenge(self):
+        return self._parse_dezimal("laenge")
+
+    def clean_tiefe(self):
+        return self._parse_dezimal("tiefe")
 
     def clean(self):
         cleaned_data = super().clean()
