@@ -20,10 +20,8 @@ services:
       - "traefik.http.routers.segelmanager.tls.certresolver=le"
       # App-Port (HTTP→HTTPS Redirect läuft global über Traefik-Entrypoint)
       - "traefik.http.services.segelmanager.loadbalancer.server.port=8000"
-      # Großzügiges Body-Limit für PDF-Uploads (Logbuch)
-      - "traefik.http.middlewares.segelmanager-bodylimit.buffering.maxRequestBodyBytes=52428800"
-      - "traefik.http.middlewares.segelmanager-bodylimit.buffering.memRequestBodyBytes=10485760"
-      - "traefik.http.routers.segelmanager.middlewares=segelmanager-bodylimit"
+      # Kein Buffering-Middleware: Traefik streamt direkt zu Gunicorn (kein Body-Limit)
+      # Django/Gunicorn handeln große Uploads selbst (FILE_UPLOAD_MAX_MEMORY_SIZE in settings.py)
 
       # --- Temporärer Redirect: undmeererleben.de + www → segelmanager ---
       # Zukünftig: diesen Block entfernen und durch eigenen Landingpage-Container ersetzen
