@@ -3146,13 +3146,12 @@ def tagesplan_pdf(request, toern_id, boot_id):
     BORDER     = colors.HexColor('#E2E8F0')   # base-300
     GRAY_TXT   = colors.HexColor('#64748B')
 
-    # ── Seitengeometrie (zuerst – wird für Schriftgrößenberechnung benötigt) ─
+    # ── Seitengeometrie ──────────────────────────────────────────────────────
     PAGE     = landscape(A4)
     L_MAR = R_MAR = T_MAR = B_MAR = 12 * mm
     USABLE_W = PAGE[0] - L_MAR - R_MAR   # ≈ 273 mm
-    USABLE_H = PAGE[1] - T_MAR - B_MAR   # ≈ 186 mm
 
-    # ── Anzahl Tage → dynamische Schrift- und Layoutgrößen ──────────────────
+    # ── Törndaten ────────────────────────────────────────────────────────────
     if toern.startdatum and toern.enddatum:
         _start = toern.startdatum.date() if hasattr(toern.startdatum, 'date') else toern.startdatum
         _end   = toern.enddatum.date()   if hasattr(toern.enddatum,   'date') else toern.enddatum
@@ -3161,46 +3160,24 @@ def tagesplan_pdf(request, toern_id, boot_id):
         _start = _end = None
         num_days = 1
 
-    HEADER_H_EST = 21 * mm   # Logo + Titel-Block (Schätzwert)
-    THEAD_H_EST  =  7 * mm   # Spaltenköpfe
-    avail_pt = USABLE_H - HEADER_H_EST - THEAD_H_EST   # verfügbar für Datenzeilen
-
-    row_h_pt = max(avail_pt / num_days, 9 * mm)
-
-    # Schriftgröße, Zeilenabstand, Padding und max. Einträge pro Zelle
-    if row_h_pt >= 54:       # ≥ 19 mm (bis 8 Tage)
-        FS, LEAD, PAD_T, PAD_B, MAX_ITEMS = 8.0, 11.5, 4, 4, 4
-    elif row_h_pt >= 43:     # ≥ 15 mm (bis 10 Tage)
-        FS, LEAD, PAD_T, PAD_B, MAX_ITEMS = 7.5, 11.0, 3, 3, 3
-    elif row_h_pt >= 34:     # ≥ 12 mm (bis 13 Tage)
-        FS, LEAD, PAD_T, PAD_B, MAX_ITEMS = 7.0, 10.5, 2, 3, 2
-    else:                    # sehr eng (14+ Tage)
-        FS, LEAD, PAD_T, PAD_B, MAX_ITEMS = 6.5, 10.0, 2, 2, 2
-
-    # ── Styles ───────────────────────────────────────────────────────────────
+    # ── Styles (feste 8 pt – gut lesbar beim Drucken) ────────────────────────
     styles = getSampleStyleSheet()
     def _ps(name, **kw):
         return ParagraphStyle(name, parent=styles['Normal'], **kw)
 
     title_s = _ps('T',  fontSize=14, fontName='Helvetica-Bold', textColor=MID_BLUE, leading=17)
-    sub_s   = _ps('S',  fontSize=8,  textColor=GRAY_TXT, leading=11, spaceAfter=2*mm)
+    sub_s   = _ps('S',  fontSize=8,  textColor=GRAY_TXT,  leading=11, spaceAfter=2*mm)
     head_s  = _ps('H',  fontSize=8,  fontName='Helvetica-Bold', textColor=colors.white)
-    day_s   = _ps('D',  fontSize=max(FS, 7.5), fontName='Helvetica-Bold', textColor=MID_BLUE, leading=LEAD + 1)
-    thema_s = _ps('TH', fontSize=max(FS - 1.0, 6.0), textColor=TEAL, fontName='Helvetica-Oblique', leading=LEAD - 1)
-    cell_s  = _ps('C',  fontSize=FS, leading=LEAD, textColor=colors.HexColor('#222222'))
-    badge_s = _ps('B',  fontSize=max(FS - 1.5, 5.5), textColor=TEAL, fontName='Helvetica-Bold', leading=LEAD - 2)
-    empty_s = _ps('E',  fontSize=FS, textColor=colors.HexColor('#AAAAAA'))
-    more_s  = _ps('M',  fontSize=max(FS - 1.5, 5.5), textColor=colors.HexColor('#999999'),
-                  fontName='Helvetica-Oblique', leading=LEAD - 2)
+    day_s   = _ps('D',  fontSize=9,  fontName='Helvetica-Bold', textColor=MID_BLUE, leading=13)
+    thema_s = _ps('TH', fontSize=7,  textColor=TEAL, fontName='Helvetica-Oblique', leading=10)
+    cell_s  = _ps('C',  fontSize=8,  leading=11.5, textColor=colors.HexColor('#222222'))
+    badge_s = _ps('B',  fontSize=6.5, textColor=TEAL, fontName='Helvetica-Bold', leading=9)
+    empty_s = _ps('E',  fontSize=8,  textColor=colors.HexColor('#AAAAAA'))
+    more_s  = _ps('M',  fontSize=6.5, textColor=colors.HexColor('#999999'),
+                  fontName='Helvetica-Oblique', leading=9)
 
     LOCALE_DE  = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
     MEAL_LABEL = {'fruehstueck': '☀ ', 'mittag': '○ ', 'abend': '☽ ', 'essen_gehen': '↗ ', 'snack': '· '}
-
-    def _trim(items):
-        if len(items) <= MAX_ITEMS:
-            return items
-        rest = len(items) - (MAX_ITEMS - 1)
-        return items[:MAX_ITEMS - 1] + [Paragraph(f'+ {rest} weitere', more_s)]
 
     # ── Buffer / Doc ─────────────────────────────────────────────────────────
     buffer = BytesIO()
@@ -3218,46 +3195,64 @@ def tagesplan_pdf(request, toern_id, boot_id):
     # ── Kopfzeile ────────────────────────────────────────────────────────────
     start_str = toern.startdatum.strftime('%d.%m.%Y') if toern.startdatum else '–'
     end_str   = toern.enddatum.strftime('%d.%m.%Y')   if toern.enddatum   else '–'
-    header_content = [
-        [
-            [Paragraph(f"Tagesplan – {boot.name}", title_s),
-             Paragraph(f"{toern.titel}  ·  {toern.revier}  ·  {start_str} – {end_str}", sub_s)],
-            logo_cell,
-        ]
-    ]
+    header_content = [[
+        [Paragraph(f"Tagesplan – {boot.name}", title_s),
+         Paragraph(f"{toern.titel}  ·  {toern.revier}  ·  {start_str} – {end_str}", sub_s)],
+        logo_cell,
+    ]]
     header_tbl = Table(header_content, colWidths=[USABLE_W - 24*mm, 24*mm])
     header_tbl.setStyle(TableStyle([
         ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
         ('ALIGN',         (1, 0), (1, 0),   'RIGHT'),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 2*mm),
     ]))
-
     elements = [header_tbl]
 
-    # ── Spaltenbreiten: Datum | Mahlzeiten | Aufgaben [| Impulse] ───────────
+    # ── Spaltenstruktur ───────────────────────────────────────────────────────
+    # Immer 5 Spalten; Aufgaben-Bereich belegt 2 oder 3 Spalten (kein Kürzen!).
+    # Ohne Impulse: Datum | Mahlzeiten | Aufg.A | Aufg.B | Aufg.C  (3 Task-Spalten)
+    # Mit Impulse:  Datum | Mahlzeiten | Aufg.A | Aufg.B | Impulse (2 Task-Spalten,
+    #               Überschuss > 8 Tasks erscheint unter Datum/Thema)
     mit_impulse = toern.tagesimpulse_aktiv
-    if mit_impulse:
-        COL_W = [36*mm, 66*mm, 90*mm, USABLE_W - 36*mm - 66*mm - 90*mm]
-    else:
-        COL_W = [36*mm, 78*mm, USABLE_W - 36*mm - 78*mm]
 
-    # ── Tabellen-Header ──────────────────────────────────────────────────────
+    if mit_impulse:
+        N_TASK = 2
+        MAX_PER_TASK_COL = 4   # > 8 Tasks Überschuss in Datum-Spalte
+        COL_W = [42*mm, 54*mm, 57*mm, 57*mm, USABLE_W - 42*mm - 54*mm - 57*mm - 57*mm]
+        task_head_span = ('SPAN', (2, 0), (3, 0))
+    else:
+        N_TASK = 3
+        MAX_PER_TASK_COL = None
+        COL_W = [36*mm, 57*mm, 60*mm, 60*mm, USABLE_W - 36*mm - 57*mm - 60*mm - 60*mm]
+        task_head_span = ('SPAN', (2, 0), (4, 0))
+
+    # ── Tabellen-Header (mit SPAN über Task-Spalten) ──────────────────────────
     col_headers = [
         Paragraph('Datum', head_s),
         Paragraph('Mahlzeiten', head_s),
         Paragraph('Aufgaben &amp; Verantwortliche', head_s),
+        Paragraph('', head_s),
+        Paragraph('Impuls des Tages' if mit_impulse else '', head_s),
     ]
-    if mit_impulse:
-        col_headers.append(Paragraph('Impuls des Tages', head_s))
-
     rows = [col_headers]
 
+    # ── Hilfsfunktionen ───────────────────────────────────────────────────────
+    def _split(items, n):
+        """Verteilt items sequentiell auf n Spalten."""
+        if not items:
+            return [[] for _ in range(n)]
+        per = (len(items) + n - 1) // n
+        return [items[c * per:(c + 1) * per] for c in range(n)]
+
+    def _cell(lst):
+        return lst if lst else [Paragraph('–', empty_s)]
+
+    # ── Datenzeilen ──────────────────────────────────────────────────────────
     if _start:
-        delta = num_days - 1
         for i in range(num_days):
-            datum = _start + timedelta(days=i)
+            datum      = _start + timedelta(days=i)
             is_anfahrt = i == 0
-            is_abfahrt = i == delta
+            is_abfahrt = i == num_days - 1
 
             day_mahlzeiten = sorted(
                 [m for m in mahlzeiten_qs if m.datum == datum],
@@ -3274,79 +3269,81 @@ def tagesplan_pdf(request, toern_id, boot_id):
                 date_cell.append(Paragraph('½ Anfahrt', badge_s))
             if is_abfahrt:
                 date_cell.append(Paragraph('½ Abreise', badge_s))
-            if thema and mit_impulse and row_h_pt >= 34:
+            if thema and mit_impulse:
                 date_cell.append(Paragraph(f'„{thema}"', thema_s))
 
             # Mahlzeiten-Zelle
-            if day_mahlzeiten:
-                meal_items = []
-                for m in day_mahlzeiten:
-                    icon = MEAL_LABEL.get(m.typ, '· ')
-                    koch = f"  <font color='#888888'>({m.kochverantwortlich.user.first_name})</font>" \
-                           if m.kochverantwortlich else ''
-                    meal_items.append(Paragraph(f"{icon}<b>{m.name}</b>{koch}", cell_s))
-                meal_cell = _trim(meal_items)
-            else:
-                meal_cell = [Paragraph('–', empty_s)]
+            meal_cell = []
+            for m in day_mahlzeiten:
+                icon = MEAL_LABEL.get(m.typ, '· ')
+                koch = f"  <font color='#888888'>({m.kochverantwortlich.user.first_name})</font>" \
+                       if m.kochverantwortlich else ''
+                meal_cell.append(Paragraph(f"{icon}<b>{m.name}</b>{koch}", cell_s))
 
-            # Aufgaben-Zelle
-            if day_aufgaben:
-                auf_items = []
-                for a in day_aufgaben:
-                    label = a.beschreibung if a.typ == 'sonstiges' and a.beschreibung else a.get_typ_display()
-                    if a.beschreibung and a.typ != 'sonstiges':
-                        label += f' ({a.beschreibung})'
-                    person = f"  <font color='#0D9488'><b>→ {a.verantwortlich.user.first_name}</b></font>" \
-                             if a.verantwortlich else ''
-                    auf_items.append(Paragraph(f"• {label}{person}", cell_s))
-                auf_cell = _trim(auf_items)
-            else:
-                auf_cell = [Paragraph('–', empty_s)]
+            # Aufgaben aufbereiten
+            auf_items = []
+            for a in day_aufgaben:
+                label = a.beschreibung if a.typ == 'sonstiges' and a.beschreibung else a.get_typ_display()
+                if a.beschreibung and a.typ != 'sonstiges':
+                    label += f' ({a.beschreibung})'
+                person = f"  <font color='#0D9488'><b>→ {a.verantwortlich.user.first_name}</b></font>" \
+                         if a.verantwortlich else ''
+                auf_items.append(Paragraph(f"• {label}{person}", cell_s))
 
-            row = [date_cell, meal_cell, auf_cell]
+            # Mit Impulse: Überschuss (> 2×MAX Tasks) unter Datum/Thema
+            if mit_impulse and MAX_PER_TASK_COL:
+                cap        = MAX_PER_TASK_COL * N_TASK
+                main_tasks = auf_items[:cap]
+                overflow   = auf_items[cap:]
+                if overflow:
+                    date_cell.append(Paragraph('Weitere Aufg.:', more_s))
+                    date_cell.extend(overflow)
+            else:
+                main_tasks = auf_items
+
+            task_cols = _split(main_tasks, N_TASK)
+            auf_a = _cell(task_cols[0] if task_cols else [])
+            auf_b = _cell(task_cols[1] if len(task_cols) > 1 else [])
+            auf_c = _cell(task_cols[2] if len(task_cols) > 2 else [])
+
+            # Impuls-Zelle
+            if mit_impulse:
+                imp_cell = []
+                for imp in day_impulse:
+                    slot_label = 'Vm:' if imp.slot == 'vormittag' else 'Nm:'
+                    person = f"  <font color='#888888'>({imp.verantwortlich.user.first_name})</font>" \
+                             if imp.verantwortlich else ''
+                    imp_cell.append(Paragraph(f"<b>{slot_label}</b> {imp.thema}{person}", cell_s))
+                if not imp_cell:
+                    imp_cell = [Paragraph('–', empty_s)]
 
             if mit_impulse:
-                if day_impulse:
-                    imp_items = []
-                    for imp in day_impulse:
-                        slot_label = 'Vm:' if imp.slot == 'vormittag' else 'Nm:'
-                        person = f"  <font color='#888888'>({imp.verantwortlich.user.first_name})</font>" \
-                                 if imp.verantwortlich else ''
-                        imp_items.append(Paragraph(f"<b>{slot_label}</b> {imp.thema}{person}", cell_s))
-                    imp_cell = _trim(imp_items)
-                else:
-                    imp_cell = [Paragraph('–', empty_s)]
-                row.append(imp_cell)
+                rows.append([date_cell, _cell(meal_cell), auf_a, auf_b, imp_cell])
+            else:
+                rows.append([date_cell, _cell(meal_cell), auf_a, auf_b, auf_c])
 
-            rows.append(row)
-
-    num_data_rows = len(rows) - 1
-    row_heights = [THEAD_H_EST] + [row_h_pt] * num_data_rows
-    main_table = Table(rows, colWidths=COL_W, rowHeights=row_heights, repeatRows=1)
-    row_count = len(rows)
+    # ── Tabelle (kein festes rowHeights → fließt natürlich auf max. 2 Seiten) ─
+    main_table = Table(rows, colWidths=COL_W, repeatRows=1)
+    row_count  = len(rows)
     main_table.setStyle(TableStyle([
-        # Header-Zeile
-        ('BACKGROUND',   (0, 0), (-1, 0), HEADER_BG),
-        ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
-        ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE',     (0, 0), (-1, 0), 8),
-        ('TOPPADDING',   (0, 0), (-1, 0), 3),
-        ('BOTTOMPADDING',(0, 0), (-1, 0), 3),
-        # Datenzeilen abwechselnd
+        ('BACKGROUND',    (0, 0), (-1, 0), HEADER_BG),
+        ('TEXTCOLOR',     (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',      (0, 0), (-1, 0), 8),
+        ('TOPPADDING',    (0, 0), (-1, 0), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 3),
+        task_head_span,
         *[('BACKGROUND', (0, r), (-1, r), ROW_ODD if r % 2 else ROW_EVEN)
           for r in range(1, row_count)],
-        # Rahmen
-        ('BOX',          (0, 0), (-1, -1), 0.8, DARK_BLUE),
-        ('INNERGRID',    (0, 0), (-1, -1), 0.3, BORDER),
-        # Ausrichtung & Padding
-        ('VALIGN',       (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING',   (0, 1), (-1, -1), PAD_T),
-        ('BOTTOMPADDING',(0, 1), (-1, -1), PAD_B),
-        ('LEFTPADDING',  (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        # Datumsspalte Hintergrund
-        ('BACKGROUND',   (0, 1), (0, -1), DATE_COL),
-        ('FONTNAME',     (0, 1), (0, -1), 'Helvetica-Bold'),
+        ('BOX',           (0, 0), (-1, -1), 0.8, DARK_BLUE),
+        ('INNERGRID',     (0, 0), (-1, -1), 0.3, BORDER),
+        ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING',    (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        ('BACKGROUND',    (0, 1), (0, -1), DATE_COL),
+        ('FONTNAME',      (0, 1), (0, -1), 'Helvetica-Bold'),
     ]))
 
     elements.append(main_table)
