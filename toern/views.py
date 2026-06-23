@@ -3146,29 +3146,63 @@ def tagesplan_pdf(request, toern_id, boot_id):
     BORDER     = colors.HexColor('#E2E8F0')   # base-300
     GRAY_TXT   = colors.HexColor('#64748B')
 
+    # ── Seitengeometrie (zuerst – wird für Schriftgrößenberechnung benötigt) ─
+    PAGE     = landscape(A4)
+    L_MAR = R_MAR = T_MAR = B_MAR = 12 * mm
+    USABLE_W = PAGE[0] - L_MAR - R_MAR   # ≈ 273 mm
+    USABLE_H = PAGE[1] - T_MAR - B_MAR   # ≈ 186 mm
+
+    # ── Anzahl Tage → dynamische Schrift- und Layoutgrößen ──────────────────
+    if toern.startdatum and toern.enddatum:
+        _start = toern.startdatum.date() if hasattr(toern.startdatum, 'date') else toern.startdatum
+        _end   = toern.enddatum.date()   if hasattr(toern.enddatum,   'date') else toern.enddatum
+        num_days = (_end - _start).days + 1
+    else:
+        _start = _end = None
+        num_days = 1
+
+    HEADER_H_EST = 21 * mm   # Logo + Titel-Block (Schätzwert)
+    THEAD_H_EST  =  7 * mm   # Spaltenköpfe
+    avail_pt = USABLE_H - HEADER_H_EST - THEAD_H_EST   # verfügbar für Datenzeilen
+
+    row_h_pt = max(avail_pt / num_days, 9 * mm)
+
+    # Schriftgröße, Zeilenabstand, Padding und max. Einträge pro Zelle
+    if row_h_pt >= 54:       # ≥ 19 mm (bis 8 Tage)
+        FS, LEAD, PAD_T, PAD_B, MAX_ITEMS = 8.0, 11.5, 4, 4, 4
+    elif row_h_pt >= 43:     # ≥ 15 mm (bis 10 Tage)
+        FS, LEAD, PAD_T, PAD_B, MAX_ITEMS = 7.5, 11.0, 3, 3, 3
+    elif row_h_pt >= 34:     # ≥ 12 mm (bis 13 Tage)
+        FS, LEAD, PAD_T, PAD_B, MAX_ITEMS = 7.0, 10.5, 2, 3, 2
+    else:                    # sehr eng (14+ Tage)
+        FS, LEAD, PAD_T, PAD_B, MAX_ITEMS = 6.5, 10.0, 2, 2, 2
+
     # ── Styles ───────────────────────────────────────────────────────────────
     styles = getSampleStyleSheet()
     def _ps(name, **kw):
         return ParagraphStyle(name, parent=styles['Normal'], **kw)
 
-    title_s  = _ps('T', fontSize=16, fontName='Helvetica-Bold', textColor=MID_BLUE, leading=20)
-    sub_s    = _ps('S', fontSize=9,  textColor=GRAY_TXT, leading=13, spaceAfter=1*mm)
-    head_s   = _ps('H', fontSize=9,  fontName='Helvetica-Bold', textColor=colors.white)
-    day_s    = _ps('D', fontSize=10, fontName='Helvetica-Bold', textColor=MID_BLUE, leading=14)
-    thema_s  = _ps('TH', fontSize=8, textColor=TEAL, fontName='Helvetica-Oblique', leading=11)
-    cell_s   = _ps('C', fontSize=8,  leading=11, textColor=colors.HexColor('#222222'))
-    badge_s  = _ps('B', fontSize=7,  textColor=TEAL, fontName='Helvetica-Bold', leading=9)
-    empty_s  = _ps('E', fontSize=8,  textColor=colors.HexColor('#AAAAAA'))
+    title_s = _ps('T',  fontSize=14, fontName='Helvetica-Bold', textColor=MID_BLUE, leading=17)
+    sub_s   = _ps('S',  fontSize=8,  textColor=GRAY_TXT, leading=11, spaceAfter=2*mm)
+    head_s  = _ps('H',  fontSize=8,  fontName='Helvetica-Bold', textColor=colors.white)
+    day_s   = _ps('D',  fontSize=max(FS, 7.5), fontName='Helvetica-Bold', textColor=MID_BLUE, leading=LEAD + 1)
+    thema_s = _ps('TH', fontSize=max(FS - 1.0, 6.0), textColor=TEAL, fontName='Helvetica-Oblique', leading=LEAD - 1)
+    cell_s  = _ps('C',  fontSize=FS, leading=LEAD, textColor=colors.HexColor('#222222'))
+    badge_s = _ps('B',  fontSize=max(FS - 1.5, 5.5), textColor=TEAL, fontName='Helvetica-Bold', leading=LEAD - 2)
+    empty_s = _ps('E',  fontSize=FS, textColor=colors.HexColor('#AAAAAA'))
+    more_s  = _ps('M',  fontSize=max(FS - 1.5, 5.5), textColor=colors.HexColor('#999999'),
+                  fontName='Helvetica-Oblique', leading=LEAD - 2)
 
-    LOCALE_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+    LOCALE_DE  = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
     MEAL_LABEL = {'fruehstueck': '☀ ', 'mittag': '○ ', 'abend': '☽ ', 'essen_gehen': '↗ ', 'snack': '· '}
 
-    # ── Seite ────────────────────────────────────────────────────────────────
-    PAGE = landscape(A4)   # 297 × 210 mm → im Querformat: 297 mm breit
-    L_MAR = R_MAR = 12*mm
-    T_MAR = B_MAR = 12*mm
-    USABLE_W = PAGE[0] - L_MAR - R_MAR   # ≈ 273 mm
+    def _trim(items):
+        if len(items) <= MAX_ITEMS:
+            return items
+        rest = len(items) - (MAX_ITEMS - 1)
+        return items[:MAX_ITEMS - 1] + [Paragraph(f'+ {rest} weitere', more_s)]
 
+    # ── Buffer / Doc ─────────────────────────────────────────────────────────
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=PAGE,
@@ -3178,7 +3212,7 @@ def tagesplan_pdf(request, toern_id, boot_id):
 
     # ── Logo ─────────────────────────────────────────────────────────────────
     logo_path = os.path.join(settings.BASE_DIR, 'static', 'medien', 'Logo_Meer_erleben.png')
-    logo_cell = Image(logo_path, width=22*mm, height=22*mm, kind='proportional') \
+    logo_cell = Image(logo_path, width=18*mm, height=18*mm, kind='proportional') \
         if os.path.exists(logo_path) else Paragraph('', cell_s)
 
     # ── Kopfzeile ────────────────────────────────────────────────────────────
@@ -3191,11 +3225,11 @@ def tagesplan_pdf(request, toern_id, boot_id):
             logo_cell,
         ]
     ]
-    header_tbl = Table(header_content, colWidths=[USABLE_W - 28*mm, 28*mm])
+    header_tbl = Table(header_content, colWidths=[USABLE_W - 24*mm, 24*mm])
     header_tbl.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
-        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 3*mm),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN',         (1, 0), (1, 0),   'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2*mm),
     ]))
 
     elements = [header_tbl]
@@ -3203,9 +3237,9 @@ def tagesplan_pdf(request, toern_id, boot_id):
     # ── Spaltenbreiten: Datum | Mahlzeiten | Aufgaben [| Impulse] ───────────
     mit_impulse = toern.tagesimpulse_aktiv
     if mit_impulse:
-        COL_W = [38*mm, 68*mm, 90*mm, USABLE_W - 38*mm - 68*mm - 90*mm]
+        COL_W = [36*mm, 66*mm, 90*mm, USABLE_W - 36*mm - 66*mm - 90*mm]
     else:
-        COL_W = [38*mm, 80*mm, USABLE_W - 38*mm - 80*mm]
+        COL_W = [36*mm, 78*mm, USABLE_W - 36*mm - 78*mm]
 
     # ── Tabellen-Header ──────────────────────────────────────────────────────
     col_headers = [
@@ -3218,11 +3252,9 @@ def tagesplan_pdf(request, toern_id, boot_id):
 
     rows = [col_headers]
 
-    if toern.startdatum and toern.enddatum:
-        _start = toern.startdatum.date() if hasattr(toern.startdatum, 'date') else toern.startdatum
-        _end   = toern.enddatum.date()   if hasattr(toern.enddatum,   'date') else toern.enddatum
-        delta = (_end - _start).days
-        for i in range(delta + 1):
+    if _start:
+        delta = num_days - 1
+        for i in range(num_days):
             datum = _start + timedelta(days=i)
             is_anfahrt = i == 0
             is_abfahrt = i == delta
@@ -3237,37 +3269,37 @@ def tagesplan_pdf(request, toern_id, boot_id):
 
             # Datum-Zelle
             wochentag = LOCALE_DE[datum.weekday()]
-            datum_str = datum.strftime('%d.%m.%Y')
-            date_cell = [Paragraph(f"{wochentag}<br/>{datum_str}", day_s)]
+            date_cell = [Paragraph(f"{wochentag}<br/>{datum.strftime('%d.%m.%Y')}", day_s)]
             if is_anfahrt:
                 date_cell.append(Paragraph('½ Anfahrt', badge_s))
             if is_abfahrt:
                 date_cell.append(Paragraph('½ Abreise', badge_s))
-            if thema and mit_impulse:
-                date_cell.append(Spacer(1, 1*mm))
+            if thema and mit_impulse and row_h_pt >= 34:
                 date_cell.append(Paragraph(f'„{thema}"', thema_s))
 
             # Mahlzeiten-Zelle
             if day_mahlzeiten:
-                meal_cell = []
+                meal_items = []
                 for m in day_mahlzeiten:
                     icon = MEAL_LABEL.get(m.typ, '· ')
                     koch = f"  <font color='#888888'>({m.kochverantwortlich.user.first_name})</font>" \
                            if m.kochverantwortlich else ''
-                    meal_cell.append(Paragraph(f"{icon}<b>{m.name}</b>{koch}", cell_s))
+                    meal_items.append(Paragraph(f"{icon}<b>{m.name}</b>{koch}", cell_s))
+                meal_cell = _trim(meal_items)
             else:
                 meal_cell = [Paragraph('–', empty_s)]
 
             # Aufgaben-Zelle
             if day_aufgaben:
-                auf_cell = []
+                auf_items = []
                 for a in day_aufgaben:
                     label = a.beschreibung if a.typ == 'sonstiges' and a.beschreibung else a.get_typ_display()
                     if a.beschreibung and a.typ != 'sonstiges':
                         label += f' ({a.beschreibung})'
                     person = f"  <font color='#0D9488'><b>→ {a.verantwortlich.user.first_name}</b></font>" \
                              if a.verantwortlich else ''
-                    auf_cell.append(Paragraph(f"• {label}{person}", cell_s))
+                    auf_items.append(Paragraph(f"• {label}{person}", cell_s))
+                auf_cell = _trim(auf_items)
             else:
                 auf_cell = [Paragraph('–', empty_s)]
 
@@ -3275,28 +3307,31 @@ def tagesplan_pdf(request, toern_id, boot_id):
 
             if mit_impulse:
                 if day_impulse:
-                    imp_cell = []
+                    imp_items = []
                     for imp in day_impulse:
                         slot_label = 'Vm:' if imp.slot == 'vormittag' else 'Nm:'
                         person = f"  <font color='#888888'>({imp.verantwortlich.user.first_name})</font>" \
                                  if imp.verantwortlich else ''
-                        imp_cell.append(Paragraph(f"<b>{slot_label}</b> {imp.thema}{person}", cell_s))
+                        imp_items.append(Paragraph(f"<b>{slot_label}</b> {imp.thema}{person}", cell_s))
+                    imp_cell = _trim(imp_items)
                 else:
                     imp_cell = [Paragraph('–', empty_s)]
                 row.append(imp_cell)
 
             rows.append(row)
 
-    main_table = Table(rows, colWidths=COL_W, repeatRows=1)
+    num_data_rows = len(rows) - 1
+    row_heights = [THEAD_H_EST] + [row_h_pt] * num_data_rows
+    main_table = Table(rows, colWidths=COL_W, rowHeights=row_heights, repeatRows=1)
     row_count = len(rows)
     main_table.setStyle(TableStyle([
         # Header-Zeile
         ('BACKGROUND',   (0, 0), (-1, 0), HEADER_BG),
         ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
         ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE',     (0, 0), (-1, 0), 9),
-        ('TOPPADDING',   (0, 0), (-1, 0), 4),
-        ('BOTTOMPADDING',(0, 0), (-1, 0), 4),
+        ('FONTSIZE',     (0, 0), (-1, 0), 8),
+        ('TOPPADDING',   (0, 0), (-1, 0), 3),
+        ('BOTTOMPADDING',(0, 0), (-1, 0), 3),
         # Datenzeilen abwechselnd
         *[('BACKGROUND', (0, r), (-1, r), ROW_ODD if r % 2 else ROW_EVEN)
           for r in range(1, row_count)],
@@ -3305,11 +3340,11 @@ def tagesplan_pdf(request, toern_id, boot_id):
         ('INNERGRID',    (0, 0), (-1, -1), 0.3, BORDER),
         # Ausrichtung & Padding
         ('VALIGN',       (0, 0), (-1, -1), 'TOP'),
-        ('TOPPADDING',   (0, 1), (-1, -1), 4),
-        ('BOTTOMPADDING',(0, 1), (-1, -1), 5),
+        ('TOPPADDING',   (0, 1), (-1, -1), PAD_T),
+        ('BOTTOMPADDING',(0, 1), (-1, -1), PAD_B),
         ('LEFTPADDING',  (0, 0), (-1, -1), 4),
         ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-        # Datumsspalte Hintergrund dunkel
+        # Datumsspalte Hintergrund
         ('BACKGROUND',   (0, 1), (0, -1), DATE_COL),
         ('FONTNAME',     (0, 1), (0, -1), 'Helvetica-Bold'),
     ]))
