@@ -3209,30 +3209,24 @@ def tagesplan_pdf(request, toern_id, boot_id):
     elements = [header_tbl]
 
     # ── Spaltenstruktur ───────────────────────────────────────────────────────
-    # Immer 5 Spalten; Aufgaben-Bereich belegt 2 oder 3 Spalten (kein Kürzen!).
-    # Ohne Impulse: Datum | Mahlzeiten | Aufg.A | Aufg.B | Aufg.C  (3 Task-Spalten)
-    # Mit Impulse:  Datum | Mahlzeiten | Aufg.A | Aufg.B | Impulse (2 Task-Spalten,
-    #               Überschuss > 8 Tasks erscheint unter Datum/Thema)
+    # Immer 5 Spalten, immer 3 Task-Spalten (Aufg.A | Aufg.B | Aufg.C).
+    # Ohne Impulse: Datum (schmal)   | Mahlzeiten | Aufg.A | Aufg.B | Aufg.C
+    # Mit Impulse:  Datum+Thema+Imp. | Mahlzeiten | Aufg.A | Aufg.B | Aufg.C
+    #               (Datum-Spalte breiter; Impulse Vm/Nm stehen unter dem Thema)
     mit_impulse = toern.tagesimpulse_aktiv
 
     if mit_impulse:
-        N_TASK = 2
-        MAX_PER_TASK_COL = 4   # > 8 Tasks Überschuss in Datum-Spalte
-        COL_W = [42*mm, 54*mm, 57*mm, 57*mm, USABLE_W - 42*mm - 54*mm - 57*mm - 57*mm]
-        task_head_span = ('SPAN', (2, 0), (3, 0))
+        COL_W = [46*mm, 52*mm, 58*mm, 58*mm, USABLE_W - 46*mm - 52*mm - 58*mm - 58*mm]
     else:
-        N_TASK = 3
-        MAX_PER_TASK_COL = None
         COL_W = [36*mm, 57*mm, 60*mm, 60*mm, USABLE_W - 36*mm - 57*mm - 60*mm - 60*mm]
-        task_head_span = ('SPAN', (2, 0), (4, 0))
 
-    # ── Tabellen-Header (mit SPAN über Task-Spalten) ──────────────────────────
+    # ── Tabellen-Header (Aufgaben-Titel spannt alle 3 Task-Spalten) ───────────
     col_headers = [
         Paragraph('Datum', head_s),
         Paragraph('Mahlzeiten', head_s),
         Paragraph('Aufgaben &amp; Verantwortliche', head_s),
         Paragraph('', head_s),
-        Paragraph('Impuls des Tages' if mit_impulse else '', head_s),
+        Paragraph('', head_s),
     ]
     rows = [col_headers]
 
@@ -3246,6 +3240,8 @@ def tagesplan_pdf(request, toern_id, boot_id):
 
     def _cell(lst):
         return lst if lst else [Paragraph('–', empty_s)]
+
+    imp_s = _ps('I', fontSize=7, textColor=MID_BLUE, leading=10)
 
     # ── Datenzeilen ──────────────────────────────────────────────────────────
     if _start:
@@ -3262,15 +3258,21 @@ def tagesplan_pdf(request, toern_id, boot_id):
             day_impulse  = [imp for imp in impulse_qs if imp.datum == datum]
             thema        = tagesthemen_map.get(datum, '')
 
-            # Datum-Zelle
+            # Datum-Zelle (mit Impulse: Thema + Vm/Nm-Einträge darunter)
             wochentag = LOCALE_DE[datum.weekday()]
             date_cell = [Paragraph(f"{wochentag}<br/>{datum.strftime('%d.%m.%Y')}", day_s)]
             if is_anfahrt:
                 date_cell.append(Paragraph('½ Anfahrt', badge_s))
             if is_abfahrt:
                 date_cell.append(Paragraph('½ Abreise', badge_s))
-            if thema and mit_impulse:
-                date_cell.append(Paragraph(f'„{thema}"', thema_s))
+            if mit_impulse:
+                if thema:
+                    date_cell.append(Paragraph(f'„{thema}"', thema_s))
+                for imp in sorted(day_impulse, key=lambda x: 0 if x.slot == 'vormittag' else 1):
+                    slot = 'Vm' if imp.slot == 'vormittag' else 'Nm'
+                    txt  = f" {imp.thema}" if imp.thema else ''
+                    pers = f" → {imp.verantwortlich.user.first_name}" if imp.verantwortlich else ''
+                    date_cell.append(Paragraph(f"<b>{slot}:</b>{txt}{pers}", imp_s))
 
             # Mahlzeiten-Zelle
             meal_cell = []
@@ -3280,7 +3282,7 @@ def tagesplan_pdf(request, toern_id, boot_id):
                        if m.kochverantwortlich else ''
                 meal_cell.append(Paragraph(f"{icon}<b>{m.name}</b>{koch}", cell_s))
 
-            # Aufgaben aufbereiten
+            # Aufgaben auf 3 Spalten verteilen
             auf_items = []
             for a in day_aufgaben:
                 label = a.beschreibung if a.typ == 'sonstiges' and a.beschreibung else a.get_typ_display()
@@ -3290,39 +3292,14 @@ def tagesplan_pdf(request, toern_id, boot_id):
                          if a.verantwortlich else ''
                 auf_items.append(Paragraph(f"• {label}{person}", cell_s))
 
-            # Mit Impulse: Überschuss (> 2×MAX Tasks) unter Datum/Thema
-            if mit_impulse and MAX_PER_TASK_COL:
-                cap        = MAX_PER_TASK_COL * N_TASK
-                main_tasks = auf_items[:cap]
-                overflow   = auf_items[cap:]
-                if overflow:
-                    date_cell.append(Paragraph('Weitere Aufg.:', more_s))
-                    date_cell.extend(overflow)
-            else:
-                main_tasks = auf_items
-
-            task_cols = _split(main_tasks, N_TASK)
-            auf_a = _cell(task_cols[0] if task_cols else [])
+            task_cols = _split(auf_items, 3)
+            auf_a = _cell(task_cols[0])
             auf_b = _cell(task_cols[1] if len(task_cols) > 1 else [])
             auf_c = _cell(task_cols[2] if len(task_cols) > 2 else [])
 
-            # Impuls-Zelle
-            if mit_impulse:
-                imp_cell = []
-                for imp in day_impulse:
-                    slot_label = 'Vm:' if imp.slot == 'vormittag' else 'Nm:'
-                    person = f"  <font color='#888888'>({imp.verantwortlich.user.first_name})</font>" \
-                             if imp.verantwortlich else ''
-                    imp_cell.append(Paragraph(f"<b>{slot_label}</b> {imp.thema}{person}", cell_s))
-                if not imp_cell:
-                    imp_cell = [Paragraph('–', empty_s)]
+            rows.append([date_cell, _cell(meal_cell), auf_a, auf_b, auf_c])
 
-            if mit_impulse:
-                rows.append([date_cell, _cell(meal_cell), auf_a, auf_b, imp_cell])
-            else:
-                rows.append([date_cell, _cell(meal_cell), auf_a, auf_b, auf_c])
-
-    # ── Tabelle (kein festes rowHeights → fließt natürlich auf max. 2 Seiten) ─
+    # ── Tabelle (fließt natürlich auf max. 2 Seiten) ─────────────────────────
     main_table = Table(rows, colWidths=COL_W, repeatRows=1)
     row_count  = len(rows)
     main_table.setStyle(TableStyle([
@@ -3332,7 +3309,7 @@ def tagesplan_pdf(request, toern_id, boot_id):
         ('FONTSIZE',      (0, 0), (-1, 0), 8),
         ('TOPPADDING',    (0, 0), (-1, 0), 3),
         ('BOTTOMPADDING', (0, 0), (-1, 0), 3),
-        task_head_span,
+        ('SPAN', (2, 0), (4, 0)),   # Aufgaben-Header über alle 3 Task-Spalten
         *[('BACKGROUND', (0, r), (-1, r), ROW_ODD if r % 2 else ROW_EVEN)
           for r in range(1, row_count)],
         ('BOX',           (0, 0), (-1, -1), 0.8, DARK_BLUE),
