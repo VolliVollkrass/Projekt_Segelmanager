@@ -179,6 +179,25 @@
 
         {% endif %}{# end toern.status != ABGESCHLOSSEN #}
 
+        <!-- Törn-Einstellungen -->
+        <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-base-200">
+                <h2 class="font-semibold text-sm">Einstellungen</h2>
+            </div>
+            <div class="px-5 py-4">
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <p class="text-sm font-medium">Tagesthema &amp; Tagesimpulse</p>
+                        <p class="text-xs text-base-content/40 mt-0.5">Aktiviert Tagesthema und Impulse (Vm/Nm) im Boot-Dashboard.</p>
+                    </div>
+                    <input type="checkbox" id="impulse-toggle"
+                        class="toggle toggle-secondary shrink-0"
+                        {% if toern.tagesimpulse_aktiv %}checked{% endif %}
+                        onchange="fetch('{% url 'toern_tagesimpulse_toggle' toern.id %}', {method:'POST', headers:{'X-CSRFToken':'{{ csrf_token }}'}})">
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- ========================= TAB: ZUTEILUNG ========================= -->
@@ -518,33 +537,6 @@
     <!-- ========================= TAB: ABSCHLUSS ========================= -->
     {% if abschluss_data %}
     <div id="tab-abschluss" class="hidden space-y-5">
-
-        <!-- Törn-Einstellungen -->
-        <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
-            <div class="px-5 py-4 border-b border-base-200">
-                <h2 class="font-semibold">Törn-Einstellungen</h2>
-            </div>
-            <div class="p-5">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium">Tagesthema &amp; Tagesimpulse</p>
-                        <p class="text-xs text-base-content/40 mt-0.5">Wenn aktiv, kann im Boot-Dashboard ein Tagesthema und Impulse (Vormittag/Nachmittag) eingetragen werden.</p>
-                    </div>
-                    <input type="checkbox" id="impulse-toggle"
-                        class="toggle toggle-secondary"
-                        {% if toern.tagesimpulse_aktiv %}checked{% endif %}
-                        onchange="toggleImpulse(this.checked)">
-                </div>
-            </div>
-        </div>
-        <script>
-        function toggleImpulse(checked) {
-            fetch("{% url 'toern_tagesimpulse_toggle' toern.id %}", {
-                method: 'POST',
-                headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-            });
-        }
-        </script>
 
         <!-- Globale Foto-Links (einmalig für den ganzen Törn) -->
         <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
