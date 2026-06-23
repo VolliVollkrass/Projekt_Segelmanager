@@ -34,6 +34,7 @@ class Mahlzeit(models.Model):
         ("fruehstueck", "Frühstück"),
         ("mittag", "Mittagessen"),
         ("abend", "Abendessen"),
+        ("essen_gehen", "Essen gehen"),
         ("snack", "Snack"),
     ]
 
@@ -51,6 +52,62 @@ class Mahlzeit(models.Model):
 
     def __str__(self):
         return f"{self.get_typ_display()} am {self.datum}: {self.name}"
+
+
+# Tagesplan: Aufgaben pro Tag
+class Tagesaufgabe(models.Model):
+    TYP_CHOICES = [
+        ('abwasch', 'Abwasch'),
+        ('navigation', 'Navigation'),
+        ('abfahrtsprotokoll', 'Abfahrtsprotokoll'),
+        ('einkauf', 'Einkauf / Proviant'),
+        ('hafenwache', 'Hafenwache'),
+        ('reinigung', 'Reinigung / Aufräumen'),
+        ('sonstiges', 'Sonstiges'),
+    ]
+
+    boot = models.ForeignKey(Boot, on_delete=models.CASCADE, related_name='tagesaufgaben')
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name='tagesaufgaben')
+    datum = models.DateField()
+    typ = models.CharField(max_length=30, choices=TYP_CHOICES, default='abwasch')
+    beschreibung = models.CharField(max_length=200, blank=True)
+    verantwortlich = models.ForeignKey(
+        Teilnahme, null=True, blank=True, on_delete=models.SET_NULL, related_name='aufgaben'
+    )
+
+    class Meta:
+        ordering = ['datum', 'typ']
+
+
+# Tagesplan: Impulse pro Tag
+class Tagesimpuls(models.Model):
+    SLOT_CHOICES = [
+        ('vormittag', 'Vormittag'),
+        ('nachmittag', 'Nachmittag'),
+    ]
+
+    boot = models.ForeignKey(Boot, on_delete=models.CASCADE, related_name='tagesimpulse')
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name='tagesimpulse')
+    datum = models.DateField()
+    slot = models.CharField(max_length=20, choices=SLOT_CHOICES)
+    thema = models.CharField(max_length=200)
+    verantwortlich = models.ForeignKey(
+        Teilnahme, null=True, blank=True, on_delete=models.SET_NULL, related_name='impulse'
+    )
+
+    class Meta:
+        ordering = ['datum', 'slot']
+        unique_together = ('boot', 'toern', 'datum', 'slot')
+
+
+# Tagesplan: Bearbeitungsrechte für Crew-Mitglieder
+class TagesplanBearbeitungsrecht(models.Model):
+    boot = models.ForeignKey(Boot, on_delete=models.CASCADE, related_name='tagesplan_rechte')
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name='tagesplan_rechte')
+    teilnahme = models.ForeignKey(Teilnahme, on_delete=models.CASCADE, related_name='tagesplan_rechte')
+
+    class Meta:
+        unique_together = ('boot', 'toern', 'teilnahme')
 
 
 # Persönliche Packliste

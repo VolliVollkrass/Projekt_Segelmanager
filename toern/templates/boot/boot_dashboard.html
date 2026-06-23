@@ -44,6 +44,9 @@
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="kasse">
                 Bootskasse
             </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="tagesplan">
+                Tagesplan
+            </button>
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="bordkueche">
                 Bordküche
             </button>
@@ -325,6 +328,204 @@
             <div class="text-center py-8 text-base-content/30 text-sm">Noch keine Gegenstände erfasst.</div>
             {% endfor %}
         </div>
+
+    </div>
+
+    <!-- ========================= TAB: TAGESPLAN ========================= -->
+    <div id="tab-tagesplan" class="space-y-4 hidden">
+
+        <!-- PDF-Export -->
+        <div class="flex justify-end">
+            <a href="{% url 'tagesplan_pdf' toern.id boot.id %}" target="_blank"
+               class="btn btn-sm btn-outline gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                </svg>
+                PDF exportieren
+            </a>
+        </div>
+
+        <!-- Bearbeitungsrechte (nur Skipper/Co-Skipper/Anbieter) -->
+        {% if hat_rechte_vergeben %}
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4">
+            <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Bearbeitungsrechte vergeben</p>
+            <div class="flex flex-wrap gap-2" id="rechte-container">
+                {% for t in crew_bestaetigt %}
+                {% if t.rolle != 'skipper' and t.rolle != 'coskipper' %}
+                <button
+                    data-teilnahme-id="{{ t.id }}"
+                    onclick="toggleRecht({{ t.id }})"
+                    class="recht-btn btn btn-xs {% if t.id in tagesplan_edit_rechte %}btn-success{% else %}btn-outline{% endif %}">
+                    {{ t.user.first_name }} {{ t.user.last_name|first }}.
+                    {% if t.id in tagesplan_edit_rechte %} ✓{% endif %}
+                </button>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <p class="text-xs text-base-content/30 mt-2">Crew-Mitglied anklicken um Bearbeitungsrecht zu vergeben oder zu entziehen.</p>
+        </div>
+        {% endif %}
+
+        <!-- Tage -->
+        {% for tag in tagesplan_tage %}
+        <div>
+            <!-- Tag-Header -->
+            <div class="flex items-center gap-2 mb-2">
+                <h3 class="text-sm font-semibold">{{ tag.datum|date:"D, d. M. Y" }}</h3>
+                {% if tag.is_anfahrt %}<span class="badge badge-warning badge-sm">½ Anfahrtstag</span>{% endif %}
+                {% if tag.is_abfahrt %}<span class="badge badge-warning badge-sm">½ Abreisetag</span>{% endif %}
+            </div>
+
+            <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+
+                <!-- MAHLZEITEN -->
+                <div class="p-4 border-b border-base-200">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Mahlzeiten</p>
+                    <div id="mahlzeiten-list-{{ tag.datum|date:'Ymd' }}" class="space-y-1">
+                        {% for m in tag.mahlzeiten %}
+                        <div class="flex items-center gap-2 py-0.5" id="mz-row-{{ m.id }}">
+                            <span class="text-sm w-5 text-center shrink-0">
+                                {% if m.typ == 'fruehstueck' %}☀️{% elif m.typ == 'mittag' %}🌤️{% elif m.typ == 'abend' %}🌙{% elif m.typ == 'essen_gehen' %}🍽️{% else %}🍎{% endif %}
+                            </span>
+                            <span class="flex-1 text-sm {% if m.typ == 'essen_gehen' %}text-secondary font-medium{% endif %}">{{ m.name }}</span>
+                            {% if m.kochverantwortlich %}
+                            <span class="text-xs text-base-content/40">{{ m.kochverantwortlich.user.first_name }}</span>
+                            {% endif %}
+                            {% if hat_tagesplan_edit %}
+                            <button onclick="deleteMahlzeit({{ m.id }})" class="btn btn-ghost btn-xs text-error px-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% empty %}
+                        <p class="text-xs text-base-content/30 italic" id="mz-empty-{{ tag.datum|date:'Ymd' }}">Noch nichts geplant</p>
+                        {% endfor %}
+                    </div>
+
+                    {% if hat_tagesplan_edit %}
+                    <div class="mt-3 pt-3 border-t border-base-200">
+                        <div class="grid grid-cols-2 gap-2">
+                            <select id="mz-typ-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered">
+                                <option value="fruehstueck">☀️ Frühstück</option>
+                                <option value="mittag">🌤️ Mittagessen</option>
+                                <option value="abend" selected>🌙 Abendessen</option>
+                                <option value="essen_gehen">🍽️ Essen gehen</option>
+                                <option value="snack">🍎 Snack</option>
+                            </select>
+                            <select id="mz-koch-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered">
+                                <option value="">– Wer kocht? –</option>
+                                {% for t in crew_bestaetigt %}
+                                <option value="{{ t.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" id="mz-name-{{ tag.datum|date:'Ymd' }}" placeholder="z.B. Pasta Napoli"
+                                class="input input-xs input-bordered col-span-2">
+                        </div>
+                        <button onclick="addMahlzeitTag('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">+ Mahlzeit</button>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- AUFGABEN -->
+                <div class="p-4 border-b border-base-200">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Aufgaben</p>
+                    <div id="aufgaben-list-{{ tag.datum|date:'Ymd' }}" class="space-y-1">
+                        {% for a in tag.aufgaben %}
+                        <div class="flex items-center gap-2 py-0.5" id="auf-row-{{ a.id }}">
+                            <span class="w-1.5 h-1.5 rounded-full bg-secondary shrink-0"></span>
+                            <span class="flex-1 text-sm">
+                                {% if a.typ == 'sonstiges' %}{{ a.beschreibung|default:a.get_typ_display }}{% else %}{{ a.get_typ_display }}{% endif %}
+                                {% if a.beschreibung and a.typ != 'sonstiges' %}<span class="text-base-content/40 text-xs"> · {{ a.beschreibung }}</span>{% endif %}
+                            </span>
+                            {% if a.verantwortlich %}
+                            <span class="text-xs text-base-content/40">{{ a.verantwortlich.user.first_name }}</span>
+                            {% endif %}
+                            {% if hat_tagesplan_edit %}
+                            <button onclick="deleteAufgabe({{ a.id }})" class="btn btn-ghost btn-xs text-error px-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% empty %}
+                        <p class="text-xs text-base-content/30 italic" id="auf-empty-{{ tag.datum|date:'Ymd' }}">Noch keine Aufgaben</p>
+                        {% endfor %}
+                    </div>
+
+                    {% if hat_tagesplan_edit %}
+                    <div class="mt-3 pt-3 border-t border-base-200">
+                        <div class="grid grid-cols-2 gap-2">
+                            <select id="auf-typ-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered"
+                                onchange="toggleBeschr('{{ tag.datum|date:'Ymd' }}')">
+                                {% for value, label in aufgabe_typen %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <select id="auf-person-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered">
+                                <option value="">– Wer? –</option>
+                                {% for t in crew_bestaetigt %}
+                                <option value="{{ t.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" id="auf-beschreibung-{{ tag.datum|date:'Ymd' }}" placeholder="Beschreibung…"
+                                class="input input-xs input-bordered col-span-2 hidden">
+                        </div>
+                        <button onclick="addAufgabe('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">+ Aufgabe</button>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- TAGESIMPULSE -->
+                <div class="p-4">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Tagesimpulse</p>
+                    <div id="impulse-list-{{ tag.datum|date:'Ymd' }}" class="space-y-1">
+                        {% for imp in tag.impulse %}
+                        <div class="flex items-start gap-3 py-0.5" id="imp-row-{{ imp.id }}">
+                            <span class="text-xs font-medium text-base-content/50 w-20 shrink-0 pt-0.5">{{ imp.get_slot_display }}</span>
+                            <div class="flex-1">
+                                <p class="text-sm">{{ imp.thema }}</p>
+                                {% if imp.verantwortlich %}
+                                <p class="text-xs text-base-content/40">{{ imp.verantwortlich.user.first_name }} {{ imp.verantwortlich.user.last_name }}</p>
+                                {% endif %}
+                            </div>
+                            {% if hat_tagesplan_edit %}
+                            <button onclick="deleteImpuls({{ imp.id }})" class="btn btn-ghost btn-xs text-error px-1 mt-0.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                            {% endif %}
+                        </div>
+                        {% empty %}
+                        <p class="text-xs text-base-content/30 italic" id="imp-empty-{{ tag.datum|date:'Ymd' }}">Noch keine Impulse</p>
+                        {% endfor %}
+                    </div>
+
+                    {% if hat_tagesplan_edit %}
+                    <div class="mt-3 pt-3 border-t border-base-200">
+                        <div class="grid grid-cols-2 gap-2">
+                            <select id="imp-slot-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered">
+                                <option value="vormittag">Vormittag</option>
+                                <option value="nachmittag">Nachmittag</option>
+                            </select>
+                            <select id="imp-person-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered">
+                                <option value="">– Wer? –</option>
+                                {% for t in crew_bestaetigt %}
+                                <option value="{{ t.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="text" id="imp-thema-{{ tag.datum|date:'Ymd' }}" placeholder="Thema…"
+                                class="input input-xs input-bordered col-span-2">
+                        </div>
+                        <button onclick="addImpuls('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">+ Impuls</button>
+                    </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-8 text-base-content/30 text-sm border border-dashed border-base-300 rounded-xl">
+            Kein Datum für diesen Törn hinterlegt.
+        </div>
+        {% endfor %}
 
     </div>
 
@@ -774,6 +975,161 @@ function deleteMahlzeit(id) {
         method: "POST",
         headers: { "X-CSRFToken": getCSRFToken() }
     }).then(() => location.href = "?tab=bordkueche");
+}
+</script>
+
+<!-- ========================= TAGESPLAN JS ========================= -->
+<script>
+const TOERN_ID = {{ toern.id }};
+const BOOT_ID = {{ boot.id }};
+
+function toggleBeschr(datumStr) {
+    const sel = document.getElementById(`auf-typ-${datumStr}`);
+    const inp = document.getElementById(`auf-beschreibung-${datumStr}`);
+    if (!inp) return;
+    if (sel.value === 'sonstiges') {
+        inp.classList.remove('hidden');
+    } else {
+        inp.classList.add('hidden');
+    }
+}
+
+function addMahlzeitTag(datum) {
+    const d = datum.replace(/-/g, '');
+    const typ = document.getElementById(`mz-typ-${d}`).value;
+    const name = document.getElementById(`mz-name-${d}`).value.trim();
+    const koch = document.getElementById(`mz-koch-${d}`).value;
+    const nameField = document.getElementById(`mz-name-${d}`);
+    if (!name) { nameField.classList.add('input-error'); return; }
+    nameField.classList.remove('input-error');
+
+    fetch(`/toern/${TOERN_ID}/mahlzeit/add/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `datum=${datum}&typ=${typ}&name=${encodeURIComponent(name)}&kochverantwortlich=${koch}`
+    }).then(res => { if (res.ok) location.href = '?tab=tagesplan'; });
+}
+
+function addAufgabe(datum) {
+    const d = datum.replace(/-/g, '');
+    const typ = document.getElementById(`auf-typ-${d}`).value;
+    const person = document.getElementById(`auf-person-${d}`).value;
+    const bField = document.getElementById(`auf-beschreibung-${d}`);
+    const beschreibung = bField ? bField.value.trim() : '';
+    if (typ === 'sonstiges' && !beschreibung) {
+        bField.classList.add('input-error'); return;
+    }
+    if (bField) bField.classList.remove('input-error');
+
+    fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/aufgabe/add/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `datum=${datum}&typ=${typ}&verantwortlich=${person}&beschreibung=${encodeURIComponent(beschreibung)}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status !== 'ok') return;
+        const list = document.getElementById(`aufgaben-list-${d}`);
+        document.getElementById(`auf-empty-${d}`)?.remove();
+
+        const label = typ === 'sonstiges' ? beschreibung : data.typ_display;
+        const extra = beschreibung && typ !== 'sonstiges' ? ` <span class="text-base-content/40 text-xs"> · ${beschreibung}</span>` : '';
+        const personHtml = data.person ? `<span class="text-xs text-base-content/40">${data.person.split(' ')[0]}</span>` : '';
+        const row = document.createElement('div');
+        row.id = `auf-row-${data.id}`;
+        row.className = 'flex items-center gap-2 py-0.5';
+        row.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-secondary shrink-0"></span>
+            <span class="flex-1 text-sm">${label}${extra}</span>${personHtml}
+            <button onclick="deleteAufgabe(${data.id})" class="btn btn-ghost btn-xs text-error px-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>`;
+        list.appendChild(row);
+
+        document.getElementById(`auf-typ-${d}`).value = 'abwasch';
+        document.getElementById(`auf-person-${d}`).value = '';
+        if (bField) { bField.value = ''; bField.classList.add('hidden'); }
+    });
+}
+
+function deleteAufgabe(id) {
+    fetch(`/toern/tagesplan/aufgabe/${id}/delete/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    })
+    .then(res => res.json())
+    .then(data => { if (data.status === 'ok') document.getElementById(`auf-row-${id}`)?.remove(); });
+}
+
+function addImpuls(datum) {
+    const d = datum.replace(/-/g, '');
+    const slot = document.getElementById(`imp-slot-${d}`).value;
+    const thema = document.getElementById(`imp-thema-${d}`).value.trim();
+    const person = document.getElementById(`imp-person-${d}`).value;
+    const themaField = document.getElementById(`imp-thema-${d}`);
+    if (!thema) { themaField.classList.add('input-error'); return; }
+    themaField.classList.remove('input-error');
+
+    fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/impuls/add/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `datum=${datum}&slot=${slot}&thema=${encodeURIComponent(thema)}&verantwortlich=${person}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status !== 'ok') return;
+        const list = document.getElementById(`impulse-list-${d}`);
+        document.getElementById(`imp-empty-${d}`)?.remove();
+
+        const personHtml = data.person ? `<p class="text-xs text-base-content/40">${data.person}</p>` : '';
+        const newRow = document.createElement('div');
+        newRow.id = `imp-row-${data.id}`;
+        newRow.className = 'flex items-start gap-3 py-0.5';
+        newRow.innerHTML = `<span class="text-xs font-medium text-base-content/50 w-20 shrink-0 pt-0.5">${data.slot_display}</span>
+            <div class="flex-1"><p class="text-sm">${data.thema}</p>${personHtml}</div>
+            <button onclick="deleteImpuls(${data.id})" class="btn btn-ghost btn-xs text-error px-1 mt-0.5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>`;
+
+        const existing = document.getElementById(`imp-row-${data.id}`);
+        if (existing) {
+            existing.replaceWith(newRow);
+        } else if (slot === 'vormittag') {
+            list.insertBefore(newRow, list.firstChild);
+        } else {
+            list.appendChild(newRow);
+        }
+
+        themaField.value = '';
+        document.getElementById(`imp-person-${d}`).value = '';
+    });
+}
+
+function deleteImpuls(id) {
+    fetch(`/toern/tagesplan/impuls/${id}/delete/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    })
+    .then(res => res.json())
+    .then(data => { if (data.status === 'ok') document.getElementById(`imp-row-${id}`)?.remove(); });
+}
+
+function toggleRecht(teilnahmeId) {
+    fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/recht/${teilnahmeId}/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status !== 'ok') return;
+        const btn = document.querySelector(`[data-teilnahme-id="${data.teilnahme_id}"]`);
+        if (!btn) return;
+        if (data.aktiv) {
+            btn.classList.remove('btn-outline');
+            btn.classList.add('btn-success');
+            if (!btn.textContent.includes('✓')) btn.textContent += ' ✓';
+        } else {
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline');
+            btn.textContent = btn.textContent.replace(' ✓', '').trim();
+        }
+    });
 }
 </script>
 
