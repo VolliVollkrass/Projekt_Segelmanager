@@ -347,6 +347,46 @@
             </div>
         </div>
 
+        <!-- Präferenz-Modus (nur bei mehreren Booten) -->
+        {% if boote_count > 1 %}
+        <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+            <div class="px-5 py-4 border-b border-base-200">
+                <h2 class="font-semibold text-sm">Kabinenpartner-Präferenzen</h2>
+                <p class="text-xs text-base-content/40 mt-0.5">Was darf die Crew angeben?</p>
+            </div>
+            <form method="POST" action="{% url 'praeferenz_modus_setzen' toern.id %}" class="px-5 py-4 space-y-2">
+                {% csrf_token %}
+                <label class="flex items-center gap-3 cursor-pointer py-1">
+                    <input type="radio" name="praeferenz_modus" value="alle" class="radio radio-primary radio-sm"
+                           {% if toern.praeferenz_modus == "alle" %}checked{% endif %}>
+                    <div>
+                        <p class="text-sm font-medium">"Auf keinen Fall" + "Wenn möglich vermeiden"</p>
+                        <p class="text-xs text-base-content/40">Crew kann beide Präferenztypen angeben.</p>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer py-1">
+                    <input type="radio" name="praeferenz_modus" value="nur_ausschluss" class="radio radio-primary radio-sm"
+                           {% if toern.praeferenz_modus == "nur_ausschluss" %}checked{% endif %}>
+                    <div>
+                        <p class="text-sm font-medium">Nur "Auf keinen Fall"</p>
+                        <p class="text-xs text-base-content/40">Nur harte Ausschlüsse werden erfasst.</p>
+                    </div>
+                </label>
+                <label class="flex items-center gap-3 cursor-pointer py-1">
+                    <input type="radio" name="praeferenz_modus" value="keiner" class="radio radio-primary radio-sm"
+                           {% if toern.praeferenz_modus == "keiner" %}checked{% endif %}>
+                    <div>
+                        <p class="text-sm font-medium">Deaktiviert</p>
+                        <p class="text-xs text-base-content/40">Crew sieht keine Präferenz-Optionen.</p>
+                    </div>
+                </label>
+                <div class="flex justify-end pt-2">
+                    <button type="submit" class="btn btn-primary btn-sm">Speichern</button>
+                </div>
+            </form>
+        </div>
+        {% endif %}
+
         <!-- Crewliste mit Fortschritt -->
         <div>
             <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Alle Crewmitglieder</h2>

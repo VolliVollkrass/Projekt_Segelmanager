@@ -41,6 +41,18 @@ class Toern(models.Model):
     logbuch_pdf = models.FileField(upload_to='toern/logbuch/', blank=True, null=True)
     tagesimpulse_aktiv = models.BooleanField(default=True, verbose_name="Tagesthema & Impulse aktiv")
 
+    PRAEFERENZ_MODUS_CHOICES = [
+        ("alle", "Beide Präferenztypen"),
+        ("nur_ausschluss", "Nur Ausschlüsse"),
+        ("keiner", "Deaktiviert"),
+    ]
+    praeferenz_modus = models.CharField(
+        max_length=20,
+        choices=PRAEFERENZ_MODUS_CHOICES,
+        default="alle",
+        verbose_name="Kabinenpartner-Präferenzen",
+    )
+
     def save(self, *args, **kwargs):
         self.update_status_by_deadline()
 
