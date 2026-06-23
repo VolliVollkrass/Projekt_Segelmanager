@@ -504,6 +504,8 @@ def crew_dashboard(request, toern_id):
         # Präferenzen
         "exclude_ids": exclude_ids,
         "avoid_ids": avoid_ids,
+        "praeferenz_modus": toern.praeferenz_modus,
+        "boote_count": toern.boote.count(),
 
         # Abschluss-Daten (Boot des Crew-Mitglieds)
         "abschluss_boot": teilnahme.boot,
@@ -661,6 +663,10 @@ def praeferenzen_speichern(request, toern_id):
         messages.error(request, "Die Zuteilung ist abgeschlossen. Präferenzen können nicht mehr geändert werden.")
         return redirect(reverse("crew_dashboard", args=[toern_id]) + "?tab=crew")
 
+    if toern.praeferenz_modus == "keiner":
+        messages.error(request, "Präferenzen sind für diesen Törn deaktiviert.")
+        return redirect(reverse("crew_dashboard", args=[toern_id]) + "?tab=crew")
+
     teilnahme = Teilnahme.objects.filter(
         user=request.user,
         toern=toern
@@ -677,7 +683,7 @@ def praeferenzen_speichern(request, toern_id):
 
     # Sets verhindern doppelte Werte
     exclude_ids = set(request.POST.getlist("exclude"))
-    avoid_ids = set(request.POST.getlist("avoid"))
+    avoid_ids = set(request.POST.getlist("avoid")) if toern.praeferenz_modus == "alle" else set()
 
     # ❗ Konfliktregel: exclude gewinnt
     avoid_ids -= exclude_ids
@@ -951,6 +957,9 @@ def skipper_dashboard(request, toern_id):
 
         # Abschluss
         "abschluss_data": abschluss_data,
+
+        # Präferenz-Modus
+        "boote_count": boote.count(),
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)
@@ -999,6 +1008,25 @@ def boot_abschluss_update(request, boot_id):
 
     messages.success(request, f'Daten für "{boot.name}" gespeichert.')
     return redirect("skipper_dashboard", toern_id=toern.id)
+
+
+@login_required
+@require_POST
+def praeferenz_modus_setzen(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    is_anbieter = toern.anbieter == request.user
+    is_skipper = Teilnahme.objects.filter(
+        toern=toern, user=request.user, rolle__in=("skipper", "coskipper")
+    ).exists()
+    if not is_anbieter and not is_skipper:
+        raise PermissionDenied
+    modus = request.POST.get("praeferenz_modus", "alle")
+    if modus not in ("keiner", "nur_ausschluss", "alle"):
+        modus = "alle"
+    toern.praeferenz_modus = modus
+    toern.save(update_fields=["praeferenz_modus"])
+    messages.success(request, "Präferenz-Einstellung gespeichert.")
+    return redirect(reverse("skipper_dashboard", args=[toern_id]) + "?tab=crew")
 
 
 @login_required
