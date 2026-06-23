@@ -51,8 +51,8 @@
                 </a>
             </li>
             <li>
-                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="bordkueche" data-tip="Bordküche" onclick="switchToTab('bordkueche'); return false;">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="bordkueche" data-tip="Einkaufsliste" onclick="switchToTab('bordkueche'); return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                 </a>
             </li>
         </ul>
@@ -84,7 +84,7 @@
                 Tagesplan
             </button>
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="bordkueche">
-                Bordküche
+                Einkaufsliste
             </button>
         </div>
     </div>
@@ -371,13 +371,20 @@
     <div id="tab-tagesplan" class="space-y-4 hidden">
 
         <!-- PDF-Export -->
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-2">
+            <a href="{% url 'tagesplan_kochplan_pdf' toern.id boot.id %}" target="_blank"
+               class="btn btn-sm btn-outline gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                </svg>
+                Kochplan PDF
+            </a>
             <a href="{% url 'tagesplan_pdf' toern.id boot.id %}" target="_blank"
                class="btn btn-sm btn-outline gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
                 </svg>
-                PDF exportieren
+                Tagesplan PDF
             </a>
         </div>
 
@@ -443,6 +450,20 @@
                             {% if m.kochverantwortlich %}
                             <span class="text-xs text-base-content/40">{{ m.kochverantwortlich.user.first_name }}</span>
                             {% endif %}
+                            {% if m.rezept %}
+                            <a href="{% url 'rezept_detail' m.rezept.pk %}" target="_blank"
+                               class="btn btn-ghost btn-xs text-secondary px-1" title="Rezept: {{ m.rezept.name }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                            </a>
+                            <a href="{% url 'rezept_pdf' m.rezept.pk %}?personen={{ crew_bestaetigt.count }}" target="_blank"
+                               class="btn btn-ghost btn-xs text-base-content/40 hover:text-secondary px-1" title="Rezept als PDF ({{ crew_bestaetigt.count }} Personen)">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+                                </svg>
+                            </a>
+                            {% endif %}
                             {% if hat_tagesplan_edit %}
                             <button onclick="deleteMahlzeit({{ m.id }})" class="btn btn-ghost btn-xs text-error px-1">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -470,8 +491,20 @@
                                 <option value="{{ t.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
                                 {% endfor %}
                             </select>
-                            <input type="text" id="mz-name-{{ tag.datum|date:'Ymd' }}" placeholder="z.B. Pasta Napoli"
-                                class="input input-xs input-bordered col-span-2">
+                            <!-- Rezept-Suche mit Autocomplete -->
+                            <div class="col-span-2" id="mz-search-wrap-{{ tag.datum|date:'Ymd' }}">
+                                <input type="text"
+                                       id="mz-name-{{ tag.datum|date:'Ymd' }}"
+                                       placeholder="Gericht suchen oder frei eingeben…"
+                                       autocomplete="off"
+                                       class="input input-xs input-bordered w-full"
+                                       oninput="rezeptSuche('{{ tag.datum|date:'Ymd' }}', this.value)"
+                                       onkeydown="if(event.key==='Escape') schliesseDropdown('{{ tag.datum|date:'Ymd' }}')">
+                                <input type="hidden" id="mz-rezept-{{ tag.datum|date:'Ymd' }}" value="">
+                                <div id="mz-dropdown-{{ tag.datum|date:'Ymd' }}"
+                                     class="hidden mt-1 bg-base-100 border border-base-300 rounded-lg shadow-md overflow-hidden">
+                                </div>
+                            </div>
                         </div>
                         <button onclick="addMahlzeitTag('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2" id="mz-btn-{{ tag.datum|date:'Ymd' }}">+ Mahlzeit</button>
                     </div>
@@ -584,7 +617,7 @@
     </div>
 
     <!-- ========================= TAB: BORDKÜCHE ========================= -->
-    <div id="tab-bordkueche" class="space-y-6 hidden">
+    <div id="tab-bordkueche" class="space-y-5 hidden">
 
         <!-- Ess-Statistik -->
         <div class="flex flex-wrap gap-3">
@@ -618,7 +651,7 @@
             {% endif %}
         </div>
 
-        <!-- Ess-Übersicht der Crew -->
+        <!-- Crew-Übersicht -->
         <div>
             <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Crew-Übersicht</h2>
             <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
@@ -632,19 +665,12 @@
                             <p class="text-sm font-medium">{{ t.user.first_name }} {{ t.user.last_name }}</p>
                             <div class="flex flex-wrap gap-2 mt-1">
                                 {% if t.essgewohnheiten %}
-                                <span class="badge badge-sm badge-outline
-                                    {% if t.essgewohnheiten == 'vegan' %}badge-success
-                                    {% elif t.essgewohnheiten == 'vegetarisch' %}border-lime-500 text-lime-600
-                                    {% endif %}">
-                                    {{ t.get_essgewohnheiten_display }}
-                                </span>
+                                <span class="badge badge-sm badge-outline {% if t.essgewohnheiten == 'vegan' %}badge-success{% elif t.essgewohnheiten == 'vegetarisch' %}border-lime-500 text-lime-600{% endif %}">{{ t.get_essgewohnheiten_display }}</span>
                                 {% else %}
                                 <span class="badge badge-sm badge-ghost opacity-40">keine Angabe</span>
                                 {% endif %}
                                 {% if t.lebensmittelunvertraeglichkeiten %}
-                                <span class="badge badge-sm badge-warning badge-outline">
-                                    ⚠ {{ t.lebensmittelunvertraeglichkeiten }}
-                                </span>
+                                <span class="badge badge-sm badge-warning badge-outline">⚠ {{ t.lebensmittelunvertraeglichkeiten }}</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -656,101 +682,123 @@
             </div>
         </div>
 
-        <!-- Mahlzeitenplaner -->
+        <!-- ═══ EINKAUFSLISTE ═══ -->
         <div>
-            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Mahlzeitenplan</h2>
-
-            <!-- Neue Mahlzeit hinzufügen (nur Skipper) -->
-            {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
-            <div class="bg-base-100 border border-base-300 rounded-xl p-4 mb-4">
-                <p class="text-sm font-medium mb-3">Mahlzeit hinzufügen</p>
-                <div class="grid grid-cols-2 gap-2 mb-2">
-                    <input type="date" id="mz-datum"
-                        value="{{ toern.startdatum|date:'Y-m-d' }}"
-                        class="input input-sm input-bordered col-span-2">
-                    <select id="mz-typ" class="select select-sm select-bordered">
-                        <option value="fruehstueck">Frühstück</option>
-                        <option value="mittag">Mittagessen</option>
-                        <option value="abend" selected>Abendessen</option>
-                        <option value="snack">Snack</option>
-                    </select>
-                    <select id="mz-koch" class="select select-sm select-bordered">
-                        <option value="">– Wer kocht? –</option>
-                        {% for t in crew_bestaetigt %}
-                        <option value="{{ t.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
-                        {% endfor %}
-                    </select>
-                    <input type="text" id="mz-name" placeholder="z.B. Pasta Napoli"
-                        class="input input-sm input-bordered col-span-2">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-3">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Einkaufsliste</h2>
+                    {% if einkauf_gesamt %}
+                    <span id="ek-badge" class="badge badge-xs {% if einkauf_erledigt == einkauf_gesamt %}badge-success{% else %}badge-outline{% endif %}">
+                        {{ einkauf_erledigt }}/{{ einkauf_gesamt }}
+                    </span>
+                    {% endif %}
                 </div>
-                <button onclick="addMahlzeit()" class="btn btn-sm btn-primary w-full">+ Eintragen</button>
+                <div class="flex gap-2">
+                    <button onclick="generiereEinkaufsliste()" id="btn-generieren"
+                            class="btn btn-xs btn-outline gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        Generieren
+                    </button>
+                    {% if einkauf_gruppen %}
+                    <button onclick="zeigeAufteilen()" class="btn btn-xs btn-outline btn-secondary gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        Aufteilen
+                    </button>
+                    {% endif %}
+                </div>
             </div>
-            {% endif %}
 
-            <!-- Liste nach Datum gruppiert -->
-            {% regroup mahlzeiten by datum as tage %}
-            {% if tage %}
-            <div class="space-y-4">
-                {% for tag in tage %}
-                <div>
-                    <p class="text-xs font-semibold text-base-content/40 mb-2">{{ tag.grouper|date:"D, d. M." }}</p>
-                    <div class="flex flex-col gap-2">
-                        {% for m in tag.list %}
-                        <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-xl px-4 py-3">
-                            <div class="shrink-0 w-20">
-                                <span class="badge badge-sm badge-outline">{{ m.get_typ_display }}</span>
-                            </div>
-                            <div class="flex-1 min-w-0">
-                                <p class="text-sm font-medium truncate">{{ m.name }}</p>
-                                {% if m.kochverantwortlich %}
-                                <p class="text-xs text-base-content/40">
-                                    👨‍🍳 {{ m.kochverantwortlich.user.first_name }} {{ m.kochverantwortlich.user.last_name }}
-                                </p>
+            <!-- Aufteilen-Panel -->
+            <div id="aufteilen-panel" class="hidden bg-base-200 rounded-xl p-4 mb-4 border border-base-300">
+                <p class="text-sm font-medium mb-3">Wer geht einkaufen?</p>
+                <div class="flex flex-wrap gap-3 mb-3" id="shopper-auswahl">
+                    {% for t in crew_bestaetigt %}
+                    <label class="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" class="checkbox checkbox-sm checkbox-secondary" value="{{ t.id }}" name="shopper">
+                        <span class="text-sm">{{ t.user.first_name }} {{ t.user.last_name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="aufteilenBestaetigen()" class="btn btn-sm btn-secondary flex-1">Liste aufteilen</button>
+                    <button onclick="document.getElementById('aufteilen-panel').classList.add('hidden')" class="btn btn-sm btn-ghost">Abbrechen</button>
+                </div>
+            </div>
+
+            <!-- Shopper-Filter (erscheint nach Aufteilen) -->
+            <div id="shopper-filter" class="hidden flex-wrap gap-2 mb-4"></div>
+
+            <!-- Leerer Zustand -->
+            {% if not einkauf_gruppen %}
+            <div class="text-center py-10 text-base-content/30 border border-dashed border-base-300 rounded-xl">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <p class="text-sm mb-1">Noch keine Einkaufsliste.</p>
+                <p class="text-xs">„Generieren" erstellt die Liste aus dem Tagesplan + Standard-Artikel.</p>
+            </div>
+            {% else %}
+
+            <!-- Items gruppiert nach Kategorie -->
+            <div class="space-y-4" id="einkauf-liste">
+                {% for kat, label, items in einkauf_gruppen %}
+                <div class="einkauf-kategorie" data-kat="{{ kat }}">
+                    <h3 class="text-[11px] font-semibold uppercase tracking-widest text-secondary mb-1.5 flex items-center gap-2">
+                        {{ label }}
+                        <span class="badge badge-xs badge-outline">{{ items|length }}</span>
+                    </h3>
+                    <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+                        <div class="divide-y divide-base-200">
+                            {% for item in items %}
+                            <div class="einkauf-item flex items-center gap-3 px-4 py-3 transition-opacity {% if item.erledigt %}opacity-40{% endif %}"
+                                 id="ei-{{ item.id }}"
+                                 data-shopper="{{ item.einkaufer_id|default:'' }}">
+                                <input type="checkbox" class="checkbox checkbox-sm shrink-0"
+                                       {% if item.erledigt %}checked{% endif %}
+                                       onchange="toggleEinkauf({{ item.id }}, this.checked)">
+                                <div class="flex-1 min-w-0">
+                                    <span class="text-sm {% if item.erledigt %}line-through{% endif %}">{{ item.name }}</span>
+                                    {% if item.menge %}
+                                    <span class="text-xs text-base-content/40 ml-1.5">{{ item.menge }}</span>
+                                    {% endif %}
+                                    {% if item.rezept_info %}
+                                    <p class="text-[10px] text-base-content/30 truncate mt-0.5">{{ item.rezept_info }}</p>
+                                    {% endif %}
+                                </div>
+                                {% if item.erledigt and item.erledigt_von %}
+                                <span class="text-[10px] text-success shrink-0">{{ item.erledigt_von.first_name }}</span>
                                 {% endif %}
+                                {% if item.einkaufer %}
+                                <span class="einkaufer-badge badge badge-xs shrink-0"
+                                      data-shopper-id="{{ item.einkaufer_id }}">{{ item.einkaufer.user.first_name }}</span>
+                                {% endif %}
+                                <button onclick="loescheEinkauf({{ item.id }})"
+                                        class="btn btn-ghost btn-xs text-error px-1 shrink-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
                             </div>
-                            {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
-                            <button onclick="deleteMahlzeit({{ m.id }})" class="btn btn-ghost btn-xs text-error shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
-                            </button>
-                            {% endif %}
+                            {% endfor %}
                         </div>
-                        {% endfor %}
                     </div>
                 </div>
                 {% endfor %}
             </div>
-            {% else %}
-            <div class="text-center py-8 text-base-content/30 text-sm border border-dashed border-base-300 rounded-xl">
-                Noch keine Mahlzeiten geplant.
-            </div>
             {% endif %}
-        </div>
 
-        <!-- Einkaufsliste -->
-        <div>
-            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Einkaufsliste</h2>
-            {% if einkaufsliste %}
-            <div class="flex flex-col gap-2">
-                {% for e in einkaufsliste %}
-                <div class="flex items-center gap-3 px-4 py-3 rounded-xl border
-                    {% if e.erledigt %}bg-success/5 border-success/20{% else %}bg-base-100 border-base-300{% endif %}">
-                    <span class="flex-1 text-sm {% if e.erledigt %}line-through text-base-content/30{% endif %}">
-                        {{ e.name }}
-                    </span>
-                    {% if e.menge %}<span class="text-xs text-base-content/40">{{ e.menge }}</span>{% endif %}
-                    {% if e.verantwortlich %}
-                    <span class="badge badge-outline badge-xs">{{ e.verantwortlich.user.first_name }}</span>
-                    {% endif %}
+            <!-- Manuell hinzufügen -->
+            <div class="mt-4 pt-4 border-t border-base-200">
+                <p class="text-xs text-base-content/40 mb-2">Eigenen Posten hinzufügen</p>
+                <div class="flex gap-2">
+                    <input type="text" id="ek-name" placeholder="Produkt" class="input input-sm input-bordered flex-1">
+                    <input type="text" id="ek-menge" placeholder="Menge" class="input input-sm input-bordered w-24">
+                    <button onclick="addEinkauf()" class="btn btn-sm btn-primary px-3">+</button>
                 </div>
-                {% endfor %}
             </div>
-            {% else %}
-            <div class="text-center py-6 text-base-content/30 text-sm border border-dashed border-base-300 rounded-xl">
-                Noch keine Einkaufsposten.
-            </div>
-            {% endif %}
         </div>
 
     </div>
@@ -1055,20 +1103,102 @@ function toggleBeschr(datumStr) {
 
 const MEAL_ICONS = { fruehstueck:'☀️', mittag:'🌤️', abend:'🌙', essen_gehen:'🍽️', snack:'🍎' };
 
+// ── Rezept-Suche Autocomplete ──
+let _suchTimer = {};
+function rezeptSuche(d, q) {
+    // Reset bei Freitext — Rezept-Bindung aufheben
+    document.getElementById(`mz-rezept-${d}`).value = '';
+    clearTimeout(_suchTimer[d]);
+    if (q.length < 2) { schliesseDropdown(d); return; }
+    _suchTimer[d] = setTimeout(async () => {
+        const res = await fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/rezept-suche/?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        zeigeDropdown(d, q, data.results);
+    }, 250);
+}
+
+function escAttr(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+}
+
+function zeigeDropdown(d, q, results) {
+    const dd = document.getElementById(`mz-dropdown-${d}`);
+    if (!results.length) {
+        dd.innerHTML = `
+            <div class="px-3 py-2 text-xs text-base-content/40">Kein Rezept gefunden</div>
+            <a href="/kochbuch/neu/" target="_blank"
+               class="flex items-center gap-2 px-3 py-2 text-xs text-secondary hover:bg-base-200 border-t border-base-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+                </svg>
+                Im Kochbuch hinzufügen →
+            </a>`;
+        dd.classList.remove('hidden');
+        return;
+    }
+    dd.innerHTML = results.map(r => `
+        <button type="button"
+                class="mz-rezept-option w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-base-200 transition-colors"
+                data-d="${escAttr(d)}"
+                data-id="${r.id}"
+                data-name="${escAttr(r.name)}">
+            <div class="flex-1 min-w-0 pointer-events-none">
+                <p class="text-xs font-medium truncate">${escAttr(r.name)}</p>
+                <p class="text-[10px] text-base-content/40">${escAttr(r.kategorie)} · ${r.portionen} Pers. · ${r.zubereitungszeit} Min.</p>
+            </div>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-base-content/20 shrink-0 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+        </button>`).join('') +
+        `<a href="/kochbuch/neu/" target="_blank"
+            class="flex items-center gap-1.5 px-3 py-2 text-[10px] text-base-content/40 hover:bg-base-200 border-t border-base-200">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+            </svg>
+            Neues Rezept im Kochbuch anlegen
+        </a>`;
+    dd.classList.remove('hidden');
+}
+
+function schliesseDropdown(d) {
+    document.getElementById(`mz-dropdown-${d}`)?.classList.add('hidden');
+}
+
+// Einheitlicher Click-Handler: Rezept auswählen + Dropdown schließen
+document.addEventListener('click', e => {
+    const btn = e.target.closest('.mz-rezept-option');
+    if (btn) {
+        const d    = btn.dataset.d;
+        const id   = btn.dataset.id;
+        const name = btn.dataset.name;
+        document.getElementById(`mz-name-${d}`).value   = name;
+        document.getElementById(`mz-rezept-${d}`).value = id;
+        schliesseDropdown(d);
+        return;
+    }
+    document.querySelectorAll('[id^="mz-search-wrap-"]').forEach(wrap => {
+        if (!wrap.contains(e.target)) {
+            schliesseDropdown(wrap.id.replace('mz-search-wrap-', ''));
+        }
+    });
+});
+
 function addMahlzeitTag(datum) {
     const d = datum.replace(/-/g, '');
     const typ = document.getElementById(`mz-typ-${d}`).value;
     const name = document.getElementById(`mz-name-${d}`).value.trim();
     const koch = document.getElementById(`mz-koch-${d}`).value;
+    const rezeptId = document.getElementById(`mz-rezept-${d}`).value;
     const nameField = document.getElementById(`mz-name-${d}`);
     const btn = document.getElementById(`mz-btn-${d}`);
     nameField.classList.remove('input-error');
     if (btn) btn.disabled = true;
+    schliesseDropdown(d);
 
     fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/mahlzeit/add/`, {
         method: 'POST',
         headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `datum=${datum}&typ=${typ}&name=${encodeURIComponent(name)}&kochverantwortlich=${koch}`
+        body: `datum=${datum}&typ=${typ}&name=${encodeURIComponent(name)}&kochverantwortlich=${koch}&rezept_id=${rezeptId}`
     })
     .then(res => res.json())
     .then(data => {
@@ -1079,6 +1209,11 @@ function addMahlzeitTag(datum) {
         const icon = MEAL_ICONS[data.typ] || '🍎';
         const isEssen = data.typ === 'essen_gehen';
         const personHtml = data.person ? `<span class="text-xs text-base-content/40">${data.person.split(' ')[0]}</span>` : '';
+        const rezeptHtml = data.rezept_id
+            ? `<a href="/kochbuch/${data.rezept_id}/" target="_blank" class="btn btn-ghost btn-xs text-secondary px-1" title="Rezept ansehen">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg></a>` : '';
         const deleteBtn = `<button onclick="deleteMahlzeit(${data.id})" class="btn btn-ghost btn-xs text-error px-1">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
         </button>`;
@@ -1088,10 +1223,11 @@ function addMahlzeitTag(datum) {
         row.className = 'flex items-center gap-2 py-0.5';
         row.innerHTML = `<span class="text-sm w-5 text-center shrink-0">${icon}</span>
             <span class="flex-1 text-sm${isEssen ? ' text-secondary font-medium' : ''}">${data.name}</span>
-            ${personHtml}${deleteBtn}`;
+            ${personHtml}${rezeptHtml}${deleteBtn}`;
         list.appendChild(row);
 
         nameField.value = '';
+        document.getElementById(`mz-rezept-${d}`).value = '';
         document.getElementById(`mz-typ-${d}`).value = 'abend';
         document.getElementById(`mz-koch-${d}`).value = '';
         if (btn) btn.disabled = false;
@@ -1222,6 +1358,231 @@ function toggleRecht(teilnahmeId) {
             btn.textContent = btn.textContent.replace(' ✓', '').trim();
         }
     });
+}
+
+// ═══ Einkaufsliste ═══════════════════════════════════════════════════════════
+
+const CSRF = '{{ csrf_token }}';
+
+// Farben für Einkäufer-Badges (round-robin)
+const SHOPPER_COLORS = ['badge-primary','badge-secondary','badge-accent','badge-info','badge-warning'];
+const shopperColorMap = {};  // shopper_id -> color class
+let shopperNameMap = {};     // shopper_id -> name
+
+function shopperColor(id) {
+    if (!shopperColorMap[id]) {
+        const keys = Object.keys(shopperColorMap);
+        shopperColorMap[id] = SHOPPER_COLORS[keys.length % SHOPPER_COLORS.length];
+    }
+    return shopperColorMap[id];
+}
+
+// Initialisiere bestehende Einkäufer-Badges beim Laden
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.einkaufer-badge').forEach(b => {
+        const sid = b.dataset.shopperId;
+        if (sid) {
+            b.classList.add(shopperColor(sid));
+            shopperNameMap[sid] = b.textContent.trim();
+        }
+    });
+    startEinkaufPolling();
+});
+
+async function generiereEinkaufsliste() {
+    const btn = document.getElementById('btn-generieren');
+    btn.disabled = true;
+    btn.textContent = '…';
+    const r = await fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/einkaufsliste/generieren/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+    const d = await r.json();
+    if (d.ok) location.reload();
+}
+
+function updateEkBadge() {
+    const total    = document.querySelectorAll('.einkauf-item').length;
+    const erledigt = document.querySelectorAll('.einkauf-item input[type=checkbox]:checked').length;
+    const badge    = document.getElementById('ek-badge');
+    if (!badge) return;
+    badge.textContent = `${erledigt}/${total}`;
+    badge.classList.toggle('badge-success', erledigt === total && total > 0);
+    badge.classList.toggle('badge-outline', erledigt !== total || total === 0);
+}
+
+async function toggleEinkauf(id, checked) {
+    const row = document.getElementById(`ei-${id}`);
+    if (row) {
+        row.classList.toggle('opacity-40', checked);
+        const nameEl = row.querySelector('span.text-sm');
+        if (nameEl) nameEl.classList.toggle('line-through', checked);
+    }
+    updateEkBadge();
+    await fetch(`/toern/einkaufsliste/${id}/toggle/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+}
+
+async function loescheEinkauf(id) {
+    const row = document.getElementById(`ei-${id}`);
+    if (row) row.remove();
+    await fetch(`/toern/einkaufsliste/${id}/delete/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+}
+
+async function addEinkauf() {
+    const name  = document.getElementById('ek-name').value.trim();
+    const menge = document.getElementById('ek-menge').value.trim();
+    if (!name) return;
+    const fd = new FormData();
+    fd.append('name', name);
+    fd.append('menge', menge);
+    const r = await fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/einkaufsliste/add/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF}, body: fd,
+    });
+    const d = await r.json();
+    if (!d.ok) return;
+
+    // Zeile in passende Kategorie einfügen (oder neu anlegen)
+    document.getElementById('ek-name').value  = '';
+    document.getElementById('ek-menge').value = '';
+
+    let container = document.querySelector(`.einkauf-kategorie[data-kat="${d.kategorie}"] .divide-y`);
+    if (!container) {
+        // Neue Kategorie anlegen
+        const liste = document.getElementById('einkauf-liste');
+        if (!liste) { location.reload(); return; }
+        const div = document.createElement('div');
+        div.className = 'einkauf-kategorie';
+        div.dataset.kat = d.kategorie;
+        div.innerHTML = `
+          <h3 class="text-[11px] font-semibold uppercase tracking-widest text-secondary mb-1.5">${d.kategorie_label}</h3>
+          <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+            <div class="divide-y divide-base-200"></div>
+          </div>`;
+        liste.appendChild(div);
+        container = div.querySelector('.divide-y');
+    }
+
+    const row = document.createElement('div');
+    row.id = `ei-${d.id}`;
+    row.className = 'einkauf-item flex items-center gap-3 px-4 py-3 transition-opacity';
+    row.dataset.shopper = '';
+    row.innerHTML = `
+      <input type="checkbox" class="checkbox checkbox-sm shrink-0" onchange="toggleEinkauf(${d.id}, this.checked)">
+      <div class="flex-1 min-w-0">
+        <span class="text-sm">${d.name}</span>
+        ${d.menge ? `<span class="text-xs text-base-content/40 ml-1.5">${d.menge}</span>` : ''}
+      </div>
+      <button onclick="loescheEinkauf(${d.id})" class="btn btn-ghost btn-xs text-error px-1 shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+      </button>`;
+    container.appendChild(row);
+}
+
+function zeigeAufteilen() {
+    const panel = document.getElementById('aufteilen-panel');
+    panel.classList.toggle('hidden');
+}
+
+async function aufteilenBestaetigen() {
+    const ids = [...document.querySelectorAll('#shopper-auswahl input:checked')].map(i => +i.value);
+    if (ids.length < 1) { alert('Bitte mindestens eine Person auswählen.'); return; }
+    const r = await fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/einkaufsliste/aufteilen/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+        body: JSON.stringify({shopper_ids: ids}),
+    });
+    const d = await r.json();
+    if (!d.ok) return;
+
+    // Badges aktualisieren
+    Object.entries(d.assignment).forEach(([itemId, info]) => {
+        const row = document.getElementById(`ei-${itemId}`);
+        if (!row) return;
+        row.dataset.shopper = info.shopper_id;
+        shopperNameMap[info.shopper_id] = info.name;
+        let badge = row.querySelector('.einkaufer-badge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = `einkaufer-badge badge badge-xs shrink-0`;
+            badge.dataset.shopperId = info.shopper_id;
+            row.querySelector('button.text-error').before(badge);
+        }
+        badge.className = `einkaufer-badge badge badge-xs shrink-0 ${shopperColor(info.shopper_id)}`;
+        badge.dataset.shopperId = info.shopper_id;
+        badge.textContent = info.name;
+    });
+
+    // Filter-Bar aufbauen
+    zeigeShopperFilter(ids);
+    document.getElementById('aufteilen-panel').classList.add('hidden');
+}
+
+function zeigeShopperFilter(ids) {
+    const bar = document.getElementById('shopper-filter');
+    bar.innerHTML = '';
+    bar.classList.remove('hidden');
+    bar.classList.add('flex');
+
+    const alleBtn = document.createElement('button');
+    alleBtn.className = 'btn btn-xs btn-outline';
+    alleBtn.textContent = 'Alle';
+    alleBtn.onclick = () => filterShopper(null, alleBtn);
+    bar.appendChild(alleBtn);
+
+    ids.forEach(id => {
+        const btn = document.createElement('button');
+        btn.className = `btn btn-xs ${shopperColor(id)}`;
+        btn.textContent = shopperNameMap[id] || `#${id}`;
+        btn.onclick = () => filterShopper(id, btn);
+        bar.appendChild(btn);
+    });
+}
+
+function filterShopper(shopperId, activeBtn) {
+    document.querySelectorAll('#shopper-filter button').forEach(b => b.classList.remove('btn-active'));
+    if (activeBtn) activeBtn.classList.add('btn-active');
+    document.querySelectorAll('.einkauf-item').forEach(row => {
+        if (shopperId === null) {
+            row.style.display = '';
+        } else {
+            row.style.display = (String(row.dataset.shopper) === String(shopperId)) ? '' : 'none';
+        }
+    });
+    document.querySelectorAll('.einkauf-kategorie').forEach(kat => {
+        const sichtbar = [...kat.querySelectorAll('.einkauf-item')].some(r => r.style.display !== 'none');
+        kat.style.display = sichtbar ? '' : 'none';
+    });
+}
+
+// Live-Polling: alle 5 Sekunden Status holen
+let _pollTimer = null;
+function startEinkaufPolling() {
+    if (_pollTimer) return;
+    _pollTimer = setInterval(pollEinkaufStatus, 5000);
+}
+
+async function pollEinkaufStatus() {
+    try {
+        const r = await fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/einkaufsliste/status/`);
+        const d = await r.json();
+        let changed = false;
+        d.items.forEach(item => {
+            const row = document.getElementById(`ei-${item.id}`);
+            if (!row) return;
+            const cb = row.querySelector('input[type=checkbox]');
+            if (cb && cb.checked !== item.erledigt) {
+                cb.checked = item.erledigt;
+                row.classList.toggle('opacity-40', item.erledigt);
+                const nameEl = row.querySelector('span.text-sm');
+                if (nameEl) nameEl.classList.toggle('line-through', item.erledigt);
+                changed = true;
+            }
+        });
+        if (changed) updateEkBadge();
+    } catch(e) { /* ignorieren */ }
 }
 </script>
 

@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from boote.models import Boot, Kabine
 from config import settings
-from logistik.models import Einkaufspunkt, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
+from logistik.models import Einkaufspunkt, EinkaufslistenEintrag, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
@@ -1882,7 +1882,7 @@ def boot_dashboard(request, toern_id):
     )
     mahlzeiten_qs = list(
         Mahlzeit.objects.filter(boot=boot, toern=toern)
-        .select_related('kochverantwortlich__user')
+        .select_related('kochverantwortlich__user', 'rezept')
     )
 
     tagesplan_tage = []
@@ -1923,6 +1923,21 @@ def boot_dashboard(request, toern_id):
         or request.user == toern.anbieter
     )
 
+    # Einkaufsliste (neu)
+    einkaufs_qs = EinkaufslistenEintrag.objects.filter(
+        boot=boot, toern=toern
+    ).select_related('einkaufer__user', 'erledigt_von')
+    einkaufs_by_kat = {k: [] for k in EINKAUF_KATEGORIE_ORDER}
+    for e in einkaufs_qs:
+        einkaufs_by_kat.setdefault(e.kategorie, []).append(e)
+    einkauf_gruppen = [
+        (kat, EINKAUF_KATEGORIE_LABEL[kat], einkaufs_by_kat[kat])
+        for kat in EINKAUF_KATEGORIE_ORDER
+        if einkaufs_by_kat.get(kat)
+    ]
+    einkauf_gesamt   = einkaufs_qs.count()
+    einkauf_erledigt = einkaufs_qs.filter(erledigt=True).count()
+
     context = {
         "toern": toern,
         "boot": boot,
@@ -1942,6 +1957,10 @@ def boot_dashboard(request, toern_id):
         "hat_rechte_vergeben": hat_rechte_vergeben,
         "tagesplan_edit_rechte": tagesplan_edit_rechte,
         "aufgabe_typen": Tagesaufgabe.TYP_CHOICES,
+        # Einkaufsliste (neu)
+        "einkauf_gruppen": einkauf_gruppen,
+        "einkauf_gesamt": einkauf_gesamt,
+        "einkauf_erledigt": einkauf_erledigt,
     }
 
     return render(request, "boot/boot_dashboard.html", context)
@@ -3350,16 +3369,23 @@ def tagesplan_mahlzeit_add(request, toern_id, boot_id):
     if not _hat_tagesplan_edit(request, toern, boot, teilnahme):
         raise PermissionDenied
 
+    from rezepte.models import Rezept as KochbuchRezept
+
     datum = request.POST.get('datum')
     typ = request.POST.get('typ', 'abend')
     name = request.POST.get('name', '').strip()
     koch_id = request.POST.get('kochverantwortlich') or None
+    rezept_id = request.POST.get('rezept_id') or None
 
     if not datum:
         return JsonResponse({'status': 'error', 'msg': 'Datum fehlt'}, status=400)
 
+    rezept = None
+    if rezept_id:
+        rezept = KochbuchRezept.objects.filter(id=rezept_id).first()
+
     if not name:
-        name = dict(Mahlzeit.TYP_CHOICES).get(typ, typ)
+        name = rezept.name if rezept else dict(Mahlzeit.TYP_CHOICES).get(typ, typ)
 
     koch = None
     if koch_id:
@@ -3367,7 +3393,8 @@ def tagesplan_mahlzeit_add(request, toern_id, boot_id):
 
     mahlzeit = Mahlzeit.objects.create(
         boot=boot, toern=toern, datum=datum,
-        typ=typ, name=name, kochverantwortlich=koch
+        typ=typ, name=name, kochverantwortlich=koch,
+        rezept=rezept,
     )
     person = ''
     if mahlzeit.kochverantwortlich:
@@ -3380,7 +3407,38 @@ def tagesplan_mahlzeit_add(request, toern_id, boot_id):
         'typ_display': mahlzeit.get_typ_display(),
         'name': mahlzeit.name,
         'person': person,
+        'rezept_id': mahlzeit.rezept_id,
     })
+
+
+@login_required
+def rezept_suche(request, toern_id, boot_id):
+    """Rezept-Suche für Tagesplan — AJAX GET, gibt Kochbuch-Treffer zurück."""
+    from rezepte.models import Rezept as KochbuchRezept
+    from django.db.models import Count, Q
+
+    q = request.GET.get('q', '').strip()
+    if not q:
+        return JsonResponse({'results': []})
+
+    qs = (
+        KochbuchRezept.objects
+        .annotate(anzahl_sterne=Count('sterne'))
+        .filter(Q(name__icontains=q) | Q(zutaten__name__icontains=q))
+        .distinct()
+        .order_by('-anzahl_sterne', 'name')[:8]
+    )
+    results = [
+        {
+            'id': r.id,
+            'name': r.name,
+            'kategorie': r.get_kategorie_display(),
+            'portionen': r.portionen,
+            'zubereitungszeit': r.zubereitungszeit,
+        }
+        for r in qs
+    ]
+    return JsonResponse({'results': results})
 
 
 @login_required
@@ -3471,3 +3529,536 @@ def mitfahrt_anfrage_zurueckziehen(request, anfrage_id):
     anfrage.delete()
     messages.success(request, "Anfrage zurückgezogen.")
     return redirect(reverse("crew_dashboard", args=[toern.id]) + "?tab=mitfahrt")
+
+
+@login_required
+def tagesplan_kochplan_pdf(request, toern_id, boot_id):
+    """Kochplan-PDF: alle Mahlzeiten nach Tag, Zutaten auf Crew-Größe skaliert."""
+    import re
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.platypus import Image as RLImage
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from io import BytesIO
+
+    toern = get_object_or_404(Toern, id=toern_id)
+    boot = get_object_or_404(Boot, id=boot_id)
+
+    teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern).first()
+    if not teilnahme and request.user != toern.anbieter:
+        raise PermissionDenied
+
+    crew_anzahl = Teilnahme.objects.filter(
+        toern=toern, boot=boot, status="bestaetigt"
+    ).count() or 1
+
+    _TYP_ORDER = {'fruehstueck': 0, 'mittag': 1, 'abend': 2, 'essen_gehen': 3, 'snack': 4}
+    _TYP_LABEL = {
+        'fruehstueck': 'Frühstück', 'mittag': 'Mittagessen',
+        'abend': 'Abendessen', 'essen_gehen': 'Essen gehen', 'snack': 'Snack',
+    }
+
+    mahlzeiten_qs = list(
+        Mahlzeit.objects.filter(boot=boot, toern=toern)
+        .select_related('kochverantwortlich__user', 'rezept')
+        .prefetch_related('rezept__zutaten')
+    )
+
+    # Mengen skalieren: versucht führende Zahl zu parsen und mit Faktor zu multiplizieren
+    def _fmt(n):
+        if n != n:  # NaN guard
+            return ""
+        if n == int(n):
+            return str(int(n))
+        return str(round(n, 1)).replace('.', ',')
+
+    def scale_menge(menge, factor):
+        if not menge:
+            return ""
+        menge = menge.strip()
+        # Bereich "2-3" oder "2–3"
+        range_m = re.match(r'^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)(.*)', menge)
+        if range_m:
+            lo = float(range_m.group(1).replace(',', '.')) * factor
+            hi = float(range_m.group(2).replace(',', '.')) * factor
+            return f"{_fmt(lo)}–{_fmt(hi)}{range_m.group(3)}"
+        # Einzelne Zahl am Anfang
+        single_m = re.match(r'^(\d+(?:[.,]\d+)?)(.*)', menge)
+        if single_m:
+            num = float(single_m.group(1).replace(',', '.')) * factor
+            return f"{_fmt(num)}{single_m.group(2)}"
+        return menge  # kein parse-barer Wert → unverändert
+
+    # Tage aufbauen
+    tage = []
+    if toern.startdatum and toern.enddatum:
+        _start = toern.startdatum.date() if hasattr(toern.startdatum, 'date') else toern.startdatum
+        _end   = toern.enddatum.date()   if hasattr(toern.enddatum,   'date') else toern.enddatum
+        for i in range((_end - _start).days + 1):
+            datum = _start + timedelta(days=i)
+            meals = sorted(
+                [m for m in mahlzeiten_qs if m.datum == datum],
+                key=lambda m: _TYP_ORDER.get(m.typ, 99),
+            )
+            if meals:
+                tage.append({'datum': datum, 'is_anfahrt': i == 0,
+                             'is_abfahrt': i == (_end - _start).days, 'mahlzeiten': meals})
+
+    # ── PDF aufbauen ─────────────────────────────────────────────────────────
+    TEAL    = colors.HexColor("#0D9488")
+    PRIMARY = colors.HexColor("#1e3a5f")
+    GRAY    = colors.HexColor("#64748b")
+    LIGHT   = colors.HexColor("#E2F2F1")
+
+    MAR = 18 * mm
+    USABLE_W = A4[0] - 2 * MAR
+
+    def sty(name, **kw):
+        return ParagraphStyle(name, **kw)
+
+    title_s  = sty("kp_title",  fontSize=16, leading=20, fontName="Helvetica-Bold", textColor=PRIMARY)
+    sub_s    = sty("kp_sub",    fontSize=9,  leading=13, fontName="Helvetica",      textColor=GRAY, spaceAfter=4*mm)
+    day_s    = sty("kp_day",    fontSize=11, leading=14, fontName="Helvetica-Bold", textColor=colors.white)
+    meal_s   = sty("kp_meal",   fontSize=10, leading=14, fontName="Helvetica-Bold", textColor=PRIMARY, spaceBefore=3*mm)
+    cook_s   = sty("kp_cook",   fontSize=8,  leading=11, fontName="Helvetica",      textColor=GRAY)
+    rezept_s = sty("kp_rname",  fontSize=8,  leading=11, fontName="Helvetica-Oblique", textColor=TEAL, spaceAfter=2*mm)
+    menge_s  = sty("kp_menge",  fontSize=9,  leading=13, fontName="Helvetica-Bold", textColor=colors.HexColor("#475569"))
+    zutat_s  = sty("kp_zutat",  fontSize=9,  leading=13, fontName="Helvetica",      textColor=colors.black)
+    nomeal_s = sty("kp_nomeal", fontSize=9,  leading=13, fontName="Helvetica-Oblique", textColor=GRAY)
+    foot_s   = sty("kp_foot",   fontSize=7,  leading=10, fontName="Helvetica",      textColor=GRAY, alignment=TA_CENTER)
+    scale_s  = sty("kp_scale",  fontSize=7,  leading=10, fontName="Helvetica-Oblique", textColor=TEAL)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        leftMargin=MAR, rightMargin=MAR,
+        topMargin=MAR, bottomMargin=MAR,
+    )
+
+    elements = []
+
+    # ── Kopf ─────────────────────────────────────────────────────────────────
+    logo_path = os.path.join(settings.BASE_DIR, "static", "medien", "Logo_Meer_erleben.png")
+    logo_cell = RLImage(logo_path, width=14*mm, height=14*mm, kind="proportional") \
+        if os.path.exists(logo_path) else Paragraph("", zutat_s)
+
+    start_str = toern.startdatum.strftime('%d.%m.%Y') if toern.startdatum else "–"
+    end_str   = toern.enddatum.strftime('%d.%m.%Y')   if toern.enddatum   else "–"
+    hdr_tbl = Table(
+        [[Paragraph(f"Kochplan – {boot.name}", title_s), logo_cell],
+         [Paragraph(f"{toern.titel}  ·  {start_str} – {end_str}  ·  Crew: {crew_anzahl} Personen", sub_s), ""]],
+        colWidths=[USABLE_W - 16*mm, 16*mm],
+    )
+    hdr_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",  (1, 0), (1, 0),   "RIGHT"),
+        ("SPAN",   (1, 0), (1, 1)),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+    ]))
+    elements.append(hdr_tbl)
+    elements.append(HRFlowable(width=USABLE_W, thickness=0.8, color=TEAL, spaceBefore=2*mm, spaceAfter=4*mm))
+
+    LOCALE_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+
+    if not tage:
+        elements.append(Paragraph("Keine Mahlzeiten im Tagesplan vorhanden.", nomeal_s))
+    else:
+        for tag in tage:
+            datum = tag['datum']
+            wt = LOCALE_DE[datum.weekday()]
+            label_parts = [f"{wt}, {datum.strftime('%d.%m.%Y')}"]
+            if tag['is_anfahrt']:
+                label_parts.append("  – Anfahrtstag")
+            if tag['is_abfahrt']:
+                label_parts.append("  – Abreisetag")
+
+            # Tag-Header (teal Balken)
+            day_tbl = Table(
+                [[Paragraph("  " + "".join(label_parts), day_s)]],
+                colWidths=[USABLE_W],
+            )
+            day_tbl.setStyle(TableStyle([
+                ("BACKGROUND",    (0, 0), (-1, -1), TEAL),
+                ("TOPPADDING",    (0, 0), (-1, -1), 3*mm),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3*mm),
+                ("LEFTPADDING",   (0, 0), (-1, -1), 3*mm),
+                ("RIGHTPADDING",  (0, 0), (-1, -1), 3*mm),
+            ]))
+            elements.append(day_tbl)
+
+            for mahlzeit in tag['mahlzeiten']:
+                typ_label = _TYP_LABEL.get(mahlzeit.typ, mahlzeit.typ)
+                cook_name = ""
+                if mahlzeit.kochverantwortlich:
+                    u = mahlzeit.kochverantwortlich.user
+                    cook_name = f"{u.first_name} {u.last_name}".strip()
+
+                elements.append(Paragraph(f"{typ_label}: {mahlzeit.name}", meal_s))
+                if cook_name:
+                    elements.append(Paragraph(f"Koch/Köchin: {cook_name}", cook_s))
+
+                rezept = mahlzeit.rezept
+                if rezept:
+                    factor = crew_anzahl / (rezept.portionen or 1)
+                    elements.append(Paragraph(
+                        f"Rezept: {rezept.name}  "
+                        f"(Originalrezept für {rezept.portionen} Port. → skaliert auf {crew_anzahl} Pers.)",
+                        rezept_s,
+                    ))
+                    zutaten = list(rezept.zutaten.all())
+                    if zutaten:
+                        rows = []
+                        for z in zutaten:
+                            scaled = scale_menge(z.menge, factor)
+                            rows.append([
+                                Paragraph(scaled, menge_s),
+                                Paragraph(z.name, zutat_s),
+                            ])
+                        ztbl = Table(rows, colWidths=[24*mm, USABLE_W - 24*mm])
+                        ztbl.setStyle(TableStyle([
+                            ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+                            ("TOPPADDING",   (0, 0), (-1, -1), 1),
+                            ("BOTTOMPADDING",(0, 0), (-1, -1), 1),
+                            ("LEFTPADDING",  (0, 0), (-1, -1), 2),
+                            ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+                            ("BACKGROUND",   (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                            ("BOX",          (0, 0), (-1, -1), 0.3, colors.HexColor("#E2E8F0")),
+                        ]))
+                        elements.append(ztbl)
+                        if factor != 1:
+                            elements.append(Paragraph(
+                                f"Skalierungsfaktor: ×{round(factor, 2)}", scale_s,
+                            ))
+
+                elements.append(Spacer(1, 2*mm))
+
+            elements.append(Spacer(1, 3*mm))
+
+    # ── Footer ────────────────────────────────────────────────────────────────
+    elements.append(HRFlowable(width=USABLE_W, thickness=0.3, color=colors.HexColor("#e2e8f0"), spaceBefore=4*mm))
+    elements.append(Spacer(1, 1*mm))
+    elements.append(Paragraph(f"Kochplan  –  Meer erleben  –  {boot.name}  –  Crew: {crew_anzahl} Personen", foot_s))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    response = HttpResponse(buffer, content_type="application/pdf")
+    safe = boot.name.replace(" ", "_")
+    response["Content-Disposition"] = f'inline; filename="Kochplan_{safe}.pdf"'
+    return response
+
+
+# ─── Einkaufsliste — Utilities ────────────────────────────────────────────────
+
+EINKAUF_KATEGORIE_ORDER = [
+    'obst_gemuese', 'fleisch_fisch', 'milch_kase', 'brot',
+    'nudeln_reis', 'konserven', 'gewurze_ol', 'getranke',
+    'tiefkuhl', 'haushalt', 'sonstiges',
+]
+EINKAUF_KATEGORIE_LABEL = {
+    'obst_gemuese':  'Obst & Gemüse',
+    'fleisch_fisch': 'Fleisch & Fisch',
+    'milch_kase':    'Milch, Käse & Eier',
+    'brot':          'Brot & Backwaren',
+    'nudeln_reis':   'Nudeln, Reis & Hülsenfrüchte',
+    'konserven':     'Konserven & Saucen',
+    'gewurze_ol':    'Gewürze, Öle & Essig',
+    'getranke':      'Getränke',
+    'tiefkuhl':      'Tiefkühlprodukte',
+    'haushalt':      'Haushalt & Hygiene',
+    'sonstiges':     'Sonstiges',
+}
+
+_KAT_KEYWORDS = [
+    ('obst_gemuese',  ['zwiebel', 'tomate', 'kartoffel', 'paprika', 'gurke', 'salat',
+                        'spinat', 'zucchini', 'aubergine', 'knoblauch', 'möhre', 'karotte',
+                        'lauch', 'sellerie', 'brokkoli', 'erbse', 'bohne', 'pilz',
+                        'champignon', 'apfel', 'birne', 'banane', 'orange', 'zitrone',
+                        'limette', 'traube', 'erdbeere', 'avocado', 'mais', 'porree',
+                        'fenchel', 'kohl', 'kräuter', 'petersilie', 'basilikum',
+                        'schnittlauch', 'dill', 'thymian', 'rosmarin', 'minze', 'ingwer',
+                        'kürbis', 'rettich', 'radieschen', 'spargel', 'rucola', 'feldsalat',
+                        'rote bete', 'pak choi', 'artischocke', 'mangold']),
+    ('fleisch_fisch', ['fleisch', 'huhn', 'hähnchen', 'rind', 'hackfleisch', 'hack',
+                        'speck', 'wurst', 'schinken', 'lachs', 'forelle', 'thunfisch',
+                        'sardine', 'hering', 'garnele', 'shrimp', 'fisch', 'meeresfrüchte',
+                        'krabben', 'salami', 'chorizo', 'lamm', 'kalb', 'ente', 'truthahn',
+                        'lachsfilet', 'dosenthunfisch']),
+    ('milch_kase',    ['milch', 'butter', 'sahne', 'joghurt', 'käse', 'mozzarella',
+                        'parmesan', 'feta', 'quark', 'frischkäse', 'schmand', 'creme fraiche',
+                        'crème fraîche', 'ei ', 'eier', 'kondensmilch', 'schlagsahne', 'gouda',
+                        'emmentaler', 'ricotta', 'mascarpone', 'skyr', 'kefir', 'rahm']),
+    ('brot',          ['brot', 'brötchen', 'toast', 'semmel', 'croissant', 'mehl',
+                        'backpulver', 'hefe', 'paniermehl', 'semmelbrösel', 'wrap', 'pita',
+                        'tortilla', 'ciabatta', 'baguette', 'laugenstange']),
+    ('nudeln_reis',   ['nudel', 'pasta', 'spaghetti', 'penne', 'fusilli', 'tagliatelle',
+                        'rigatoni', 'farfalle', 'tortellini', 'reis', 'linse', 'kichererbse',
+                        'bulgur', 'couscous', 'quinoa', 'haferflocken', 'hirse', 'polenta',
+                        'lasagne', 'cannelloni']),
+    ('konserven',     ['dose', 'konserve', 'passierte', 'tomatensauce', 'tomatensoße',
+                        'kokosmilch', 'kidneybohne', 'mais dose', 'thunfisch dose',
+                        'tomatenpüree', 'tomatenmark']),
+    ('gewurze_ol',    ['salz', 'pfeffer', 'zucker', 'öl', 'olivenöl', 'sonnenblumenöl',
+                        'rapsöl', 'essig', 'balsamico', 'senf', 'ketchup', 'sojasoße',
+                        'worcester', 'tabasco', 'curry', 'paprikapulver', 'zimt', 'muskat',
+                        'oregano', 'majoran', 'lorbeer', 'chili', 'cumin', 'kurkuma',
+                        'gewürz', 'brühwürfel', 'brühe', 'honig', 'sirup', 'vanille',
+                        'stärke', 'gelatine']),
+    ('getranke',      ['wasser', 'saft', 'cola', 'limo', 'bier', 'wein', 'sekt',
+                        'prosecco', 'kaffee', 'tee', 'smoothie', 'limonade', 'sprudel',
+                        'mineralwasser', 'apfelsaft', 'orangensaft', 'kakao']),
+    ('tiefkuhl',      ['tiefkühl', 'gefroren', 'tk ']),
+    ('haushalt',      ['klopapier', 'toilettenpapier', 'küchenrolle', 'spüllappen',
+                        'spülmittel', 'waschmittel', 'putzmittel', 'müllbeutel', 'müllsack',
+                        'backpapier', 'schwamm', 'reiniger', 'folie']),
+]
+
+def _detect_kategorie(name):
+    n = name.lower()
+    for kat, keywords in _KAT_KEYWORDS:
+        if any(kw in n for kw in keywords):
+            return kat
+    return 'sonstiges'
+
+def _fmt_einkauf_num(n):
+    return str(int(n)) if n == int(n) else str(round(n, 1)).replace('.', ',')
+
+def _scale_einkauf_menge(menge, factor):
+    import re as _re
+    if not menge or factor == 1:
+        return menge or ''
+    menge = menge.strip()
+    m = _re.match(r'^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)(.*)', menge)
+    if m:
+        lo = float(m.group(1).replace(',', '.')) * factor
+        hi = float(m.group(2).replace(',', '.')) * factor
+        return f"{_fmt_einkauf_num(lo)}–{_fmt_einkauf_num(hi)}{m.group(3)}"
+    m = _re.match(r'^(\d+(?:[.,]\d+)?)(.*)', menge)
+    if m:
+        num = float(m.group(1).replace(',', '.')) * factor
+        return f"{_fmt_einkauf_num(num)}{m.group(2)}"
+    return menge
+
+def _merge_mengen(menge_list):
+    import re as _re
+    totals = {}   # unit -> float
+    leftovers = []
+    for raw in menge_list:
+        if not raw:
+            continue
+        raw = raw.strip()
+        m = _re.match(r'^(\d+(?:[.,]\d+)?)\s*(.*)', raw)
+        if m:
+            num  = float(m.group(1).replace(',', '.'))
+            unit = m.group(2).strip()
+            totals[unit] = totals.get(unit, 0.0) + num
+        else:
+            if raw not in leftovers:
+                leftovers.append(raw)
+    parts = [f"{_fmt_einkauf_num(v)} {k}".strip() for k, v in totals.items()]
+    parts += leftovers
+    return " + ".join(parts) if parts else ""
+
+_STANDARD_ARTIKEL = [
+    # (name, menge_template, kategorie)  — {crew} = crew count, {wasser} = crew*5
+    ('Klopapier',      '{crew} Rolle(n)',   'haushalt'),
+    ('Küchenrolle',    '1 Packung',          'haushalt'),
+    ('Spüllappen',     '1 Packung',          'haushalt'),
+    ('Spülmittel',     '1 Flasche',          'haushalt'),
+    ('Wasser',         '{wasser} Liter',     'getranke'),
+    ('Kaffee',         '2 Packungen',        'getranke'),
+    ('Salz',           '1 Packung',          'gewurze_ol'),
+    ('Müllbeutel 5L',  '1 Rolle',            'haushalt'),
+    ('Müllbeutel 20L', '1 Rolle',            'haushalt'),
+]
+
+
+# ─── Einkaufsliste — Views ────────────────────────────────────────────────────
+
+@login_required
+@require_POST
+def einkaufsliste_generieren(request, toern_id, boot_id):
+    from collections import defaultdict
+    toern = get_object_or_404(Toern, id=toern_id)
+    boot  = get_object_or_404(Boot,  id=boot_id)
+    if not Teilnahme.objects.filter(user=request.user, toern=toern).exists() \
+            and request.user != toern.anbieter:
+        raise PermissionDenied
+
+    crew_anzahl = Teilnahme.objects.filter(
+        toern=toern, boot=boot, status='bestaetigt'
+    ).count() or 1
+
+    # Löscht alle nicht-manuellen Einträge
+    EinkaufslistenEintrag.objects.filter(boot=boot, toern=toern).exclude(quelle='manuell').delete()
+
+    # Zutaten aus Rezepten sammeln + skalieren
+    raw = defaultdict(lambda: {'mengen': [], 'rezepte': [], 'name': ''})
+    for mz in Mahlzeit.objects.filter(boot=boot, toern=toern).select_related('rezept').prefetch_related('rezept__zutaten'):
+        if not mz.rezept:
+            continue
+        factor = crew_anzahl / (mz.rezept.portionen or 1)
+        for z in mz.rezept.zutaten.all():
+            key = z.name.lower().strip()
+            raw[key]['name'] = raw[key]['name'] or z.name
+            raw[key]['mengen'].append(_scale_einkauf_menge(z.menge, factor))
+            if mz.rezept.name not in raw[key]['rezepte']:
+                raw[key]['rezepte'].append(mz.rezept.name)
+
+    to_create = [
+        EinkaufslistenEintrag(
+            boot=boot, toern=toern,
+            name=data['name'],
+            menge=_merge_mengen(data['mengen']),
+            kategorie=_detect_kategorie(data['name']),
+            quelle='rezept',
+            rezept_info=', '.join(data['rezepte']),
+        )
+        for data in raw.values()
+    ]
+
+    # Standard-Artikel
+    for name, tpl, kat in _STANDARD_ARTIKEL:
+        to_create.append(EinkaufslistenEintrag(
+            boot=boot, toern=toern,
+            name=name,
+            menge=tpl.format(crew=crew_anzahl, wasser=crew_anzahl * 5),
+            kategorie=kat,
+            quelle='standard',
+        ))
+
+    EinkaufslistenEintrag.objects.bulk_create(to_create)
+    return JsonResponse({'ok': True, 'count': len(to_create)})
+
+
+@login_required
+@require_POST
+def einkaufsliste_toggle(request, eintrag_id):
+    from django.utils.timezone import now as tz_now
+    eintrag = get_object_or_404(EinkaufslistenEintrag, id=eintrag_id)
+    if not Teilnahme.objects.filter(user=request.user, toern=eintrag.toern).exists() \
+            and request.user != eintrag.toern.anbieter:
+        raise PermissionDenied
+    eintrag.erledigt = not eintrag.erledigt
+    if eintrag.erledigt:
+        eintrag.erledigt_von = request.user
+        eintrag.erledigt_am  = tz_now()
+    else:
+        eintrag.erledigt_von = None
+        eintrag.erledigt_am  = None
+    eintrag.save()
+    von = ''
+    if eintrag.erledigt_von:
+        von = f"{eintrag.erledigt_von.first_name} {eintrag.erledigt_von.last_name}".strip()
+    return JsonResponse({'ok': True, 'erledigt': eintrag.erledigt, 'erledigt_von': von})
+
+
+@login_required
+@require_POST
+def einkaufsliste_add(request, toern_id, boot_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    boot  = get_object_or_404(Boot,  id=boot_id)
+    if not Teilnahme.objects.filter(user=request.user, toern=toern).exists() \
+            and request.user != toern.anbieter:
+        raise PermissionDenied
+    name  = request.POST.get('name', '').strip()
+    menge = request.POST.get('menge', '').strip()
+    if not name:
+        return JsonResponse({'error': 'Name fehlt'}, status=400)
+    e = EinkaufslistenEintrag.objects.create(
+        boot=boot, toern=toern,
+        name=name, menge=menge,
+        kategorie=_detect_kategorie(name),
+        quelle='manuell',
+    )
+    return JsonResponse({
+        'ok': True,
+        'id': e.id,
+        'name': e.name,
+        'menge': e.menge,
+        'kategorie': e.kategorie,
+        'kategorie_label': EINKAUF_KATEGORIE_LABEL.get(e.kategorie, 'Sonstiges'),
+    })
+
+
+@login_required
+@require_POST
+def einkaufsliste_delete(request, eintrag_id):
+    eintrag = get_object_or_404(EinkaufslistenEintrag, id=eintrag_id)
+    if not Teilnahme.objects.filter(user=request.user, toern=eintrag.toern).exists() \
+            and request.user != eintrag.toern.anbieter:
+        raise PermissionDenied
+    eintrag.delete()
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def einkaufsliste_aufteilen(request, toern_id, boot_id):
+    from collections import defaultdict
+    toern = get_object_or_404(Toern, id=toern_id)
+    boot  = get_object_or_404(Boot,  id=boot_id)
+    if not Teilnahme.objects.filter(user=request.user, toern=toern).exists() \
+            and request.user != toern.anbieter:
+        raise PermissionDenied
+
+    data       = json.loads(request.body)
+    shopper_ids = data.get('shopper_ids', [])
+    if len(shopper_ids) < 1:
+        return JsonResponse({'error': 'Mindestens 1 Person angeben'}, status=400)
+
+    shoppers = list(Teilnahme.objects.filter(id__in=shopper_ids, toern=toern, boot=boot))
+    if not shoppers:
+        return JsonResponse({'error': 'Keine gültigen Personen'}, status=400)
+    n = len(shoppers)
+
+    items = list(EinkaufslistenEintrag.objects.filter(boot=boot, toern=toern, erledigt=False))
+
+    # Kategorien in Supermarkt-Reihenfolge, dann per round-robin auf Einkäufer verteilen
+    by_cat = defaultdict(list)
+    for item in items:
+        by_cat[item.kategorie].append(item)
+
+    ordered_cats = [by_cat[k] for k in EINKAUF_KATEGORIE_ORDER if k in by_cat]
+    for k, v in by_cat.items():
+        if k not in EINKAUF_KATEGORIE_ORDER:
+            ordered_cats.append(v)
+
+    assignment = {}  # item.id -> Teilnahme
+    for i, cat_items in enumerate(ordered_cats):
+        shopper = shoppers[i % n]
+        for item in cat_items:
+            item.einkaufer = shopper
+            assignment[item.id] = {'shopper_id': shopper.id, 'name': shopper.user.first_name}
+
+    EinkaufslistenEintrag.objects.bulk_update(items, ['einkaufer'])
+    return JsonResponse({'ok': True, 'assignment': assignment})
+
+
+@login_required
+def einkaufsliste_status(request, toern_id, boot_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    boot  = get_object_or_404(Boot,  id=boot_id)
+    if not Teilnahme.objects.filter(user=request.user, toern=toern).exists() \
+            and request.user != toern.anbieter:
+        raise PermissionDenied
+    qs = EinkaufslistenEintrag.objects.filter(boot=boot, toern=toern).select_related('erledigt_von', 'einkaufer__user')
+    items = []
+    for e in qs:
+        von = ''
+        if e.erledigt_von:
+            von = f"{e.erledigt_von.first_name} {e.erledigt_von.last_name}".strip()
+        shopper = ''
+        shopper_id = None
+        if e.einkaufer:
+            shopper = e.einkaufer.user.first_name
+            shopper_id = e.einkaufer_id
+        items.append({'id': e.id, 'erledigt': e.erledigt, 'erledigt_von': von,
+                      'shopper': shopper, 'shopper_id': shopper_id})
+    return JsonResponse({'items': items})

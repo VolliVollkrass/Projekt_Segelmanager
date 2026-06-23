@@ -69,4 +69,13 @@ urlpatterns = [
     path("<int:pk>/tagesimpulse/toggle/", toern_tagesimpulse_toggle, name="toern_tagesimpulse_toggle"),
     path("<int:toern_id>/boot/<int:boot_id>/tagesplan/mahlzeit/add/", tagesplan_mahlzeit_add, name="tagesplan_mahlzeit_add"),
     path("<int:toern_id>/boot/<int:boot_id>/tagesplan/thema/", tagesthema_set, name="tagesthema_set"),
+    path("<int:toern_id>/boot/<int:boot_id>/tagesplan/rezept-suche/", rezept_suche, name="tagesplan_rezept_suche"),
+    path("<int:toern_id>/boot/<int:boot_id>/tagesplan/kochplan/pdf/", tagesplan_kochplan_pdf, name="tagesplan_kochplan_pdf"),
+    # Einkaufsliste
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/generieren/", einkaufsliste_generieren, name="einkaufsliste_generieren"),
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/add/",        einkaufsliste_add,        name="einkaufsliste_add"),
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufteilen/",  einkaufsliste_aufteilen,  name="einkaufsliste_aufteilen"),
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/status/",     einkaufsliste_status,     name="einkaufsliste_status"),
+    path("einkaufsliste/<int:eintrag_id>/toggle/",                       einkaufsliste_toggle,     name="einkaufsliste_toggle"),
+    path("einkaufsliste/<int:eintrag_id>/delete/",                       einkaufsliste_delete,     name="einkaufsliste_delete"),
 ]

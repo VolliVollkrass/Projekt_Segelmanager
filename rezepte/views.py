@@ -1,10 +1,13 @@
+import io
 import json
+import os
 import re
 
+from django.conf import settings as django_settings
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -258,8 +261,11 @@ def ki_url_import(request):
                 f"Die Bordküche hat: 2 Gasflammen, einen kleinen Gasofen (meist nur Ober- ODER Unterhitze). "
                 f"Kein Geschirrspüler, begrenzte Arbeitsfläche.\n\n"
                 f"Webseiteninhalt:\n{text}\n\n"
+                f"Wichtig: Übernimm die Portionenanzahl EXAKT wie im Originalrezept angegeben. "
+                f"Passe die Zutatmengen nicht an — sie sollen zur originalen Portionengröße passen.\n\n"
                 f"Gib das Rezept als JSON zurück (ohne Markdown-Codeblöcke):\n"
-                f'{{"name": "...", "kategorie": "hauptgericht", "zubereitungszeit": 30, "portionen": 4, '
+                f'{{"name": "Name aus dem Originalrezept", "kategorie": "hauptgericht", '
+                f'"zubereitungszeit": <Minuten aus Original>, "portionen": <Anzahl aus Original>, '
                 f'"zutaten": [{{"menge": "200g", "name": "Nudeln"}}], '
                 f'"schritte": ["Schritt 1...", "Schritt 2..."], '
                 f'"tipps": "...", "getraenk": "..."}}\n'
@@ -277,3 +283,189 @@ def ki_url_import(request):
         return JsonResponse({"error": "KI-Antwort konnte nicht verarbeitet werden."}, status=500)
 
     return JsonResponse(result)
+
+
+@login_required
+def rezept_pdf(request, pk):
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+    from reportlab.platypus import Image as RLImage
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import mm
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+
+    rezept = get_object_or_404(
+        Rezept.objects.prefetch_related("zutaten", "schritte").select_related("autor"),
+        pk=pk,
+    )
+
+    # Optionale Mengen-Skalierung: ?personen=X
+    try:
+        personen = int(request.GET.get("personen", 0))
+    except (ValueError, TypeError):
+        personen = 0
+    scale_factor = (personen / rezept.portionen) if personen and rezept.portionen else 1
+
+    def _fmt_zahl(n):
+        if n == int(n):
+            return str(int(n))
+        return str(round(n, 1)).replace('.', ',')
+
+    def scale_menge(menge):
+        if scale_factor == 1 or not menge:
+            return menge or ""
+        menge = menge.strip()
+        range_m = re.match(r'^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)(.*)', menge)
+        if range_m:
+            lo = float(range_m.group(1).replace(',', '.')) * scale_factor
+            hi = float(range_m.group(2).replace(',', '.')) * scale_factor
+            return f"{_fmt_zahl(lo)}–{_fmt_zahl(hi)}{range_m.group(3)}"
+        single_m = re.match(r'^(\d+(?:[.,]\d+)?)(.*)', menge)
+        if single_m:
+            num = float(single_m.group(1).replace(',', '.')) * scale_factor
+            return f"{_fmt_zahl(num)}{single_m.group(2)}"
+        return menge
+
+    buffer = io.BytesIO()
+    MAR = 20 * mm
+    USABLE_W = A4[0] - 2 * MAR
+
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        leftMargin=MAR, rightMargin=MAR,
+        topMargin=MAR, bottomMargin=MAR,
+    )
+
+    PRIMARY = colors.HexColor("#1e3a5f")
+    TEAL    = colors.HexColor("#0D9488")
+
+    def sty(name, **kw):
+        return ParagraphStyle(name, **kw)
+
+    title_s    = sty("t_title",   fontSize=22, leading=27, textColor=PRIMARY, fontName="Helvetica-Bold", spaceAfter=1*mm)
+    sub_s      = sty("t_sub",     fontSize=10, leading=14, textColor=colors.HexColor("#64748b"), fontName="Helvetica", spaceAfter=3*mm)
+    label_s    = sty("t_label",   fontSize=8,  leading=10, textColor=TEAL, fontName="Helvetica-Bold",
+                                  spaceBefore=4*mm, spaceAfter=2*mm)
+    body_s     = sty("t_body",    fontSize=10, leading=15, fontName="Helvetica", textColor=colors.black)
+    menge_s    = sty("t_menge",   fontSize=10, leading=15, fontName="Helvetica-Bold", textColor=colors.HexColor("#475569"))
+    step_num_s = sty("t_snum",    fontSize=11, leading=15, fontName="Helvetica-Bold", textColor=TEAL)
+    step_s     = sty("t_step",    fontSize=10, leading=15, fontName="Helvetica", textColor=colors.black)
+    tip_s      = sty("t_tip",     fontSize=9,  leading=14, fontName="Helvetica", textColor=colors.HexColor("#92400e"))
+    foot_s     = sty("t_foot",    fontSize=8,  leading=10, fontName="Helvetica", textColor=colors.HexColor("#94a3b8"), alignment=TA_CENTER)
+
+    TBL_BASE = TableStyle([
+        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING",   (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 2),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+    ])
+
+    elements = []
+
+    # ── Header ──────────────────────────────────────────────────────────────
+    logo_path = os.path.join(django_settings.BASE_DIR, "static", "medien", "Logo_Meer_erleben.png")
+    logo_cell = RLImage(logo_path, width=14*mm, height=14*mm, kind="proportional") \
+        if os.path.exists(logo_path) else Paragraph("", body_s)
+
+    portionen_info = f"{personen} Personen (skaliert)" if personen and personen != rezept.portionen else f"{rezept.portionen} Portionen"
+    header_tbl = Table(
+        [[Paragraph(rezept.name, title_s), logo_cell],
+         [Paragraph(f"{rezept.get_kategorie_display()}  ·  {rezept.zubereitungszeit} Min.  ·  {portionen_info}", sub_s), ""]],
+        colWidths=[USABLE_W - 18*mm, 18*mm],
+    )
+    header_tbl.setStyle(TableStyle([
+        ("VALIGN",  (0, 0), (-1, -1), "TOP"),
+        ("ALIGN",   (1, 0), (1, 0),   "RIGHT"),
+        ("SPAN",    (1, 0), (1, 1)),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    elements.append(header_tbl)
+    elements.append(HRFlowable(width=USABLE_W, thickness=0.5, color=TEAL, spaceAfter=4*mm, spaceBefore=2*mm))
+
+    # ── Zutaten ─────────────────────────────────────────────────────────────
+    zutaten = list(rezept.zutaten.all())
+    if zutaten:
+        elements.append(Paragraph("Zutaten", label_s))
+        if len(zutaten) > 6:
+            # Zweispaltig
+            mid = (len(zutaten) + 1) // 2
+            links, rechts = zutaten[:mid], zutaten[mid:]
+            col_w = (USABLE_W - 6*mm) / 2
+            rows = []
+            for i in range(mid):
+                l = links[i]
+                r = rechts[i] if i < len(rechts) else None
+                lm = Paragraph(scale_menge(l.menge), menge_s)
+                ln = Paragraph(l.name,               body_s)
+                rm = Paragraph(scale_menge(r.menge), menge_s) if r else Paragraph("", body_s)
+                rn = Paragraph(r.name,               body_s)  if r else Paragraph("", body_s)
+                rows.append([lm, ln, Paragraph("", body_s), rm, rn])
+            ztbl = Table(rows, colWidths=[18*mm, col_w - 18*mm, 6*mm, 18*mm, col_w - 18*mm])
+        else:
+            rows = [[Paragraph(scale_menge(z.menge), menge_s), Paragraph(z.name, body_s)] for z in zutaten]
+            ztbl = Table(rows, colWidths=[22*mm, USABLE_W - 22*mm])
+        ztbl.setStyle(TBL_BASE)
+        elements.append(ztbl)
+
+    # ── Schritte ─────────────────────────────────────────────────────────────
+    schritte = list(rezept.schritte.all())
+    if schritte:
+        elements.append(Spacer(1, 2*mm))
+        elements.append(Paragraph("Zubereitung", label_s))
+        for s in schritte:
+            stbl = Table(
+                [[Paragraph(str(s.nummer), step_num_s), Paragraph(s.text, step_s)]],
+                colWidths=[8*mm, USABLE_W - 8*mm],
+            )
+            stbl.setStyle(TableStyle([
+                ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+                ("TOPPADDING",   (0, 0), (-1, -1), 1),
+                ("BOTTOMPADDING",(0, 0), (-1, -1), 4),
+                ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ]))
+            elements.append(stbl)
+
+    # ── Tipps ────────────────────────────────────────────────────────────────
+    if rezept.tipps:
+        elements.append(Spacer(1, 2*mm))
+        elements.append(Paragraph("Tipps", label_s))
+        tip_tbl = Table(
+            [[Paragraph(rezept.tipps, tip_s)]],
+            colWidths=[USABLE_W],
+        )
+        tip_tbl.setStyle(TableStyle([
+            ("BACKGROUND",   (0, 0), (-1, -1), colors.HexColor("#fffbeb")),
+            ("TOPPADDING",   (0, 0), (-1, -1), 4*mm),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 4*mm),
+            ("LEFTPADDING",  (0, 0), (-1, -1), 4*mm),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4*mm),
+            ("BOX",          (0, 0), (-1, -1), 0.5, colors.HexColor("#fcd34d")),
+        ]))
+        elements.append(tip_tbl)
+
+    # ── Getränk ──────────────────────────────────────────────────────────────
+    if rezept.getraenk:
+        elements.append(Spacer(1, 2*mm))
+        elements.append(Paragraph("Getraenkeempfehlung", label_s))
+        elements.append(Paragraph(rezept.getraenk, body_s))
+
+    # ── Footer ───────────────────────────────────────────────────────────────
+    elements.append(Spacer(1, 8*mm))
+    elements.append(HRFlowable(width=USABLE_W, thickness=0.3, color=colors.HexColor("#e2e8f0"), spaceBefore=0))
+    elements.append(Spacer(1, 2*mm))
+    autor = f"{rezept.autor.first_name} {rezept.autor.last_name}".strip() or rezept.autor.email
+    elements.append(Paragraph(f"Segelkochbuch  -  Meer erleben  -  Rezept von {autor}", foot_s))
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    safe_name = re.sub(r"[^\w\-]", "_", rezept.name)[:60]
+    response = HttpResponse(buffer, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="Rezept_{safe_name}.pdf"'
+    return response
