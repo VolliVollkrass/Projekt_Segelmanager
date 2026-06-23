@@ -1003,6 +1003,22 @@ def boot_abschluss_update(request, boot_id):
 
 @login_required
 @require_POST
+@login_required
+@require_POST
+def toern_tagesimpulse_toggle(request, pk):
+    """Tagesthema & Impulse für einen Törn ein-/ausschalten."""
+    toern = get_object_or_404(Toern, pk=pk)
+    is_anbieter = toern.anbieter == request.user
+    is_skipper = Teilnahme.objects.filter(
+        toern=toern, user=request.user, rolle__in=('skipper', 'coskipper')
+    ).exists()
+    if not is_anbieter and not is_skipper:
+        raise PermissionDenied
+    toern.tagesimpulse_aktiv = not toern.tagesimpulse_aktiv
+    toern.save(update_fields=['tagesimpulse_aktiv'])
+    return JsonResponse({'aktiv': toern.tagesimpulse_aktiv})
+
+
 def toern_foto_links_update(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
     is_anbieter = toern.anbieter == request.user
@@ -2944,14 +2960,12 @@ def _get_tagesplan_teilnahme(request, toern_id, boot_id):
     toern = get_object_or_404(Toern, id=toern_id)
     boot = get_object_or_404(Boot, id=boot_id)
     teilnahme = Teilnahme.objects.filter(
-        user=request.user, toern=toern, boot=boot, status='bestaetigt'
+        user=request.user, toern=toern, boot=boot
     ).first()
     if not teilnahme:
-        # Anbieter ohne eigene Teilnahme: darf trotzdem bearbeiten
+        # Anbieter ohne eigene Boot-Teilnahme: holt irgendeine Teilnahme im Törn
         if request.user == toern.anbieter:
-            teilnahme = Teilnahme.objects.filter(
-                user=request.user, toern=toern
-            ).first()
+            teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern).first()
         if not teilnahme:
             raise PermissionDenied
     return toern, boot, teilnahme
@@ -3021,8 +3035,8 @@ def tagesimpuls_add(request, toern_id, boot_id):
     thema = request.POST.get('thema', '').strip()
     verantwortlich_id = request.POST.get('verantwortlich') or None
 
-    if not datum or not thema:
-        return JsonResponse({'status': 'error', 'msg': 'Datum und Thema erforderlich'}, status=400)
+    if not datum:
+        return JsonResponse({'status': 'error', 'msg': 'Datum fehlt'}, status=400)
 
     verantwortlich = None
     if verantwortlich_id:
@@ -3119,25 +3133,26 @@ def tagesplan_pdf(request, toern_id, boot_id):
     )
     tagesthemen_map = {t.datum: t.thema for t in Tagesthema.objects.filter(boot=boot, toern=toern)}
 
-    # ── Farbpalette ──────────────────────────────────────────────────────────
-    DARK_BLUE  = colors.HexColor('#0D2137')
-    MID_BLUE   = colors.HexColor('#1A5FA8')
-    LIGHT_BLUE = colors.HexColor('#D8EAF8')
-    TEAL       = colors.HexColor('#0D9488')
-    ROW_ODD    = colors.HexColor('#F8FBFF')
+    # ── Farbpalette (aus DaisyUI-Theme "segelmanager") ───────────────────────
+    DARK_BLUE  = colors.HexColor('#0F172A')   # base-content / neutral
+    MID_BLUE   = colors.HexColor('#1E293B')   # neutral
+    HEADER_BG  = colors.HexColor('#1E293B')   # neutral – Tabellenkopf
+    TEAL       = colors.HexColor('#0D9488')   # secondary
+    ROW_ODD    = colors.HexColor('#F8FAFC')   # base-100
     ROW_EVEN   = colors.white
-    BORDER     = colors.HexColor('#B8CCE0')
-    GRAY_TXT   = colors.HexColor('#555555')
+    DATE_COL   = colors.HexColor('#E2F2F1')   # helles Teal für Datumsspalte
+    BORDER     = colors.HexColor('#E2E8F0')   # base-300
+    GRAY_TXT   = colors.HexColor('#64748B')
 
     # ── Styles ───────────────────────────────────────────────────────────────
     styles = getSampleStyleSheet()
     def _ps(name, **kw):
         return ParagraphStyle(name, parent=styles['Normal'], **kw)
 
-    title_s  = _ps('T', fontSize=16, fontName='Helvetica-Bold', textColor=DARK_BLUE, leading=20)
+    title_s  = _ps('T', fontSize=16, fontName='Helvetica-Bold', textColor=MID_BLUE, leading=20)
     sub_s    = _ps('S', fontSize=9,  textColor=GRAY_TXT, leading=13, spaceAfter=1*mm)
-    head_s   = _ps('H', fontSize=8,  fontName='Helvetica-Bold', textColor=colors.white)
-    day_s    = _ps('D', fontSize=10, fontName='Helvetica-Bold', textColor=DARK_BLUE, leading=14)
+    head_s   = _ps('H', fontSize=9,  fontName='Helvetica-Bold', textColor=colors.white)
+    day_s    = _ps('D', fontSize=10, fontName='Helvetica-Bold', textColor=MID_BLUE, leading=14)
     thema_s  = _ps('TH', fontSize=8, textColor=TEAL, fontName='Helvetica-Oblique', leading=11)
     cell_s   = _ps('C', fontSize=8,  leading=11, textColor=colors.HexColor('#222222'))
     badge_s  = _ps('B', fontSize=7,  textColor=TEAL, fontName='Helvetica-Bold', leading=9)
@@ -3263,7 +3278,7 @@ def tagesplan_pdf(request, toern_id, boot_id):
     row_count = len(rows)
     main_table.setStyle(TableStyle([
         # Header-Zeile
-        ('BACKGROUND',   (0, 0), (-1, 0), MID_BLUE),
+        ('BACKGROUND',   (0, 0), (-1, 0), HEADER_BG),
         ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
         ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE',     (0, 0), (-1, 0), 9),
@@ -3282,7 +3297,7 @@ def tagesplan_pdf(request, toern_id, boot_id):
         ('LEFTPADDING',  (0, 0), (-1, -1), 4),
         ('RIGHTPADDING', (0, 0), (-1, -1), 4),
         # Datumsspalte Hintergrund dunkel
-        ('BACKGROUND',   (0, 1), (0, -1), LIGHT_BLUE),
+        ('BACKGROUND',   (0, 1), (0, -1), DATE_COL),
         ('FONTNAME',     (0, 1), (0, -1), 'Helvetica-Bold'),
     ]))
 

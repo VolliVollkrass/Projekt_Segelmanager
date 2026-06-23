@@ -39,6 +39,7 @@ class Toern(models.Model):
     foto_upload_link = models.URLField(blank=True)
     foto_download_link = models.URLField(blank=True)
     logbuch_pdf = models.FileField(upload_to='toern/logbuch/', blank=True, null=True)
+    tagesimpulse_aktiv = models.BooleanField(default=True, verbose_name="Tagesthema & Impulse aktiv")
 
     def save(self, *args, **kwargs):
         self.update_status_by_deadline()
