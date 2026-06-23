@@ -3092,9 +3092,9 @@ def tagesplan_recht_toggle(request, toern_id, boot_id, teilnahme_id):
 
 @login_required
 def tagesplan_pdf(request, toern_id, boot_id):
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Paragraph, KeepTogether
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Paragraph, Image
     from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.pagesizes import landscape, A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import mm
     from django.http import HttpResponse
@@ -3104,55 +3104,97 @@ def tagesplan_pdf(request, toern_id, boot_id):
     boot = get_object_or_404(Boot, id=boot_id)
 
     teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern).first()
-    if not teilnahme:
+    if not teilnahme and request.user != toern.anbieter:
         raise PermissionDenied
 
+    _TYP_ORDER = {'fruehstueck': 0, 'mittag': 1, 'abend': 2, 'essen_gehen': 3, 'snack': 4}
     aufgaben_qs = list(
-        Tagesaufgabe.objects.filter(boot=boot, toern=toern)
-        .select_related('verantwortlich__user')
+        Tagesaufgabe.objects.filter(boot=boot, toern=toern).select_related('verantwortlich__user')
     )
     impulse_qs = list(
-        Tagesimpuls.objects.filter(boot=boot, toern=toern)
-        .select_related('verantwortlich__user')
+        Tagesimpuls.objects.filter(boot=boot, toern=toern).select_related('verantwortlich__user')
     )
-    _TYP_ORDER = {'fruehstueck': 0, 'mittag': 1, 'abend': 2, 'essen_gehen': 3, 'snack': 4}
     mahlzeiten_qs = list(
-        Mahlzeit.objects.filter(boot=boot, toern=toern)
-        .select_related('kochverantwortlich__user')
-        .order_by('datum')
+        Mahlzeit.objects.filter(boot=boot, toern=toern).select_related('kochverantwortlich__user')
     )
+    tagesthemen_map = {t.datum: t.thema for t in Tagesthema.objects.filter(boot=boot, toern=toern)}
+
+    # ── Farbpalette ──────────────────────────────────────────────────────────
+    DARK_BLUE  = colors.HexColor('#0D2137')
+    MID_BLUE   = colors.HexColor('#1A5FA8')
+    LIGHT_BLUE = colors.HexColor('#D8EAF8')
+    TEAL       = colors.HexColor('#0D9488')
+    ROW_ODD    = colors.HexColor('#F8FBFF')
+    ROW_EVEN   = colors.white
+    BORDER     = colors.HexColor('#B8CCE0')
+    GRAY_TXT   = colors.HexColor('#555555')
+
+    # ── Styles ───────────────────────────────────────────────────────────────
+    styles = getSampleStyleSheet()
+    def _ps(name, **kw):
+        return ParagraphStyle(name, parent=styles['Normal'], **kw)
+
+    title_s  = _ps('T', fontSize=16, fontName='Helvetica-Bold', textColor=DARK_BLUE, leading=20)
+    sub_s    = _ps('S', fontSize=9,  textColor=GRAY_TXT, leading=13, spaceAfter=1*mm)
+    head_s   = _ps('H', fontSize=8,  fontName='Helvetica-Bold', textColor=colors.white)
+    day_s    = _ps('D', fontSize=10, fontName='Helvetica-Bold', textColor=DARK_BLUE, leading=14)
+    thema_s  = _ps('TH', fontSize=8, textColor=TEAL, fontName='Helvetica-Oblique', leading=11)
+    cell_s   = _ps('C', fontSize=8,  leading=11, textColor=colors.HexColor('#222222'))
+    badge_s  = _ps('B', fontSize=7,  textColor=TEAL, fontName='Helvetica-Bold', leading=9)
+    empty_s  = _ps('E', fontSize=8,  textColor=colors.HexColor('#AAAAAA'))
+
+    LOCALE_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+    MEAL_LABEL = {'fruehstueck': '☀ ', 'mittag': '○ ', 'abend': '☽ ', 'essen_gehen': '↗ ', 'snack': '· '}
+
+    # ── Seite ────────────────────────────────────────────────────────────────
+    PAGE = landscape(A4)   # 297 × 210 mm → im Querformat: 297 mm breit
+    L_MAR = R_MAR = 12*mm
+    T_MAR = B_MAR = 12*mm
+    USABLE_W = PAGE[0] - L_MAR - R_MAR   # ≈ 273 mm
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        leftMargin=15*mm, rightMargin=15*mm,
-        topMargin=15*mm, bottomMargin=15*mm,
+        buffer, pagesize=PAGE,
+        leftMargin=L_MAR, rightMargin=R_MAR,
+        topMargin=T_MAR, bottomMargin=B_MAR,
     )
 
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('title', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', spaceAfter=2*mm)
-    sub_style = ParagraphStyle('sub', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#666666'), spaceAfter=4*mm)
-    day_style = ParagraphStyle('day', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', spaceBefore=4*mm, spaceAfter=1*mm)
-    cell_style = ParagraphStyle('cell', parent=styles['Normal'], fontSize=8, leading=11)
-    head_style = ParagraphStyle('head', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', textColor=colors.HexColor('#444444'))
+    # ── Logo ─────────────────────────────────────────────────────────────────
+    logo_path = os.path.join(settings.BASE_DIR, 'static', 'medien', 'Logo_Meer_erleben.png')
+    logo_cell = Image(logo_path, width=22*mm, height=22*mm, kind='proportional') \
+        if os.path.exists(logo_path) else Paragraph('', cell_s)
 
-    DARK_BLUE = colors.HexColor('#0D2137')
-    MID_BLUE = colors.HexColor('#185FA5')
-    LIGHT_BLUE = colors.HexColor('#E6F1FB')
-    LIGHT_GRAY = colors.HexColor('#F5F5F3')
-    BORDER = colors.HexColor('#D0D0CC')
-
-    elements = []
-
-    # Header
-    elements.append(Paragraph(f"Tagesplan — {boot.name}", title_style))
+    # ── Kopfzeile ────────────────────────────────────────────────────────────
     start_str = toern.startdatum.strftime('%d.%m.%Y') if toern.startdatum else '–'
-    end_str = toern.enddatum.strftime('%d.%m.%Y') if toern.enddatum else '–'
-    elements.append(Paragraph(f"{toern.titel}  ·  {toern.revier}  ·  {start_str} – {end_str}", sub_style))
+    end_str   = toern.enddatum.strftime('%d.%m.%Y')   if toern.enddatum   else '–'
+    header_content = [
+        [
+            [Paragraph(f"Tagesplan – {boot.name}", title_s),
+             Paragraph(f"{toern.titel}  ·  {toern.revier}  ·  {start_str} – {end_str}", sub_s)],
+            logo_cell,
+        ]
+    ]
+    header_tbl = Table(header_content, colWidths=[USABLE_W - 28*mm, 28*mm])
+    header_tbl.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (1, 0), (1, 0), 'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3*mm),
+    ]))
 
-    col_w = [25*mm, 52*mm, 52*mm, 36*mm]
-    LOCALE_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+    elements = [header_tbl]
+
+    # ── Spaltenbreiten: Datum | Mahlzeiten | Aufgaben | Impulse ─────────────
+    COL_W = [38*mm, 72*mm, 90*mm, USABLE_W - 38*mm - 72*mm - 90*mm]
+
+    # ── Tabellen-Header ──────────────────────────────────────────────────────
+    col_headers = [
+        Paragraph('Datum', head_s),
+        Paragraph('Mahlzeiten', head_s),
+        Paragraph('Aufgaben &amp; Verantwortliche', head_s),
+        Paragraph('Impuls des Tages', head_s),
+    ]
+
+    rows = [col_headers]
 
     if toern.startdatum and toern.enddatum:
         delta = (toern.enddatum - toern.startdatum).days
@@ -3166,81 +3208,85 @@ def tagesplan_pdf(request, toern_id, boot_id):
                 key=lambda m: _TYP_ORDER.get(m.typ, 99)
             )
             day_aufgaben = [a for a in aufgaben_qs if a.datum == datum]
-            day_impulse = sorted(
-                [imp for imp in impulse_qs if imp.datum == datum],
-                key=lambda imp: 0 if imp.slot == 'vormittag' else 1
-            )
+            day_impulse  = [imp for imp in impulse_qs if imp.datum == datum]
+            thema        = tagesthemen_map.get(datum, '')
 
-            tag_label = f"{LOCALE_DE[datum.weekday()]}, {datum.strftime('%d.%m.')}"
+            # Datum-Zelle
+            wochentag = LOCALE_DE[datum.weekday()]
+            datum_str = datum.strftime('%d.%m.%Y')
+            date_cell = [Paragraph(f"{wochentag}<br/>{datum_str}", day_s)]
             if is_anfahrt:
-                tag_label += "  ½ Anfahrt"
+                date_cell.append(Paragraph('½ Anfahrt', badge_s))
             if is_abfahrt:
-                tag_label += "  ½ Abreise"
+                date_cell.append(Paragraph('½ Abreise', badge_s))
+            if thema:
+                date_cell.append(Spacer(1, 1*mm))
+                date_cell.append(Paragraph(f'„{thema}"', thema_s))
 
-            # Mahlzeiten cell
-            MEAL_ICONS = {'fruehstueck': '☀ ', 'mittag': '○ ', 'abend': '☽ ', 'essen_gehen': '↗ ', 'snack': '• '}
-            meal_lines = []
-            for m in day_mahlzeiten:
-                icon = MEAL_ICONS.get(m.typ, '• ')
-                koch = f"  ({m.kochverantwortlich.user.first_name})" if m.kochverantwortlich else ''
-                meal_lines.append(Paragraph(f"{icon}{m.name}{koch}", cell_style))
-            if not meal_lines:
-                meal_lines = [Paragraph("–", cell_style)]
+            # Mahlzeiten-Zelle
+            if day_mahlzeiten:
+                meal_cell = []
+                for m in day_mahlzeiten:
+                    icon = MEAL_LABEL.get(m.typ, '· ')
+                    koch = f"  <font color='#888888'>({m.kochverantwortlich.user.first_name})</font>" \
+                           if m.kochverantwortlich else ''
+                    meal_cell.append(Paragraph(f"{icon}<b>{m.name}</b>{koch}", cell_s))
+            else:
+                meal_cell = [Paragraph('–', empty_s)]
 
-            # Aufgaben cell
-            auf_lines = []
-            for a in day_aufgaben:
-                label = a.beschreibung if a.typ == 'sonstiges' and a.beschreibung else a.get_typ_display()
-                if a.beschreibung and a.typ != 'sonstiges':
-                    label += f" ({a.beschreibung})"
-                person = f"  → {a.verantwortlich.user.first_name}" if a.verantwortlich else ''
-                auf_lines.append(Paragraph(f"• {label}{person}", cell_style))
-            if not auf_lines:
-                auf_lines = [Paragraph("–", cell_style)]
+            # Aufgaben-Zelle
+            if day_aufgaben:
+                auf_cell = []
+                for a in day_aufgaben:
+                    label = a.beschreibung if a.typ == 'sonstiges' and a.beschreibung else a.get_typ_display()
+                    if a.beschreibung and a.typ != 'sonstiges':
+                        label += f' ({a.beschreibung})'
+                    person = f"  <font color='#0D9488'><b>→ {a.verantwortlich.user.first_name}</b></font>" \
+                             if a.verantwortlich else ''
+                    auf_cell.append(Paragraph(f"• {label}{person}", cell_s))
+            else:
+                auf_cell = [Paragraph('–', empty_s)]
 
-            # Impulse cell
-            imp_lines = []
-            for imp in day_impulse:
-                slot_label = "Vm:" if imp.slot == 'vormittag' else "Nm:"
-                person = f" ({imp.verantwortlich.user.first_name})" if imp.verantwortlich else ''
-                imp_lines.append(Paragraph(f"<b>{slot_label}</b> {imp.thema}{person}", cell_style))
-            if not imp_lines:
-                imp_lines = [Paragraph("–", cell_style)]
+            # Impulse-Zelle
+            if day_impulse:
+                imp_cell = []
+                for imp in day_impulse:
+                    person = f"  <font color='#888888'>({imp.verantwortlich.user.first_name})</font>" \
+                             if imp.verantwortlich else ''
+                    imp_cell.append(Paragraph(f"✦ {imp.thema}{person}", cell_s))
+            else:
+                imp_cell = [Paragraph('–', empty_s)]
 
-            header_row = [
-                Paragraph(tag_label, head_style),
-                Paragraph("Mahlzeiten", head_style),
-                Paragraph("Aufgaben", head_style),
-                Paragraph("Impulse", head_style),
-            ]
-            content_row = [
-                Paragraph("", cell_style),
-                meal_lines,
-                auf_lines,
-                imp_lines,
-            ]
+            rows.append([date_cell, meal_cell, auf_cell, imp_cell])
 
-            t = Table(
-                [header_row, content_row],
-                colWidths=col_w,
-            )
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), LIGHT_BLUE),
-                ('TEXTCOLOR', (0, 0), (-1, 0), DARK_BLUE),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 8),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white]),
-                ('BOX', (0, 0), (-1, -1), 0.5, BORDER),
-                ('INNERGRID', (0, 0), (-1, -1), 0.3, BORDER),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('SPAN', (0, 0), (0, 1)),
-            ]))
-            elements.append(KeepTogether(t))
-            elements.append(Spacer(1, 2*mm))
+    main_table = Table(rows, colWidths=COL_W, repeatRows=1)
+    row_count = len(rows)
+    main_table.setStyle(TableStyle([
+        # Header-Zeile
+        ('BACKGROUND',   (0, 0), (-1, 0), MID_BLUE),
+        ('TEXTCOLOR',    (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',     (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',     (0, 0), (-1, 0), 9),
+        ('TOPPADDING',   (0, 0), (-1, 0), 4),
+        ('BOTTOMPADDING',(0, 0), (-1, 0), 4),
+        # Datenzeilen abwechselnd
+        *[('BACKGROUND', (0, r), (-1, r), ROW_ODD if r % 2 else ROW_EVEN)
+          for r in range(1, row_count)],
+        # Rahmen
+        ('BOX',          (0, 0), (-1, -1), 0.8, DARK_BLUE),
+        ('INNERGRID',    (0, 0), (-1, -1), 0.3, BORDER),
+        # Ausrichtung & Padding
+        ('VALIGN',       (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING',   (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING',(0, 1), (-1, -1), 5),
+        ('LEFTPADDING',  (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+        # Datumsspalte Hintergrund dunkel
+        ('BACKGROUND',   (0, 1), (0, -1), LIGHT_BLUE),
+        ('FONTNAME',     (0, 1), (0, -1), 'Helvetica-Bold'),
+    ]))
+
+    elements.append(main_table)
 
     doc.build(elements)
     buffer.seek(0)
@@ -3264,8 +3310,11 @@ def tagesplan_mahlzeit_add(request, toern_id, boot_id):
     name = request.POST.get('name', '').strip()
     koch_id = request.POST.get('kochverantwortlich') or None
 
-    if not datum or not name:
-        return JsonResponse({'status': 'error', 'msg': 'Datum und Name erforderlich'}, status=400)
+    if not datum:
+        return JsonResponse({'status': 'error', 'msg': 'Datum fehlt'}, status=400)
+
+    if not name:
+        name = dict(Mahlzeit.TYP_CHOICES).get(typ, typ)
 
     koch = None
     if koch_id:

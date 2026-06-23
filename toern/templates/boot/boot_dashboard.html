@@ -22,8 +22,20 @@
         </div>
     </div>
 
-    <!-- TAB-NAVIGATION -->
-    <div class="border-b border-base-300 mb-6 overflow-x-auto">
+    <!-- TAB-NAVIGATION Mobile Dropdown -->
+    <div class="lg:hidden mb-4">
+        <select id="tab-select" class="select select-bordered w-full" onchange="switchToTab(this.value)">
+            <option value="uebersicht">Crew &amp; Boot</option>
+            <option value="packliste">Meine Packliste</option>
+            <option value="bootspackliste">Mitbringen</option>
+            <option value="kasse">Bootskasse</option>
+            <option value="tagesplan">Tagesplan</option>
+            <option value="bordkueche">Bordküche</option>
+        </select>
+    </div>
+
+    <!-- TAB-NAVIGATION Desktop -->
+    <div class="hidden lg:block border-b border-base-300 mb-6 overflow-x-auto">
         <div class="flex min-w-max">
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-primary whitespace-nowrap" data-tab="uebersicht">
                 Crew &amp; Boot
@@ -493,8 +505,8 @@
                     <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Tagesimpulse</p>
                     <div id="impulse-list-{{ tag.datum|date:'Ymd' }}" class="space-y-1">
                         {% for imp in tag.impulse %}
-                        <div class="flex items-start gap-3 py-0.5" id="imp-row-{{ imp.id }}">
-                            <span class="text-xs font-medium text-base-content/50 w-20 shrink-0 pt-0.5">{{ imp.get_slot_display }}</span>
+                        <div class="flex items-start gap-2 py-0.5" id="imp-row-{{ imp.id }}">
+                            <span class="text-secondary shrink-0 mt-0.5">✦</span>
                             <div class="flex-1">
                                 <p class="text-sm">{{ imp.thema }}</p>
                                 {% if imp.verantwortlich %}
@@ -514,19 +526,16 @@
 
                     {% if hat_tagesplan_edit %}
                     <div class="mt-3 pt-3 border-t border-base-200">
-                        <div class="grid grid-cols-2 gap-2">
-                            <select id="imp-slot-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered">
-                                <option value="vormittag">Vormittag</option>
-                                <option value="nachmittag">Nachmittag</option>
-                            </select>
-                            <select id="imp-person-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered">
+                        <input type="hidden" id="imp-slot-{{ tag.datum|date:'Ymd' }}" value="vormittag">
+                        <div class="flex gap-2">
+                            <input type="text" id="imp-thema-{{ tag.datum|date:'Ymd' }}" placeholder="Impuls für diesen Tag…"
+                                class="input input-xs input-bordered flex-1">
+                            <select id="imp-person-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered w-32">
                                 <option value="">– Wer? –</option>
                                 {% for t in crew_bestaetigt %}
-                                <option value="{{ t.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                                <option value="{{ t.id }}">{{ t.user.first_name }}</option>
                                 {% endfor %}
                             </select>
-                            <input type="text" id="imp-thema-{{ tag.datum|date:'Ymd' }}" placeholder="Thema…"
-                                class="input input-xs input-bordered col-span-2">
                         </div>
                         <button onclick="addImpuls('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">+ Impuls</button>
                     </div>
@@ -746,28 +755,29 @@
 <!-- ========================= JS ========================= -->
 <script>
 // Tab-Navigation
-document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-        const tab = btn.dataset.tab;
-        document.querySelectorAll(".tab-btn").forEach(b => {
-            b.classList.remove("border-primary", "text-primary");
-            b.classList.add("border-transparent", "text-base-content/50");
-        });
-        btn.classList.add("border-primary", "text-primary");
-        btn.classList.remove("border-transparent", "text-base-content/50");
-        document.querySelectorAll("[id^='tab-']").forEach(t => t.classList.add("hidden"));
-        document.getElementById(`tab-${tab}`).classList.remove("hidden");
+function switchToTab(tab) {
+    document.querySelectorAll(".tab-btn").forEach(b => {
+        const active = b.dataset.tab === tab;
+        b.classList.toggle("border-primary", active);
+        b.classList.toggle("text-primary", active);
+        b.classList.toggle("border-transparent", !active);
+        b.classList.toggle("text-base-content/50", !active);
     });
+    document.querySelectorAll("[id^='tab-']").forEach(t => t.classList.add("hidden"));
+    document.getElementById(`tab-${tab}`)?.classList.remove("hidden");
+    const sel = document.getElementById("tab-select");
+    if (sel) sel.value = tab;
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => switchToTab(btn.dataset.tab));
 });
 
 // URL-Tab beim Laden
 (function() {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
-    if (tab) {
-        const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
-        if (btn) btn.click();
-    }
+    if (tab) switchToTab(tab);
 })();
 
 function getCSRFToken() {
@@ -1017,7 +1027,6 @@ function addMahlzeitTag(datum) {
     const koch = document.getElementById(`mz-koch-${d}`).value;
     const nameField = document.getElementById(`mz-name-${d}`);
     const btn = document.getElementById(`mz-btn-${d}`);
-    if (!name) { nameField.classList.add('input-error'); return; }
     nameField.classList.remove('input-error');
     if (btn) btn.disabled = true;
 
@@ -1132,24 +1141,19 @@ function addImpuls(datum) {
         const list = document.getElementById(`impulse-list-${d}`);
         document.getElementById(`imp-empty-${d}`)?.remove();
 
-        const personHtml = data.person ? `<p class="text-xs text-base-content/40">${data.person}</p>` : '';
+        const personHtml = data.person ? `<p class="text-xs text-base-content/40">${data.person.split(' ')[0]}</p>` : '';
         const newRow = document.createElement('div');
         newRow.id = `imp-row-${data.id}`;
-        newRow.className = 'flex items-start gap-3 py-0.5';
-        newRow.innerHTML = `<span class="text-xs font-medium text-base-content/50 w-20 shrink-0 pt-0.5">${data.slot_display}</span>
+        newRow.className = 'flex items-start gap-2 py-0.5';
+        newRow.innerHTML = `<span class="text-secondary shrink-0 mt-0.5">✦</span>
             <div class="flex-1"><p class="text-sm">${data.thema}</p>${personHtml}</div>
             <button onclick="deleteImpuls(${data.id})" class="btn btn-ghost btn-xs text-error px-1 mt-0.5">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>`;
 
         const existing = document.getElementById(`imp-row-${data.id}`);
-        if (existing) {
-            existing.replaceWith(newRow);
-        } else if (slot === 'vormittag') {
-            list.insertBefore(newRow, list.firstChild);
-        } else {
-            list.appendChild(newRow);
-        }
+        if (existing) existing.replaceWith(newRow);
+        else list.appendChild(newRow);
 
         themaField.value = '';
         document.getElementById(`imp-person-${d}`).value = '';
