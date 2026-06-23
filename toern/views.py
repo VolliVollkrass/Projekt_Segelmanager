@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from boote.models import Boot, Kabine
 from config import settings
-from logistik.models import Einkaufspunkt, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht
+from logistik.models import Einkaufspunkt, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
@@ -1851,6 +1851,11 @@ def boot_dashboard(request, toern_id):
     # ─── Tagesplan ───
     _TYP_ORDER = {'fruehstueck': 0, 'mittag': 1, 'abend': 2, 'essen_gehen': 3, 'snack': 4}
 
+    tagesthemen_map = {
+        t.datum: t
+        for t in Tagesthema.objects.filter(boot=boot, toern=toern)
+    }
+
     aufgaben_qs = list(
         Tagesaufgabe.objects.filter(boot=boot, toern=toern)
         .select_related('verantwortlich__user')
@@ -1869,10 +1874,12 @@ def boot_dashboard(request, toern_id):
         delta = (toern.enddatum - toern.startdatum).days
         for i in range(delta + 1):
             datum = toern.startdatum + timedelta(days=i)
+            tagesthema_obj = tagesthemen_map.get(datum)
             tagesplan_tage.append({
                 'datum': datum,
                 'is_anfahrt': i == 0,
                 'is_abfahrt': i == delta,
+                'tagesthema': tagesthema_obj.thema if tagesthema_obj else '',
                 'mahlzeiten': sorted(
                     [m for m in mahlzeiten_qs if m.datum == datum],
                     key=lambda m: _TYP_ORDER.get(m.typ, 99)
@@ -2921,7 +2928,11 @@ def mitfahrangebot_loeschen(request, eintrag_id):
 
 def _hat_tagesplan_edit(request, toern, boot, teilnahme):
     """True wenn der User Tagesplan-Bearbeitungsrecht hat."""
-    if teilnahme.rolle in ['skipper', 'coskipper'] or request.user == toern.anbieter:
+    if request.user == toern.anbieter:
+        return True
+    if not teilnahme:
+        return False
+    if teilnahme.rolle in ['skipper', 'coskipper']:
         return True
     return TagesplanBearbeitungsrecht.objects.filter(
         boot=boot, toern=toern, teilnahme=teilnahme
@@ -3238,6 +3249,65 @@ def tagesplan_pdf(request, toern_id, boot_id):
     safe_name = boot.name.replace(' ', '_')
     response['Content-Disposition'] = f'inline; filename="Tagesplan_{safe_name}.pdf"'
     return response
+
+
+@login_required
+@require_POST
+def tagesplan_mahlzeit_add(request, toern_id, boot_id):
+    """Mahlzeit für den Tagesplan hinzufügen — AJAX, gibt Mahlzeit-Daten zurück."""
+    toern, boot, teilnahme = _get_tagesplan_teilnahme(request, toern_id, boot_id)
+    if not _hat_tagesplan_edit(request, toern, boot, teilnahme):
+        raise PermissionDenied
+
+    datum = request.POST.get('datum')
+    typ = request.POST.get('typ', 'abend')
+    name = request.POST.get('name', '').strip()
+    koch_id = request.POST.get('kochverantwortlich') or None
+
+    if not datum or not name:
+        return JsonResponse({'status': 'error', 'msg': 'Datum und Name erforderlich'}, status=400)
+
+    koch = None
+    if koch_id:
+        koch = Teilnahme.objects.filter(id=koch_id, toern=toern, boot=boot).first()
+
+    mahlzeit = Mahlzeit.objects.create(
+        boot=boot, toern=toern, datum=datum,
+        typ=typ, name=name, kochverantwortlich=koch
+    )
+    person = ''
+    if mahlzeit.kochverantwortlich:
+        person = f"{mahlzeit.kochverantwortlich.user.first_name} {mahlzeit.kochverantwortlich.user.last_name}"
+
+    return JsonResponse({
+        'status': 'ok',
+        'id': mahlzeit.id,
+        'typ': mahlzeit.typ,
+        'typ_display': mahlzeit.get_typ_display(),
+        'name': mahlzeit.name,
+        'person': person,
+    })
+
+
+@login_required
+@require_POST
+def tagesthema_set(request, toern_id, boot_id):
+    """Tagesthema setzen oder aktualisieren — AJAX."""
+    toern, boot, teilnahme = _get_tagesplan_teilnahme(request, toern_id, boot_id)
+    if not _hat_tagesplan_edit(request, toern, boot, teilnahme):
+        raise PermissionDenied
+
+    datum = request.POST.get('datum')
+    thema = request.POST.get('thema', '').strip()
+
+    if not datum:
+        return JsonResponse({'status': 'error', 'msg': 'Datum fehlt'}, status=400)
+
+    obj, _ = Tagesthema.objects.update_or_create(
+        boot=boot, toern=toern, datum=datum,
+        defaults={'thema': thema}
+    )
+    return JsonResponse({'status': 'ok', 'thema': obj.thema})
 
 
 # ========================= MITFAHRTANFRAGE =========================

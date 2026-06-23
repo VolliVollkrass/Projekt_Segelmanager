@@ -54,6 +54,17 @@ class Mahlzeit(models.Model):
         return f"{self.get_typ_display()} am {self.datum}: {self.name}"
 
 
+# Tagesplan: Tagesthema
+class Tagesthema(models.Model):
+    boot = models.ForeignKey(Boot, on_delete=models.CASCADE, related_name='tagesthemen')
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name='tagesthemen')
+    datum = models.DateField()
+    thema = models.CharField(max_length=300, blank=True)
+
+    class Meta:
+        unique_together = ('boot', 'toern', 'datum')
+
+
 # Tagesplan: Aufgaben pro Tag
 class Tagesaufgabe(models.Model):
     TYP_CHOICES = [

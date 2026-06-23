@@ -66,4 +66,6 @@ urlpatterns = [
     path("tagesplan/impuls/<int:impuls_id>/delete/", tagesimpuls_delete, name="tagesimpuls_delete"),
     path("<int:toern_id>/boot/<int:boot_id>/tagesplan/recht/<int:teilnahme_id>/", tagesplan_recht_toggle, name="tagesplan_recht_toggle"),
     path("<int:toern_id>/boot/<int:boot_id>/tagesplan/pdf/", tagesplan_pdf, name="tagesplan_pdf"),
+    path("<int:toern_id>/boot/<int:boot_id>/tagesplan/mahlzeit/add/", tagesplan_mahlzeit_add, name="tagesplan_mahlzeit_add"),
+    path("<int:toern_id>/boot/<int:boot_id>/tagesplan/thema/", tagesthema_set, name="tagesthema_set"),
 ]

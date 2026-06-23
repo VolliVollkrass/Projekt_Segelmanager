@@ -378,6 +378,20 @@
 
             <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 
+                <!-- TAGESTHEMA -->
+                <div class="px-4 py-3 border-b border-base-200 bg-base-200/30">
+                    {% if hat_tagesplan_edit %}
+                    <input type="text"
+                        id="thema-{{ tag.datum|date:'Ymd' }}"
+                        value="{{ tag.tagesthema }}"
+                        placeholder="Tagesthema… z.B. Weite erleben"
+                        class="input input-ghost w-full text-sm font-medium italic placeholder:text-base-content/30 focus:outline-none px-0"
+                        onblur="saveThema('{{ tag.datum|date:'Y-m-d' }}', this.value)">
+                    {% elif tag.tagesthema %}
+                    <p class="text-sm font-medium italic text-base-content/70">{{ tag.tagesthema }}</p>
+                    {% endif %}
+                </div>
+
                 <!-- MAHLZEITEN -->
                 <div class="p-4 border-b border-base-200">
                     <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Mahlzeiten</p>
@@ -421,7 +435,7 @@
                             <input type="text" id="mz-name-{{ tag.datum|date:'Ymd' }}" placeholder="z.B. Pasta Napoli"
                                 class="input input-xs input-bordered col-span-2">
                         </div>
-                        <button onclick="addMahlzeitTag('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">+ Mahlzeit</button>
+                        <button onclick="addMahlzeitTag('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2" id="mz-btn-{{ tag.datum|date:'Ymd' }}">+ Mahlzeit</button>
                     </div>
                     {% endif %}
                 </div>
@@ -994,20 +1008,59 @@ function toggleBeschr(datumStr) {
     }
 }
 
+const MEAL_ICONS = { fruehstueck:'☀️', mittag:'🌤️', abend:'🌙', essen_gehen:'🍽️', snack:'🍎' };
+
 function addMahlzeitTag(datum) {
     const d = datum.replace(/-/g, '');
     const typ = document.getElementById(`mz-typ-${d}`).value;
     const name = document.getElementById(`mz-name-${d}`).value.trim();
     const koch = document.getElementById(`mz-koch-${d}`).value;
     const nameField = document.getElementById(`mz-name-${d}`);
+    const btn = document.getElementById(`mz-btn-${d}`);
     if (!name) { nameField.classList.add('input-error'); return; }
     nameField.classList.remove('input-error');
+    if (btn) btn.disabled = true;
 
-    fetch(`/toern/${TOERN_ID}/mahlzeit/add/`, {
+    fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/mahlzeit/add/`, {
         method: 'POST',
         headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `datum=${datum}&typ=${typ}&name=${encodeURIComponent(name)}&kochverantwortlich=${koch}`
-    }).then(res => { if (res.ok) location.href = '?tab=tagesplan'; });
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status !== 'ok') { if (btn) btn.disabled = false; return; }
+        const list = document.getElementById(`mahlzeiten-list-${d}`);
+        document.getElementById(`mz-empty-${d}`)?.remove();
+
+        const icon = MEAL_ICONS[data.typ] || '🍎';
+        const isEssen = data.typ === 'essen_gehen';
+        const personHtml = data.person ? `<span class="text-xs text-base-content/40">${data.person.split(' ')[0]}</span>` : '';
+        const deleteBtn = `<button onclick="deleteMahlzeit(${data.id})" class="btn btn-ghost btn-xs text-error px-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>`;
+
+        const row = document.createElement('div');
+        row.id = `mz-row-${data.id}`;
+        row.className = 'flex items-center gap-2 py-0.5';
+        row.innerHTML = `<span class="text-sm w-5 text-center shrink-0">${icon}</span>
+            <span class="flex-1 text-sm${isEssen ? ' text-secondary font-medium' : ''}">${data.name}</span>
+            ${personHtml}${deleteBtn}`;
+        list.appendChild(row);
+
+        nameField.value = '';
+        document.getElementById(`mz-typ-${d}`).value = 'abend';
+        document.getElementById(`mz-koch-${d}`).value = '';
+        if (btn) btn.disabled = false;
+    })
+    .catch(() => { if (btn) btn.disabled = false; });
+}
+
+function saveThema(datum, thema) {
+    fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/thema/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `datum=${datum}&thema=${encodeURIComponent(thema)}`
+    });
 }
 
 function addAufgabe(datum) {
