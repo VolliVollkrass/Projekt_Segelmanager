@@ -3177,7 +3177,15 @@ def tagesplan_pdf(request, toern_id, boot_id):
                   fontName='Helvetica-Oblique', leading=9)
 
     LOCALE_DE  = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
-    MEAL_LABEL = {'fruehstueck': '☀ ', 'mittag': '○ ', 'abend': '☽ ', 'essen_gehen': '↗ ', 'snack': '· '}
+    # Helvetica kennt keine Unicode-Symbole → farbige Text-Kürzel in Teal
+    TEAL_HEX = '#0D9488'
+    MEAL_LABEL = {
+        'fruehstueck': f"<font color='{TEAL_HEX}'><b>Fr</b></font> ",
+        'mittag':      f"<font color='{TEAL_HEX}'><b>Mi</b></font> ",
+        'abend':       f"<font color='{TEAL_HEX}'><b>Ab</b></font> ",
+        'essen_gehen': f"<font color='{TEAL_HEX}'><b>EG</b></font> ",
+        'snack':       f"<font color='{TEAL_HEX}'><b>Sn</b></font> ",
+    }
 
     # ── Buffer / Doc ─────────────────────────────────────────────────────────
     buffer = BytesIO()
@@ -3277,7 +3285,7 @@ def tagesplan_pdf(request, toern_id, boot_id):
             # Mahlzeiten-Zelle
             meal_cell = []
             for m in day_mahlzeiten:
-                icon = MEAL_LABEL.get(m.typ, '· ')
+                icon = MEAL_LABEL.get(m.typ, f"<font color='{TEAL_HEX}'><b>--</b></font> ")
                 koch = f"  <font color='#888888'>({m.kochverantwortlich.user.first_name})</font>" \
                        if m.kochverantwortlich else ''
                 meal_cell.append(Paragraph(f"{icon}<b>{m.name}</b>{koch}", cell_s))
