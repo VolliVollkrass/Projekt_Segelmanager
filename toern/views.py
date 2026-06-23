@@ -10,7 +10,7 @@ from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE
-from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot
+from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
 from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
@@ -347,6 +347,22 @@ def crew_overview(request):
 
     return render(request, "crew/crew_overview.html", context)
 
+
+def _mitfahrangebote_mit_anfrage(toern, user):
+    angebote = list(
+        Mitfahrangebot.objects.filter(toern=toern)
+        .select_related("user")
+        .prefetch_related("anfragen__anfragender")
+    )
+    anfragen_map = {
+        a.angebot_id: a
+        for a in Mitfahrtanfrage.objects.filter(anfragender=user, angebot__toern=toern)
+    }
+    for a in angebote:
+        a.meine_anfrage = anfragen_map.get(a.id)
+    return angebote
+
+
 def crew_dashboard(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
 
@@ -497,7 +513,7 @@ def crew_dashboard(request, toern_id):
         "kann_pinnwand_posten": is_skipper or is_coskipper or (toern.anbieter == request.user),
 
         # Mitfahrgelegenheiten
-        "mitfahrangebote": Mitfahrangebot.objects.filter(toern=toern).select_related("user"),
+        "mitfahrangebote": _mitfahrangebote_mit_anfrage(toern, request.user),
     }
 
     return render(request, "crew/crew_dashboard.html", context)
@@ -2849,7 +2865,7 @@ def pinnwand_nachricht_loeschen(request, nachricht_id):
 @require_POST
 def mitfahrangebot_erstellen(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
-    teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern, status="bestaetigt").first()
+    teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern, status__in=["angemeldet", "bestaetigt"]).first()
 
     if not teilnahme:
         raise PermissionDenied
@@ -3222,3 +3238,72 @@ def tagesplan_pdf(request, toern_id, boot_id):
     safe_name = boot.name.replace(' ', '_')
     response['Content-Disposition'] = f'inline; filename="Tagesplan_{safe_name}.pdf"'
     return response
+
+
+# ========================= MITFAHRTANFRAGE =========================
+
+@login_required
+@require_POST
+def mitfahrt_anfrage_senden(request, angebot_id):
+    angebot = get_object_or_404(Mitfahrangebot, id=angebot_id)
+    toern = angebot.toern
+
+    teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern, status__in=["angemeldet", "bestaetigt"]).first()
+    if not teilnahme:
+        raise PermissionDenied
+
+    if angebot.user == request.user:
+        messages.error(request, "Das geht leider nicht bei deinem eigenen Eintrag.")
+        return redirect(reverse("crew_dashboard", args=[toern.id]) + "?tab=mitfahrt")
+
+    if angebot.typ == "angebot" and angebot.verbleibende_plaetze is not None and angebot.verbleibende_plaetze <= 0:
+        messages.error(request, "Leider sind keine Plätze mehr frei.")
+        return redirect(reverse("crew_dashboard", args=[toern.id]) + "?tab=mitfahrt")
+
+    _, created = Mitfahrtanfrage.objects.get_or_create(angebot=angebot, anfragender=request.user)
+    if created:
+        if angebot.typ == "angebot":
+            messages.success(request, "Anfrage gesendet – der Fahrer wird sie bestätigen.")
+        else:
+            messages.success(request, "Angebot gesendet – die Person wird es bestätigen.")
+    else:
+        messages.info(request, "Du hast bereits eine Anfrage/Angebot gestellt.")
+    return redirect(reverse("crew_dashboard", args=[toern.id]) + "?tab=mitfahrt")
+
+
+@login_required
+@require_POST
+def mitfahrt_anfrage_antworten(request, anfrage_id):
+    anfrage = get_object_or_404(Mitfahrtanfrage, id=anfrage_id)
+    toern = anfrage.angebot.toern
+
+    if anfrage.angebot.user != request.user:
+        raise PermissionDenied
+
+    aktion = request.POST.get("aktion")
+    if aktion == "accept":
+        if anfrage.angebot.verbleibende_plaetze is not None and anfrage.angebot.verbleibende_plaetze <= 0:
+            messages.error(request, "Keine freien Plätze mehr vorhanden.")
+        else:
+            anfrage.status = "accepted"
+            anfrage.save()
+            messages.success(request, f"{anfrage.anfragender.first_name} wurde bestätigt.")
+    elif aktion == "reject":
+        anfrage.status = "rejected"
+        anfrage.save()
+        messages.success(request, f"Anfrage von {anfrage.anfragender.first_name} abgelehnt.")
+    return redirect(reverse("crew_dashboard", args=[toern.id]) + "?tab=mitfahrt")
+
+
+@login_required
+@require_POST
+def mitfahrt_anfrage_zurueckziehen(request, anfrage_id):
+    anfrage = get_object_or_404(Mitfahrtanfrage, id=anfrage_id)
+    toern = anfrage.angebot.toern
+
+    if anfrage.anfragender != request.user:
+        raise PermissionDenied
+
+    anfrage.delete()
+    messages.success(request, "Anfrage zurückgezogen.")
+    return redirect(reverse("crew_dashboard", args=[toern.id]) + "?tab=mitfahrt")

@@ -313,6 +313,40 @@ class Mitfahrangebot(models.Model):
     def __str__(self):
         return f"{self.get_typ_display()} von {self.user.first_name} ({self.abfahrtsort})"
 
+    @property
+    def belegte_plaetze(self):
+        return self.anfragen.filter(status="accepted").count()
+
+    @property
+    def verbleibende_plaetze(self):
+        if self.freie_plaetze is None:
+            return None
+        return max(0, self.freie_plaetze - self.belegte_plaetze)
+
+
+class Mitfahrtanfrage(models.Model):
+    STATUS_CHOICES = [
+        ("pending", "Angefragt"),
+        ("accepted", "Bestätigt"),
+        ("rejected", "Abgelehnt"),
+    ]
+
+    angebot = models.ForeignKey(Mitfahrangebot, on_delete=models.CASCADE, related_name="anfragen")
+    anfragender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="mitfahrt_anfragen"
+    )
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("angebot", "anfragender")
+        ordering = ["created_at"]
+
+    def __str__(self):
+        return f"{self.anfragender.first_name} → {self.angebot} ({self.status})"
+
 
 class ErinnerungsMailLog(models.Model):
     toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="erinnerungsmails")

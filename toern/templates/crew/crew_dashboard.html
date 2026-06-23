@@ -595,49 +595,144 @@
 
         <!-- Liste aller Einträge -->
         {% if mitfahrangebote %}
-        <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden divide-y divide-base-200">
+        <div class="space-y-3">
             {% for eintrag in mitfahrangebote %}
-            <div class="px-4 py-3 flex items-start gap-3">
-                <div class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold mt-0.5
-                    {% if eintrag.typ == 'angebot' %}bg-success/10 text-success{% else %}bg-warning/10 text-warning{% endif %}">
-                    {% if eintrag.typ == 'angebot' %}
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-                    </svg>
-                    {% else %}
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                    </svg>
-                    {% endif %}
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex flex-wrap items-center gap-2 mb-0.5">
-                        <span class="text-xs font-semibold">{{ eintrag.user.first_name }} {{ eintrag.user.last_name }}</span>
-                        <span class="badge badge-xs {% if eintrag.typ == 'angebot' %}badge-success{% else %}badge-warning{% endif %}">
-                            {{ eintrag.get_typ_display }}
-                        </span>
-                        {% if eintrag.freie_plaetze %}
-                        <span class="text-xs text-base-content/40">{{ eintrag.freie_plaetze }} Platz{% if eintrag.freie_plaetze != 1 %}ätze{% endif %} frei</span>
+            <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+
+                <!-- Eintrag Header -->
+                <div class="px-4 py-3 flex items-start gap-3">
+                    <div class="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold mt-0.5
+                        {% if eintrag.typ == 'angebot' %}bg-success/10 text-success{% else %}bg-warning/10 text-warning{% endif %}">
+                        {% if eintrag.typ == 'angebot' %}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        {% else %}
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
                         {% endif %}
                     </div>
-                    <p class="text-sm font-medium">{{ eintrag.abfahrtsort }}</p>
-                    {% if eintrag.abfahrtszeit %}
-                    <p class="text-xs text-base-content/50">{{ eintrag.abfahrtszeit|date:"d.m.Y H:i" }} Uhr</p>
-                    {% endif %}
-                    {% if eintrag.anmerkung %}
-                    <p class="text-xs text-base-content/60 mt-0.5">{{ eintrag.anmerkung }}</p>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex flex-wrap items-center gap-2 mb-0.5">
+                            <span class="text-xs font-semibold">{{ eintrag.user.first_name }} {{ eintrag.user.last_name }}</span>
+                            <span class="badge badge-xs {% if eintrag.typ == 'angebot' %}badge-success{% else %}badge-warning{% endif %}">
+                                {{ eintrag.get_typ_display }}
+                            </span>
+                            {% if eintrag.typ == 'angebot' and eintrag.freie_plaetze %}
+                            <span class="text-xs text-base-content/40">
+                                {{ eintrag.verbleibende_plaetze }}/{{ eintrag.freie_plaetze }} Platz{% if eintrag.freie_plaetze != 1 %}ätze{% endif %} frei
+                            </span>
+                            {% endif %}
+                        </div>
+                        <p class="text-sm font-medium">{{ eintrag.abfahrtsort }}</p>
+                        {% if eintrag.abfahrtszeit %}
+                        <p class="text-xs text-base-content/50">{{ eintrag.abfahrtszeit|date:"d.m.Y H:i" }} Uhr</p>
+                        {% endif %}
+                        {% if eintrag.anmerkung %}
+                        <p class="text-xs text-base-content/60 mt-0.5">{{ eintrag.anmerkung }}</p>
+                        {% endif %}
+                    </div>
+                    {% if eintrag.user == request.user %}
+                    <form method="POST" action="{% url 'mitfahrangebot_loeschen' eintrag.id %}" class="shrink-0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" title="Löschen">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                        </button>
+                    </form>
                     {% endif %}
                 </div>
+
+                <!-- Eintrag-Besitzer sieht eingehende Anfragen/Angebote -->
                 {% if eintrag.user == request.user %}
-                <form method="POST" action="{% url 'mitfahrangebot_loeschen' eintrag.id %}" class="shrink-0">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-ghost btn-xs text-base-content/30 hover:text-error" title="Löschen">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                        </svg>
-                    </button>
-                </form>
+                {% if eintrag.anfragen.all %}
+                <div class="border-t border-base-200 divide-y divide-base-200">
+                    {% for a in eintrag.anfragen.all %}
+                    <div class="px-4 py-2.5 flex items-center gap-3">
+                        <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-semibold text-primary">
+                            {{ a.anfragender.first_name|first }}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <span class="text-xs font-medium">{{ a.anfragender.first_name }} {{ a.anfragender.last_name }}</span>
+                            {% if a.status == 'pending' %}
+                            <span class="ml-1 badge badge-xs badge-warning">{% if eintrag.typ == 'angebot' %}angefragt{% else %}bietet Mitfahrt an{% endif %}</span>
+                            {% elif a.status == 'accepted' %}
+                            <span class="ml-1 badge badge-xs badge-success">bestätigt</span>
+                            {% else %}
+                            <span class="ml-1 badge badge-xs badge-ghost">abgelehnt</span>
+                            {% endif %}
+                        </div>
+                        {% if a.status == 'pending' %}
+                        <div class="flex gap-1 shrink-0">
+                            <form method="POST" action="{% url 'mitfahrt_anfrage_antworten' a.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="aktion" value="accept">
+                                <button class="btn btn-success btn-xs">✓</button>
+                            </form>
+                            <form method="POST" action="{% url 'mitfahrt_anfrage_antworten' a.id %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="aktion" value="reject">
+                                <button class="btn btn-error btn-xs btn-outline">✕</button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
                 {% endif %}
+
+                <!-- Andere Crew-Mitglieder sehen Anfrage-Status oder Aktions-Button -->
+                {% else %}
+                <div class="border-t border-base-200 px-4 py-2.5">
+                    {% if eintrag.meine_anfrage %}
+                        {% with a=eintrag.meine_anfrage %}
+                        <div class="flex items-center justify-between">
+                            {% if a.status == 'pending' %}
+                            {% if eintrag.typ == 'angebot' %}
+                            <span class="text-xs text-base-content/50">Anfrage gesendet – wartet auf Bestätigung</span>
+                            {% else %}
+                            <span class="text-xs text-base-content/50">Mitfahrtangebot gesendet – wartet auf Bestätigung</span>
+                            {% endif %}
+                            <form method="POST" action="{% url 'mitfahrt_anfrage_zurueckziehen' a.id %}">
+                                {% csrf_token %}
+                                <button class="btn btn-ghost btn-xs text-base-content/40 hover:text-error">Zurückziehen</button>
+                            </form>
+                            {% elif a.status == 'accepted' %}
+                            {% if eintrag.typ == 'angebot' %}
+                            <span class="text-xs text-success font-semibold">Dein Platz ist bestätigt ✓</span>
+                            {% else %}
+                            <span class="text-xs text-success font-semibold">Mitfahrt bestätigt ✓</span>
+                            {% endif %}
+                            <form method="POST" action="{% url 'mitfahrt_anfrage_zurueckziehen' a.id %}">
+                                {% csrf_token %}
+                                <button class="btn btn-ghost btn-xs text-base-content/40 hover:text-error">Absagen</button>
+                            </form>
+                            {% else %}
+                            <span class="text-xs text-error">Leider abgelehnt</span>
+                            <form method="POST" action="{% url 'mitfahrt_anfrage_senden' eintrag.id %}">
+                                {% csrf_token %}
+                                <button class="btn btn-primary btn-xs">Erneut {% if eintrag.typ == 'angebot' %}anfragen{% else %}anbieten{% endif %}</button>
+                            </form>
+                            {% endif %}
+                        </div>
+                        {% endwith %}
+                    {% elif eintrag.typ == 'angebot' and eintrag.verbleibende_plaetze == 0 %}
+                    <p class="text-xs text-base-content/40">Keine Plätze mehr frei</p>
+                    {% else %}
+                    <form method="POST" action="{% url 'mitfahrt_anfrage_senden' eintrag.id %}">
+                        {% csrf_token %}
+                        {% if eintrag.typ == 'angebot' %}
+                        <button class="btn btn-primary btn-sm w-full">Mitfahrt anfragen</button>
+                        {% else %}
+                        <button class="btn btn-secondary btn-sm w-full">Ich nehme dich mit</button>
+                        {% endif %}
+                    </form>
+                    {% endif %}
+                </div>
+                {% endif %}
+
             </div>
             {% endfor %}
         </div>
