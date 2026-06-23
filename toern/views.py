@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from boote.models import Boot, Kabine
 from config import settings
-from logistik.models import Einkaufspunkt, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht
+from logistik.models import Einkaufspunkt, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
@@ -1003,6 +1003,22 @@ def boot_abschluss_update(request, boot_id):
 
 @login_required
 @require_POST
+@login_required
+@require_POST
+def toern_tagesimpulse_toggle(request, pk):
+    """Tagesthema & Impulse für einen Törn ein-/ausschalten."""
+    toern = get_object_or_404(Toern, pk=pk)
+    is_anbieter = toern.anbieter == request.user
+    is_skipper = Teilnahme.objects.filter(
+        toern=toern, user=request.user, rolle__in=('skipper', 'coskipper')
+    ).exists()
+    if not is_anbieter and not is_skipper:
+        raise PermissionDenied
+    toern.tagesimpulse_aktiv = not toern.tagesimpulse_aktiv
+    toern.save(update_fields=['tagesimpulse_aktiv'])
+    return JsonResponse({'aktiv': toern.tagesimpulse_aktiv})
+
+
 def toern_foto_links_update(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
     is_anbieter = toern.anbieter == request.user
@@ -1851,6 +1867,11 @@ def boot_dashboard(request, toern_id):
     # ─── Tagesplan ───
     _TYP_ORDER = {'fruehstueck': 0, 'mittag': 1, 'abend': 2, 'essen_gehen': 3, 'snack': 4}
 
+    tagesthemen_map = {
+        t.datum: t
+        for t in Tagesthema.objects.filter(boot=boot, toern=toern)
+    }
+
     aufgaben_qs = list(
         Tagesaufgabe.objects.filter(boot=boot, toern=toern)
         .select_related('verantwortlich__user')
@@ -1866,13 +1887,17 @@ def boot_dashboard(request, toern_id):
 
     tagesplan_tage = []
     if toern.startdatum and toern.enddatum:
-        delta = (toern.enddatum - toern.startdatum).days
+        _start = toern.startdatum.date() if hasattr(toern.startdatum, 'date') else toern.startdatum
+        _end   = toern.enddatum.date()   if hasattr(toern.enddatum,   'date') else toern.enddatum
+        delta = (_end - _start).days
         for i in range(delta + 1):
-            datum = toern.startdatum + timedelta(days=i)
+            datum = _start + timedelta(days=i)
+            tagesthema_obj = tagesthemen_map.get(datum)
             tagesplan_tage.append({
                 'datum': datum,
                 'is_anfahrt': i == 0,
                 'is_abfahrt': i == delta,
+                'tagesthema': tagesthema_obj.thema if tagesthema_obj else '',
                 'mahlzeiten': sorted(
                     [m for m in mahlzeiten_qs if m.datum == datum],
                     key=lambda m: _TYP_ORDER.get(m.typ, 99)
@@ -2921,7 +2946,11 @@ def mitfahrangebot_loeschen(request, eintrag_id):
 
 def _hat_tagesplan_edit(request, toern, boot, teilnahme):
     """True wenn der User Tagesplan-Bearbeitungsrecht hat."""
-    if teilnahme.rolle in ['skipper', 'coskipper'] or request.user == toern.anbieter:
+    if request.user == toern.anbieter:
+        return True
+    if not teilnahme:
+        return False
+    if teilnahme.rolle in ['skipper', 'coskipper']:
         return True
     return TagesplanBearbeitungsrecht.objects.filter(
         boot=boot, toern=toern, teilnahme=teilnahme
@@ -2933,14 +2962,12 @@ def _get_tagesplan_teilnahme(request, toern_id, boot_id):
     toern = get_object_or_404(Toern, id=toern_id)
     boot = get_object_or_404(Boot, id=boot_id)
     teilnahme = Teilnahme.objects.filter(
-        user=request.user, toern=toern, boot=boot, status='bestaetigt'
+        user=request.user, toern=toern, boot=boot
     ).first()
     if not teilnahme:
-        # Anbieter ohne eigene Teilnahme: darf trotzdem bearbeiten
+        # Anbieter ohne eigene Boot-Teilnahme: holt irgendeine Teilnahme im Törn
         if request.user == toern.anbieter:
-            teilnahme = Teilnahme.objects.filter(
-                user=request.user, toern=toern
-            ).first()
+            teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern).first()
         if not teilnahme:
             raise PermissionDenied
     return toern, boot, teilnahme
@@ -3010,8 +3037,8 @@ def tagesimpuls_add(request, toern_id, boot_id):
     thema = request.POST.get('thema', '').strip()
     verantwortlich_id = request.POST.get('verantwortlich') or None
 
-    if not datum or not thema:
-        return JsonResponse({'status': 'error', 'msg': 'Datum und Thema erforderlich'}, status=400)
+    if not datum:
+        return JsonResponse({'status': 'error', 'msg': 'Datum fehlt'}, status=400)
 
     verantwortlich = None
     if verantwortlich_id:
@@ -3081,9 +3108,9 @@ def tagesplan_recht_toggle(request, toern_id, boot_id, teilnahme_id):
 
 @login_required
 def tagesplan_pdf(request, toern_id, boot_id):
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Paragraph, KeepTogether
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Paragraph, Image
     from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.pagesizes import landscape, A4
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import mm
     from django.http import HttpResponse
@@ -3093,143 +3120,218 @@ def tagesplan_pdf(request, toern_id, boot_id):
     boot = get_object_or_404(Boot, id=boot_id)
 
     teilnahme = Teilnahme.objects.filter(user=request.user, toern=toern).first()
-    if not teilnahme:
+    if not teilnahme and request.user != toern.anbieter:
         raise PermissionDenied
 
+    _TYP_ORDER = {'fruehstueck': 0, 'mittag': 1, 'abend': 2, 'essen_gehen': 3, 'snack': 4}
     aufgaben_qs = list(
-        Tagesaufgabe.objects.filter(boot=boot, toern=toern)
-        .select_related('verantwortlich__user')
+        Tagesaufgabe.objects.filter(boot=boot, toern=toern).select_related('verantwortlich__user')
     )
     impulse_qs = list(
-        Tagesimpuls.objects.filter(boot=boot, toern=toern)
-        .select_related('verantwortlich__user')
+        Tagesimpuls.objects.filter(boot=boot, toern=toern).select_related('verantwortlich__user')
     )
-    _TYP_ORDER = {'fruehstueck': 0, 'mittag': 1, 'abend': 2, 'essen_gehen': 3, 'snack': 4}
     mahlzeiten_qs = list(
-        Mahlzeit.objects.filter(boot=boot, toern=toern)
-        .select_related('kochverantwortlich__user')
-        .order_by('datum')
+        Mahlzeit.objects.filter(boot=boot, toern=toern).select_related('kochverantwortlich__user')
     )
+    tagesthemen_map = {t.datum: t.thema for t in Tagesthema.objects.filter(boot=boot, toern=toern)}
 
+    # ── Farbpalette (aus DaisyUI-Theme "segelmanager") ───────────────────────
+    DARK_BLUE  = colors.HexColor('#0F172A')   # base-content / neutral
+    MID_BLUE   = colors.HexColor('#1E293B')   # neutral
+    HEADER_BG  = colors.HexColor('#1E293B')   # neutral – Tabellenkopf
+    TEAL       = colors.HexColor('#0D9488')   # secondary
+    ROW_ODD    = colors.HexColor('#F8FAFC')   # base-100
+    ROW_EVEN   = colors.white
+    DATE_COL   = colors.HexColor('#E2F2F1')   # helles Teal für Datumsspalte
+    BORDER     = colors.HexColor('#E2E8F0')   # base-300
+    GRAY_TXT   = colors.HexColor('#64748B')
+
+    # ── Seitengeometrie ──────────────────────────────────────────────────────
+    PAGE     = landscape(A4)
+    L_MAR = R_MAR = T_MAR = B_MAR = 12 * mm
+    USABLE_W = PAGE[0] - L_MAR - R_MAR   # ≈ 273 mm
+
+    # ── Törndaten ────────────────────────────────────────────────────────────
+    if toern.startdatum and toern.enddatum:
+        _start = toern.startdatum.date() if hasattr(toern.startdatum, 'date') else toern.startdatum
+        _end   = toern.enddatum.date()   if hasattr(toern.enddatum,   'date') else toern.enddatum
+        num_days = (_end - _start).days + 1
+    else:
+        _start = _end = None
+        num_days = 1
+
+    # ── Styles (feste 8 pt – gut lesbar beim Drucken) ────────────────────────
+    styles = getSampleStyleSheet()
+    def _ps(name, **kw):
+        return ParagraphStyle(name, parent=styles['Normal'], **kw)
+
+    title_s = _ps('T',  fontSize=14, fontName='Helvetica-Bold', textColor=MID_BLUE, leading=17)
+    sub_s   = _ps('S',  fontSize=8,  textColor=GRAY_TXT,  leading=11, spaceAfter=2*mm)
+    head_s  = _ps('H',  fontSize=8,  fontName='Helvetica-Bold', textColor=colors.white)
+    day_s   = _ps('D',  fontSize=9,  fontName='Helvetica-Bold', textColor=MID_BLUE, leading=13)
+    thema_s = _ps('TH', fontSize=7,  textColor=TEAL, fontName='Helvetica-Oblique', leading=10)
+    cell_s  = _ps('C',  fontSize=8,  leading=11.5, textColor=colors.HexColor('#222222'))
+    badge_s = _ps('B',  fontSize=6.5, textColor=TEAL, fontName='Helvetica-Bold', leading=9)
+    empty_s = _ps('E',  fontSize=8,  textColor=colors.HexColor('#AAAAAA'))
+    more_s  = _ps('M',  fontSize=6.5, textColor=colors.HexColor('#999999'),
+                  fontName='Helvetica-Oblique', leading=9)
+
+    LOCALE_DE  = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+    # Helvetica kennt keine Unicode-Symbole → farbige Text-Kürzel in Teal
+    TEAL_HEX = '#0D9488'
+    MEAL_LABEL = {
+        'fruehstueck': f"<font color='{TEAL_HEX}'><b>Fr</b></font> ",
+        'mittag':      f"<font color='{TEAL_HEX}'><b>Mi</b></font> ",
+        'abend':       f"<font color='{TEAL_HEX}'><b>Ab</b></font> ",
+        'essen_gehen': f"<font color='{TEAL_HEX}'><b>EG</b></font> ",
+        'snack':       f"<font color='{TEAL_HEX}'><b>Sn</b></font> ",
+    }
+
+    # ── Buffer / Doc ─────────────────────────────────────────────────────────
     buffer = BytesIO()
     doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        leftMargin=15*mm, rightMargin=15*mm,
-        topMargin=15*mm, bottomMargin=15*mm,
+        buffer, pagesize=PAGE,
+        leftMargin=L_MAR, rightMargin=R_MAR,
+        topMargin=T_MAR, bottomMargin=B_MAR,
     )
 
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('title', parent=styles['Normal'], fontSize=14, fontName='Helvetica-Bold', spaceAfter=2*mm)
-    sub_style = ParagraphStyle('sub', parent=styles['Normal'], fontSize=9, textColor=colors.HexColor('#666666'), spaceAfter=4*mm)
-    day_style = ParagraphStyle('day', parent=styles['Normal'], fontSize=10, fontName='Helvetica-Bold', spaceBefore=4*mm, spaceAfter=1*mm)
-    cell_style = ParagraphStyle('cell', parent=styles['Normal'], fontSize=8, leading=11)
-    head_style = ParagraphStyle('head', parent=styles['Normal'], fontSize=8, fontName='Helvetica-Bold', textColor=colors.HexColor('#444444'))
+    # ── Logo ─────────────────────────────────────────────────────────────────
+    logo_path = os.path.join(settings.BASE_DIR, 'static', 'medien', 'Logo_Meer_erleben.png')
+    logo_cell = Image(logo_path, width=18*mm, height=18*mm, kind='proportional') \
+        if os.path.exists(logo_path) else Paragraph('', cell_s)
 
-    DARK_BLUE = colors.HexColor('#0D2137')
-    MID_BLUE = colors.HexColor('#185FA5')
-    LIGHT_BLUE = colors.HexColor('#E6F1FB')
-    LIGHT_GRAY = colors.HexColor('#F5F5F3')
-    BORDER = colors.HexColor('#D0D0CC')
-
-    elements = []
-
-    # Header
-    elements.append(Paragraph(f"Tagesplan — {boot.name}", title_style))
+    # ── Kopfzeile ────────────────────────────────────────────────────────────
     start_str = toern.startdatum.strftime('%d.%m.%Y') if toern.startdatum else '–'
-    end_str = toern.enddatum.strftime('%d.%m.%Y') if toern.enddatum else '–'
-    elements.append(Paragraph(f"{toern.titel}  ·  {toern.revier}  ·  {start_str} – {end_str}", sub_style))
+    end_str   = toern.enddatum.strftime('%d.%m.%Y')   if toern.enddatum   else '–'
+    header_content = [[
+        [Paragraph(f"Tagesplan – {boot.name}", title_s),
+         Paragraph(f"{toern.titel}  ·  {toern.revier}  ·  {start_str} – {end_str}", sub_s)],
+        logo_cell,
+    ]]
+    header_tbl = Table(header_content, colWidths=[USABLE_W - 24*mm, 24*mm])
+    header_tbl.setStyle(TableStyle([
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN',         (1, 0), (1, 0),   'RIGHT'),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2*mm),
+    ]))
+    elements = [header_tbl]
 
-    col_w = [25*mm, 52*mm, 52*mm, 36*mm]
-    LOCALE_DE = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+    # ── Spaltenstruktur ───────────────────────────────────────────────────────
+    # Immer 5 Spalten, immer 3 Task-Spalten (Aufg.A | Aufg.B | Aufg.C).
+    # Ohne Impulse: Datum (schmal)   | Mahlzeiten | Aufg.A | Aufg.B | Aufg.C
+    # Mit Impulse:  Datum+Thema+Imp. | Mahlzeiten | Aufg.A | Aufg.B | Aufg.C
+    #               (Datum-Spalte breiter; Impulse Vm/Nm stehen unter dem Thema)
+    mit_impulse = toern.tagesimpulse_aktiv
 
-    if toern.startdatum and toern.enddatum:
-        delta = (toern.enddatum - toern.startdatum).days
-        for i in range(delta + 1):
-            datum = toern.startdatum + timedelta(days=i)
+    if mit_impulse:
+        COL_W = [46*mm, 52*mm, 58*mm, 58*mm, USABLE_W - 46*mm - 52*mm - 58*mm - 58*mm]
+    else:
+        COL_W = [36*mm, 57*mm, 60*mm, 60*mm, USABLE_W - 36*mm - 57*mm - 60*mm - 60*mm]
+
+    # ── Tabellen-Header (Aufgaben-Titel spannt alle 3 Task-Spalten) ───────────
+    col_headers = [
+        Paragraph('Datum', head_s),
+        Paragraph('Mahlzeiten', head_s),
+        Paragraph('Aufgaben &amp; Verantwortliche', head_s),
+        Paragraph('', head_s),
+        Paragraph('', head_s),
+    ]
+    rows = [col_headers]
+
+    # ── Hilfsfunktionen ───────────────────────────────────────────────────────
+    def _split(items, n):
+        """Verteilt items sequentiell auf n Spalten."""
+        if not items:
+            return [[] for _ in range(n)]
+        per = (len(items) + n - 1) // n
+        return [items[c * per:(c + 1) * per] for c in range(n)]
+
+    def _cell(lst):
+        return lst if lst else [Paragraph('–', empty_s)]
+
+    imp_s = _ps('I', fontSize=7, textColor=MID_BLUE, leading=10)
+
+    # ── Datenzeilen ──────────────────────────────────────────────────────────
+    if _start:
+        for i in range(num_days):
+            datum      = _start + timedelta(days=i)
             is_anfahrt = i == 0
-            is_abfahrt = i == delta
+            is_abfahrt = i == num_days - 1
 
             day_mahlzeiten = sorted(
                 [m for m in mahlzeiten_qs if m.datum == datum],
                 key=lambda m: _TYP_ORDER.get(m.typ, 99)
             )
             day_aufgaben = [a for a in aufgaben_qs if a.datum == datum]
-            day_impulse = sorted(
-                [imp for imp in impulse_qs if imp.datum == datum],
-                key=lambda imp: 0 if imp.slot == 'vormittag' else 1
-            )
+            day_impulse  = [imp for imp in impulse_qs if imp.datum == datum]
+            thema        = tagesthemen_map.get(datum, '')
 
-            tag_label = f"{LOCALE_DE[datum.weekday()]}, {datum.strftime('%d.%m.')}"
+            # Datum-Zelle (mit Impulse: Thema + Vm/Nm-Einträge darunter)
+            wochentag = LOCALE_DE[datum.weekday()]
+            date_cell = [Paragraph(f"{wochentag}<br/>{datum.strftime('%d.%m.%Y')}", day_s)]
             if is_anfahrt:
-                tag_label += "  ½ Anfahrt"
+                date_cell.append(Paragraph('½ Anfahrt', badge_s))
             if is_abfahrt:
-                tag_label += "  ½ Abreise"
+                date_cell.append(Paragraph('½ Abreise', badge_s))
+            if mit_impulse:
+                if thema:
+                    date_cell.append(Paragraph(f'„{thema}"', thema_s))
+                for imp in sorted(day_impulse, key=lambda x: 0 if x.slot == 'vormittag' else 1):
+                    slot = 'Vm' if imp.slot == 'vormittag' else 'Nm'
+                    txt  = f" {imp.thema}" if imp.thema else ''
+                    pers = f" → {imp.verantwortlich.user.first_name}" if imp.verantwortlich else ''
+                    date_cell.append(Paragraph(f"<b>{slot}:</b>{txt}{pers}", imp_s))
 
-            # Mahlzeiten cell
-            MEAL_ICONS = {'fruehstueck': '☀ ', 'mittag': '○ ', 'abend': '☽ ', 'essen_gehen': '↗ ', 'snack': '• '}
-            meal_lines = []
+            # Mahlzeiten-Zelle
+            meal_cell = []
             for m in day_mahlzeiten:
-                icon = MEAL_ICONS.get(m.typ, '• ')
-                koch = f"  ({m.kochverantwortlich.user.first_name})" if m.kochverantwortlich else ''
-                meal_lines.append(Paragraph(f"{icon}{m.name}{koch}", cell_style))
-            if not meal_lines:
-                meal_lines = [Paragraph("–", cell_style)]
+                icon = MEAL_LABEL.get(m.typ, f"<font color='{TEAL_HEX}'><b>--</b></font> ")
+                koch = f"  <font color='#888888'>({m.kochverantwortlich.user.first_name})</font>" \
+                       if m.kochverantwortlich else ''
+                meal_cell.append(Paragraph(f"{icon}<b>{m.name}</b>{koch}", cell_s))
 
-            # Aufgaben cell
-            auf_lines = []
+            # Aufgaben auf 3 Spalten verteilen
+            auf_items = []
             for a in day_aufgaben:
                 label = a.beschreibung if a.typ == 'sonstiges' and a.beschreibung else a.get_typ_display()
                 if a.beschreibung and a.typ != 'sonstiges':
-                    label += f" ({a.beschreibung})"
-                person = f"  → {a.verantwortlich.user.first_name}" if a.verantwortlich else ''
-                auf_lines.append(Paragraph(f"• {label}{person}", cell_style))
-            if not auf_lines:
-                auf_lines = [Paragraph("–", cell_style)]
+                    label += f' ({a.beschreibung})'
+                person = f"  <font color='#0D9488'><b>→ {a.verantwortlich.user.first_name}</b></font>" \
+                         if a.verantwortlich else ''
+                auf_items.append(Paragraph(f"• {label}{person}", cell_s))
 
-            # Impulse cell
-            imp_lines = []
-            for imp in day_impulse:
-                slot_label = "Vm:" if imp.slot == 'vormittag' else "Nm:"
-                person = f" ({imp.verantwortlich.user.first_name})" if imp.verantwortlich else ''
-                imp_lines.append(Paragraph(f"<b>{slot_label}</b> {imp.thema}{person}", cell_style))
-            if not imp_lines:
-                imp_lines = [Paragraph("–", cell_style)]
+            task_cols = _split(auf_items, 3)
+            auf_a = _cell(task_cols[0])
+            auf_b = _cell(task_cols[1] if len(task_cols) > 1 else [])
+            auf_c = _cell(task_cols[2] if len(task_cols) > 2 else [])
 
-            header_row = [
-                Paragraph(tag_label, head_style),
-                Paragraph("Mahlzeiten", head_style),
-                Paragraph("Aufgaben", head_style),
-                Paragraph("Impulse", head_style),
-            ]
-            content_row = [
-                Paragraph("", cell_style),
-                meal_lines,
-                auf_lines,
-                imp_lines,
-            ]
+            rows.append([date_cell, _cell(meal_cell), auf_a, auf_b, auf_c])
 
-            t = Table(
-                [header_row, content_row],
-                colWidths=col_w,
-            )
-            t.setStyle(TableStyle([
-                ('BACKGROUND', (0, 0), (-1, 0), LIGHT_BLUE),
-                ('TEXTCOLOR', (0, 0), (-1, 0), DARK_BLUE),
-                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                ('FONTSIZE', (0, 0), (-1, 0), 8),
-                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white]),
-                ('BOX', (0, 0), (-1, -1), 0.5, BORDER),
-                ('INNERGRID', (0, 0), (-1, -1), 0.3, BORDER),
-                ('TOPPADDING', (0, 0), (-1, -1), 3),
-                ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
-                ('LEFTPADDING', (0, 0), (-1, -1), 4),
-                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
-                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('SPAN', (0, 0), (0, 1)),
-            ]))
-            elements.append(KeepTogether(t))
-            elements.append(Spacer(1, 2*mm))
+    # ── Tabelle (fließt natürlich auf max. 2 Seiten) ─────────────────────────
+    main_table = Table(rows, colWidths=COL_W, repeatRows=1)
+    row_count  = len(rows)
+    main_table.setStyle(TableStyle([
+        ('BACKGROUND',    (0, 0), (-1, 0), HEADER_BG),
+        ('TEXTCOLOR',     (0, 0), (-1, 0), colors.white),
+        ('FONTNAME',      (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE',      (0, 0), (-1, 0), 8),
+        ('TOPPADDING',    (0, 0), (-1, 0), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 3),
+        ('SPAN', (2, 0), (4, 0)),   # Aufgaben-Header über alle 3 Task-Spalten
+        *[('BACKGROUND', (0, r), (-1, r), ROW_ODD if r % 2 else ROW_EVEN)
+          for r in range(1, row_count)],
+        ('BOX',           (0, 0), (-1, -1), 0.8, DARK_BLUE),
+        ('INNERGRID',     (0, 0), (-1, -1), 0.3, BORDER),
+        ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING',    (0, 1), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 4),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        ('BACKGROUND',    (0, 1), (0, -1), DATE_COL),
+        ('FONTNAME',      (0, 1), (0, -1), 'Helvetica-Bold'),
+    ]))
+
+    elements.append(main_table)
 
     doc.build(elements)
     buffer.seek(0)
@@ -3238,6 +3340,68 @@ def tagesplan_pdf(request, toern_id, boot_id):
     safe_name = boot.name.replace(' ', '_')
     response['Content-Disposition'] = f'inline; filename="Tagesplan_{safe_name}.pdf"'
     return response
+
+
+@login_required
+@require_POST
+def tagesplan_mahlzeit_add(request, toern_id, boot_id):
+    """Mahlzeit für den Tagesplan hinzufügen — AJAX, gibt Mahlzeit-Daten zurück."""
+    toern, boot, teilnahme = _get_tagesplan_teilnahme(request, toern_id, boot_id)
+    if not _hat_tagesplan_edit(request, toern, boot, teilnahme):
+        raise PermissionDenied
+
+    datum = request.POST.get('datum')
+    typ = request.POST.get('typ', 'abend')
+    name = request.POST.get('name', '').strip()
+    koch_id = request.POST.get('kochverantwortlich') or None
+
+    if not datum:
+        return JsonResponse({'status': 'error', 'msg': 'Datum fehlt'}, status=400)
+
+    if not name:
+        name = dict(Mahlzeit.TYP_CHOICES).get(typ, typ)
+
+    koch = None
+    if koch_id:
+        koch = Teilnahme.objects.filter(id=koch_id, toern=toern, boot=boot).first()
+
+    mahlzeit = Mahlzeit.objects.create(
+        boot=boot, toern=toern, datum=datum,
+        typ=typ, name=name, kochverantwortlich=koch
+    )
+    person = ''
+    if mahlzeit.kochverantwortlich:
+        person = f"{mahlzeit.kochverantwortlich.user.first_name} {mahlzeit.kochverantwortlich.user.last_name}"
+
+    return JsonResponse({
+        'status': 'ok',
+        'id': mahlzeit.id,
+        'typ': mahlzeit.typ,
+        'typ_display': mahlzeit.get_typ_display(),
+        'name': mahlzeit.name,
+        'person': person,
+    })
+
+
+@login_required
+@require_POST
+def tagesthema_set(request, toern_id, boot_id):
+    """Tagesthema setzen oder aktualisieren — AJAX."""
+    toern, boot, teilnahme = _get_tagesplan_teilnahme(request, toern_id, boot_id)
+    if not _hat_tagesplan_edit(request, toern, boot, teilnahme):
+        raise PermissionDenied
+
+    datum = request.POST.get('datum')
+    thema = request.POST.get('thema', '').strip()
+
+    if not datum:
+        return JsonResponse({'status': 'error', 'msg': 'Datum fehlt'}, status=400)
+
+    obj, _ = Tagesthema.objects.update_or_create(
+        boot=boot, toern=toern, datum=datum,
+        defaults={'thema': thema}
+    )
+    return JsonResponse({'status': 'ok', 'thema': obj.thema})
 
 
 # ========================= MITFAHRTANFRAGE =========================

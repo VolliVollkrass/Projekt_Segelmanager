@@ -22,8 +22,44 @@
         </div>
     </div>
 
-    <!-- TAB-NAVIGATION -->
-    <div class="border-b border-base-300 mb-6 overflow-x-auto">
+    <!-- TAB-NAVIGATION Mobile Icon-Menu -->
+    <div class="lg:hidden flex justify-center mb-4">
+        <ul class="menu menu-horizontal bg-base-200 rounded-box gap-0.5">
+            <li>
+                <a class="tab-icon-btn tooltip tooltip-bottom active" data-tab="uebersicht" data-tip="Crew &amp; Boot" onclick="switchToTab('uebersicht'); return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                </a>
+            </li>
+            <li>
+                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="packliste" data-tip="Meine Packliste" onclick="switchToTab('packliste'); return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                </a>
+            </li>
+            <li>
+                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="bootspackliste" data-tip="Mitbringen" onclick="switchToTab('bootspackliste'); return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                </a>
+            </li>
+            <li>
+                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="kasse" data-tip="Bootskasse" onclick="switchToTab('kasse'); return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                </a>
+            </li>
+            <li>
+                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="tagesplan" data-tip="Tagesplan" onclick="switchToTab('tagesplan'); return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </a>
+            </li>
+            <li>
+                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="bordkueche" data-tip="Bordküche" onclick="switchToTab('bordkueche'); return false;">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- TAB-NAVIGATION Desktop -->
+    <div class="hidden lg:block border-b border-base-300 mb-6 overflow-x-auto">
         <div class="flex min-w-max">
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-primary text-primary whitespace-nowrap" data-tab="uebersicht">
                 Crew &amp; Boot
@@ -378,6 +414,22 @@
 
             <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
 
+                <!-- TAGESTHEMA (nur wenn Feature aktiv) -->
+                {% if toern.tagesimpulse_aktiv %}
+                <div class="px-4 py-3 border-b border-base-200 bg-base-200/30">
+                    {% if hat_tagesplan_edit %}
+                    <input type="text"
+                        id="thema-{{ tag.datum|date:'Ymd' }}"
+                        value="{{ tag.tagesthema }}"
+                        placeholder="Tagesthema… z.B. Weite erleben"
+                        class="input input-ghost w-full text-sm font-medium italic placeholder:text-base-content/30 focus:outline-none px-0"
+                        onblur="saveThema('{{ tag.datum|date:'Y-m-d' }}', this.value)">
+                    {% elif tag.tagesthema %}
+                    <p class="text-sm font-medium italic text-base-content/70">{{ tag.tagesthema }}</p>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <!-- MAHLZEITEN -->
                 <div class="p-4 border-b border-base-200">
                     <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Mahlzeiten</p>
@@ -421,7 +473,7 @@
                             <input type="text" id="mz-name-{{ tag.datum|date:'Ymd' }}" placeholder="z.B. Pasta Napoli"
                                 class="input input-xs input-bordered col-span-2">
                         </div>
-                        <button onclick="addMahlzeitTag('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">+ Mahlzeit</button>
+                        <button onclick="addMahlzeitTag('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2" id="mz-btn-{{ tag.datum|date:'Ymd' }}">+ Mahlzeit</button>
                     </div>
                     {% endif %}
                 </div>
@@ -474,17 +526,18 @@
                     {% endif %}
                 </div>
 
-                <!-- TAGESIMPULSE -->
+                <!-- TAGESIMPULSE (nur wenn Feature aktiv) -->
+                {% if toern.tagesimpulse_aktiv %}
                 <div class="p-4">
                     <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Tagesimpulse</p>
                     <div id="impulse-list-{{ tag.datum|date:'Ymd' }}" class="space-y-1">
                         {% for imp in tag.impulse %}
-                        <div class="flex items-start gap-3 py-0.5" id="imp-row-{{ imp.id }}">
-                            <span class="text-xs font-medium text-base-content/50 w-20 shrink-0 pt-0.5">{{ imp.get_slot_display }}</span>
+                        <div class="flex items-start gap-2 py-0.5" id="imp-row-{{ imp.id }}">
+                            <span class="text-xs font-medium text-base-content/40 w-20 shrink-0 pt-0.5">{{ imp.get_slot_display }}</span>
                             <div class="flex-1">
                                 <p class="text-sm">{{ imp.thema }}</p>
                                 {% if imp.verantwortlich %}
-                                <p class="text-xs text-base-content/40">{{ imp.verantwortlich.user.first_name }} {{ imp.verantwortlich.user.last_name }}</p>
+                                <p class="text-xs text-base-content/40">{{ imp.verantwortlich.user.first_name }}</p>
                                 {% endif %}
                             </div>
                             {% if hat_tagesplan_edit %}
@@ -508,16 +561,17 @@
                             <select id="imp-person-{{ tag.datum|date:'Ymd' }}" class="select select-xs select-bordered">
                                 <option value="">– Wer? –</option>
                                 {% for t in crew_bestaetigt %}
-                                <option value="{{ t.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                                <option value="{{ t.id }}">{{ t.user.first_name }}</option>
                                 {% endfor %}
                             </select>
-                            <input type="text" id="imp-thema-{{ tag.datum|date:'Ymd' }}" placeholder="Thema…"
+                            <input type="text" id="imp-thema-{{ tag.datum|date:'Ymd' }}" placeholder="Impuls (optional)…"
                                 class="input input-xs input-bordered col-span-2">
                         </div>
                         <button onclick="addImpuls('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">+ Impuls</button>
                     </div>
                     {% endif %}
                 </div>
+                {% endif %}
 
             </div>
         </div>
@@ -732,28 +786,33 @@
 <!-- ========================= JS ========================= -->
 <script>
 // Tab-Navigation
-document.querySelectorAll(".tab-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-        const tab = btn.dataset.tab;
-        document.querySelectorAll(".tab-btn").forEach(b => {
-            b.classList.remove("border-primary", "text-primary");
-            b.classList.add("border-transparent", "text-base-content/50");
-        });
-        btn.classList.add("border-primary", "text-primary");
-        btn.classList.remove("border-transparent", "text-base-content/50");
-        document.querySelectorAll("[id^='tab-']").forEach(t => t.classList.add("hidden"));
-        document.getElementById(`tab-${tab}`).classList.remove("hidden");
+function switchToTab(tab) {
+    // Desktop tab bar
+    document.querySelectorAll(".tab-btn").forEach(b => {
+        const active = b.dataset.tab === tab;
+        b.classList.toggle("border-primary", active);
+        b.classList.toggle("text-primary", active);
+        b.classList.toggle("border-transparent", !active);
+        b.classList.toggle("text-base-content/50", !active);
     });
+    // Mobile icon menu
+    document.querySelectorAll(".tab-icon-btn").forEach(b => {
+        b.classList.toggle("active", b.dataset.tab === tab);
+    });
+    // Content panels
+    document.querySelectorAll("[id^='tab-']").forEach(t => t.classList.add("hidden"));
+    document.getElementById(`tab-${tab}`)?.classList.remove("hidden");
+}
+
+document.querySelectorAll(".tab-btn").forEach(btn => {
+    btn.addEventListener("click", () => switchToTab(btn.dataset.tab));
 });
 
 // URL-Tab beim Laden
 (function() {
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
-    if (tab) {
-        const btn = document.querySelector(`.tab-btn[data-tab="${tab}"]`);
-        if (btn) btn.click();
-    }
+    if (tab) switchToTab(tab);
 })();
 
 function getCSRFToken() {
@@ -994,20 +1053,58 @@ function toggleBeschr(datumStr) {
     }
 }
 
+const MEAL_ICONS = { fruehstueck:'☀️', mittag:'🌤️', abend:'🌙', essen_gehen:'🍽️', snack:'🍎' };
+
 function addMahlzeitTag(datum) {
     const d = datum.replace(/-/g, '');
     const typ = document.getElementById(`mz-typ-${d}`).value;
     const name = document.getElementById(`mz-name-${d}`).value.trim();
     const koch = document.getElementById(`mz-koch-${d}`).value;
     const nameField = document.getElementById(`mz-name-${d}`);
-    if (!name) { nameField.classList.add('input-error'); return; }
+    const btn = document.getElementById(`mz-btn-${d}`);
     nameField.classList.remove('input-error');
+    if (btn) btn.disabled = true;
 
-    fetch(`/toern/${TOERN_ID}/mahlzeit/add/`, {
+    fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/mahlzeit/add/`, {
         method: 'POST',
         headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `datum=${datum}&typ=${typ}&name=${encodeURIComponent(name)}&kochverantwortlich=${koch}`
-    }).then(res => { if (res.ok) location.href = '?tab=tagesplan'; });
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status !== 'ok') { if (btn) btn.disabled = false; return; }
+        const list = document.getElementById(`mahlzeiten-list-${d}`);
+        document.getElementById(`mz-empty-${d}`)?.remove();
+
+        const icon = MEAL_ICONS[data.typ] || '🍎';
+        const isEssen = data.typ === 'essen_gehen';
+        const personHtml = data.person ? `<span class="text-xs text-base-content/40">${data.person.split(' ')[0]}</span>` : '';
+        const deleteBtn = `<button onclick="deleteMahlzeit(${data.id})" class="btn btn-ghost btn-xs text-error px-1">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>`;
+
+        const row = document.createElement('div');
+        row.id = `mz-row-${data.id}`;
+        row.className = 'flex items-center gap-2 py-0.5';
+        row.innerHTML = `<span class="text-sm w-5 text-center shrink-0">${icon}</span>
+            <span class="flex-1 text-sm${isEssen ? ' text-secondary font-medium' : ''}">${data.name}</span>
+            ${personHtml}${deleteBtn}`;
+        list.appendChild(row);
+
+        nameField.value = '';
+        document.getElementById(`mz-typ-${d}`).value = 'abend';
+        document.getElementById(`mz-koch-${d}`).value = '';
+        if (btn) btn.disabled = false;
+    })
+    .catch(() => { if (btn) btn.disabled = false; });
+}
+
+function saveThema(datum, thema) {
+    fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/thema/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRFToken(), 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `datum=${datum}&thema=${encodeURIComponent(thema)}`
+    });
 }
 
 function addAufgabe(datum) {
@@ -1065,7 +1162,6 @@ function addImpuls(datum) {
     const thema = document.getElementById(`imp-thema-${d}`).value.trim();
     const person = document.getElementById(`imp-person-${d}`).value;
     const themaField = document.getElementById(`imp-thema-${d}`);
-    if (!thema) { themaField.classList.add('input-error'); return; }
     themaField.classList.remove('input-error');
 
     fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/tagesplan/impuls/add/`, {
@@ -1079,24 +1175,20 @@ function addImpuls(datum) {
         const list = document.getElementById(`impulse-list-${d}`);
         document.getElementById(`imp-empty-${d}`)?.remove();
 
-        const personHtml = data.person ? `<p class="text-xs text-base-content/40">${data.person}</p>` : '';
+        const personHtml = data.person ? `<p class="text-xs text-base-content/40">${data.person.split(' ')[0]}</p>` : '';
         const newRow = document.createElement('div');
         newRow.id = `imp-row-${data.id}`;
-        newRow.className = 'flex items-start gap-3 py-0.5';
-        newRow.innerHTML = `<span class="text-xs font-medium text-base-content/50 w-20 shrink-0 pt-0.5">${data.slot_display}</span>
-            <div class="flex-1"><p class="text-sm">${data.thema}</p>${personHtml}</div>
+        newRow.className = 'flex items-start gap-2 py-0.5';
+        newRow.innerHTML = `<span class="text-xs font-medium text-base-content/40 w-20 shrink-0 pt-0.5">${data.slot_display}</span>
+            <div class="flex-1"><p class="text-sm">${data.thema || '–'}</p>${personHtml}</div>
             <button onclick="deleteImpuls(${data.id})" class="btn btn-ghost btn-xs text-error px-1 mt-0.5">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>`;
 
         const existing = document.getElementById(`imp-row-${data.id}`);
-        if (existing) {
-            existing.replaceWith(newRow);
-        } else if (slot === 'vormittag') {
-            list.insertBefore(newRow, list.firstChild);
-        } else {
-            list.appendChild(newRow);
-        }
+        if (existing) existing.replaceWith(newRow);
+        else if (slot === 'vormittag') list.insertBefore(newRow, list.firstChild);
+        else list.appendChild(newRow);
 
         themaField.value = '';
         document.getElementById(`imp-person-${d}`).value = '';
