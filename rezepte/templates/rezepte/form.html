@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{% if action == "bearbeiten" %}{{ rezept.name }} bearbeiten{% else %}Neues Rezept{% endif %} – Segelkochbuch{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
+
+  <!-- Back -->
+  <a href="{% if action == 'bearbeiten' %}{% url 'rezept_detail' rezept.pk %}{% else %}{% url 'kochbuch_liste' %}{% endif %}"
+     class="flex items-center gap-1 text-sm text-base-content/50 hover:text-base-content transition-colors mb-4">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Zurück
+  </a>
+
+  <h1 class="text-xl font-bold mb-5">
+    {% if action == "bearbeiten" %}Rezept bearbeiten{% else %}Neues Rezept eintragen{% endif %}
+  </h1>
+
+  <!-- URL-Import -->
+  {% if action != "bearbeiten" %}
+  <div class="bg-base-200 rounded-xl p-4 mb-6">
+    <p class="text-sm font-medium mb-2">Von Chefkoch, Lecker & Co. importieren</p>
+    <p class="text-xs text-base-content/50 mb-3">Rezept-URL einfügen — die KI passt es für die Bordküche an.</p>
+    <div class="flex gap-2">
+      <input type="url" id="import-url" placeholder="https://www.chefkoch.de/rezepte/…"
+             class="input input-sm input-bordered flex-1">
+      <button type="button" onclick="urlImport()" id="import-btn" class="btn btn-sm btn-secondary gap-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+        </svg>
+        Importieren
+      </button>
+    </div>
+    <p id="import-error" class="text-xs text-error mt-2 hidden"></p>
+  </div>
+  {% endif %}
+
+  <form id="rezept-form" method="post" enctype="multipart/form-data" class="space-y-5">
+    {% csrf_token %}
+
+    <!-- Hidden JSON fields -->
+    <input type="hidden" id="zutaten-json" name="zutaten_json" value="{{ zutaten_json|default:'[]' }}">
+    <input type="hidden" id="schritte-json" name="schritte_json" value="{{ schritte_json|default:'[]' }}">
+
+    <!-- Basics -->
+    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-3">
+      <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Grundinfos</p>
+
+      <div>
+        <label class="label label-text text-xs">Name des Gerichts *</label>
+        <input type="text" name="name" id="field-name" required
+               value="{{ rezept.name|default:'' }}"
+               placeholder="z. B. Pasta Napoli" class="input input-bordered input-sm w-full">
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="label label-text text-xs">Kategorie</label>
+          <select name="kategorie" id="field-kategorie" class="select select-bordered select-sm w-full">
+            {% for k_val, k_label in kategorien %}
+            <option value="{{ k_val }}" {% if rezept.kategorie == k_val %}selected{% endif %}>{{ k_label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="label label-text text-xs">Zubereitungszeit (Min.)</label>
+          <input type="number" name="zubereitungszeit" id="field-zeit" min="1" max="999"
+                 value="{{ rezept.zubereitungszeit|default:30 }}"
+                 class="input input-bordered input-sm w-full">
+        </div>
+      </div>
+
+      <div>
+        <label class="label label-text text-xs">Portionen</label>
+        <input type="number" name="portionen" id="field-portionen" min="1" max="99"
+               value="{{ rezept.portionen|default:4 }}"
+               class="input input-bordered input-sm w-full">
+      </div>
+    </div>
+
+    <!-- Bild -->
+    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-2">
+      <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Foto (optional)</p>
+      {% if rezept.bild %}
+      <div class="rounded-lg overflow-hidden h-32 mb-2">
+        <img src="{{ rezept.bild.url }}" class="w-full h-full object-cover">
+      </div>
+      {% endif %}
+      <input type="file" name="bild" accept="image/*" class="file-input file-input-sm file-input-bordered w-full">
+    </div>
+
+    <!-- Zutaten -->
+    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-3">
+      <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Zutaten</p>
+      <div id="zutaten-liste" class="space-y-2"></div>
+      <button type="button" onclick="zutatHinzufuegen()" class="btn btn-sm btn-ghost btn-block border border-dashed border-base-300">
+        + Zutat hinzufügen
+      </button>
+    </div>
+
+    <!-- Schritte -->
+    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-3">
+      <div class="flex items-center justify-between">
+        <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Zubereitungsschritte</p>
+        <button type="button" onclick="schrittGenerieren()" id="ki-btn"
+                class="btn btn-xs btn-secondary gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          KI generieren
+        </button>
+      </div>
+      <p class="text-xs text-base-content/40">Trage erst Zutaten und Namen ein, dann per KI Schritte erzeugen lassen — oder direkt selbst schreiben.</p>
+      <div id="schritte-liste" class="space-y-2"></div>
+      <button type="button" onclick="schrittHinzufuegen()" class="btn btn-sm btn-ghost btn-block border border-dashed border-base-300">
+        + Schritt hinzufügen
+      </button>
+    </div>
+
+    <!-- Tipps & Getränk -->
+    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-3">
+      <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Extras (optional)</p>
+      <div>
+        <label class="label label-text text-xs">Tipps</label>
+        <textarea name="tipps" id="field-tipps" rows="2"
+                  placeholder="z. B. Passt gut wenn das Schiff schaukelt, weil…"
+                  class="textarea textarea-bordered textarea-sm w-full">{{ rezept.tipps|default:'' }}</textarea>
+      </div>
+      <div>
+        <label class="label label-text text-xs">Getränkeempfehlung</label>
+        <input type="text" name="getraenk" id="field-getraenk"
+               value="{{ rezept.getraenk|default:'' }}"
+               placeholder="z. B. Weißwein oder Zitronenwasser"
+               class="input input-bordered input-sm w-full">
+      </div>
+      <div>
+        <label class="label label-text text-xs">Originalquelle (URL)</label>
+        <input type="url" name="quelle_url" id="field-quelle"
+               value="{{ rezept.quelle_url|default:'' }}"
+               placeholder="https://…" class="input input-bordered input-sm w-full">
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <button type="submit" class="btn btn-primary btn-block">
+      {% if action == "bearbeiten" %}Änderungen speichern{% else %}Rezept speichern{% endif %}
+    </button>
+  </form>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+let zutaten = {{ zutaten_json|default:'[]' }};
+let schritte = {{ schritte_json|default:'[]' }};
+
+// ─── Render helpers ──────────────────────────────────────────────────────────
+function renderZutaten() {
+  const el = document.getElementById('zutaten-liste');
+  el.innerHTML = zutaten.map((z, i) => `
+    <div class="flex gap-2 items-center" data-idx="${i}">
+      <input type="text" value="${escHtml(z.menge)}" placeholder="Menge"
+             oninput="zutaten[${i}].menge=this.value; syncJson()"
+             class="input input-sm input-bordered w-24 shrink-0">
+      <input type="text" value="${escHtml(z.name)}" placeholder="Zutat *"
+             oninput="zutaten[${i}].name=this.value; syncJson()"
+             class="input input-sm input-bordered flex-1">
+      <button type="button" onclick="zutatEntfernen(${i})" class="btn btn-ghost btn-xs text-error px-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>`).join('');
+}
+
+function renderSchritte() {
+  const el = document.getElementById('schritte-liste');
+  el.innerHTML = schritte.map((s, i) => `
+    <div class="flex gap-2 items-start" data-idx="${i}">
+      <span class="w-6 h-6 rounded-full bg-primary text-primary-content flex items-center justify-center text-xs font-bold shrink-0 mt-1.5">${i+1}</span>
+      <textarea rows="2" placeholder="Schritt ${i+1} beschreiben…"
+                oninput="schritte[${i}]=this.value; syncJson()"
+                class="textarea textarea-bordered textarea-sm flex-1">${escHtml(s)}</textarea>
+      <button type="button" onclick="schrittEntfernen(${i})" class="btn btn-ghost btn-xs text-error px-1.5 mt-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>`).join('');
+}
+
+function syncJson() {
+  document.getElementById('zutaten-json').value = JSON.stringify(zutaten);
+  document.getElementById('schritte-json').value = JSON.stringify(schritte);
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ─── Zutaten ─────────────────────────────────────────────────────────────────
+function zutatHinzufuegen() {
+  zutaten.push({menge:'', name:''});
+  renderZutaten();
+  syncJson();
+  document.getElementById('zutaten-liste').lastElementChild?.querySelector('input:last-of-type')?.focus();
+}
+
+function zutatEntfernen(i) {
+  zutaten.splice(i, 1);
+  renderZutaten();
+  syncJson();
+}
+
+// ─── Schritte ────────────────────────────────────────────────────────────────
+function schrittHinzufuegen(text) {
+  schritte.push(text || '');
+  renderSchritte();
+  syncJson();
+  document.getElementById('schritte-liste').lastElementChild?.querySelector('textarea')?.focus();
+}
+
+function schrittEntfernen(i) {
+  schritte.splice(i, 1);
+  renderSchritte();
+  syncJson();
+}
+
+// ─── KI: Schritte generieren ─────────────────────────────────────────────────
+async function schrittGenerieren() {
+  const name = document.getElementById('field-name').value.trim();
+  if (!name) { alert('Bitte zuerst den Namen des Gerichts eingeben.'); return; }
+  if (!zutaten.some(z => z.name.trim())) { alert('Bitte mindestens eine Zutat eintragen.'); return; }
+
+  const btn = document.getElementById('ki-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Generiere…';
+
+  try {
+    const res = await fetch('{% url "ki_schritte_generieren" %}', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+      body: JSON.stringify({
+        name,
+        zutaten,
+        portionen: parseInt(document.getElementById('field-portionen').value) || 4,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    schritte = data.schritte || [];
+    renderSchritte();
+    syncJson();
+    document.getElementById('schritte-liste').scrollIntoView({behavior:'smooth', block:'nearest'});
+  } catch(e) {
+    alert('KI-Anfrage fehlgeschlagen. Bitte erneut versuchen.');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> KI generieren`;
+  }
+}
+
+// ─── KI: URL-Import ───────────────────────────────────────────────────────────
+async function urlImport() {
+  const url = document.getElementById('import-url').value.trim();
+  const errEl = document.getElementById('import-error');
+  errEl.classList.add('hidden');
+  if (!url) { errEl.textContent = 'Bitte eine URL eingeben.'; errEl.classList.remove('hidden'); return; }
+
+  const btn = document.getElementById('import-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Importiere…';
+
+  try {
+    const res = await fetch('{% url "ki_url_import" %}', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','X-CSRFToken':'{{ csrf_token }}'},
+      body: JSON.stringify({url}),
+    });
+    const data = await res.json();
+    if (data.error) { errEl.textContent = data.error; errEl.classList.remove('hidden'); return; }
+
+    // Felder befüllen
+    if (data.name)             document.getElementById('field-name').value = data.name;
+    if (data.zubereitungszeit) document.getElementById('field-zeit').value = data.zubereitungszeit;
+    if (data.portionen)        document.getElementById('field-portionen').value = data.portionen;
+    if (data.tipps)            document.getElementById('field-tipps').value = data.tipps;
+    if (data.getraenk)         document.getElementById('field-getraenk').value = data.getraenk;
+    document.getElementById('field-quelle').value = url;
+
+    if (data.kategorie) {
+      const sel = document.getElementById('field-kategorie');
+      [...sel.options].forEach(o => { o.selected = o.value === data.kategorie; });
+    }
+
+    if (data.zutaten?.length) {
+      zutaten = data.zutaten.map(z => ({menge: z.menge||'', name: z.name||''}));
+      renderZutaten();
+    }
+    if (data.schritte?.length) {
+      schritte = data.schritte;
+      renderSchritte();
+    }
+    syncJson();
+    document.getElementById('rezept-form').scrollIntoView({behavior:'smooth'});
+  } catch(e) {
+    errEl.textContent = 'Import fehlgeschlagen. Bitte erneut versuchen.';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg> Importieren`;
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+renderZutaten();
+renderSchritte();
+</script>
+{% endblock %}

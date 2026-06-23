@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'toern',
     'logistik',
     'finance',
+    'rezepte',
 ]
 
 # schema_viewer nur lokal (zeigt DB-Schema — nie in Production!)
@@ -99,6 +100,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'toern.context_processors.active_boot_dashboard',
             ],
         },
     },

@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Segelkochbuch{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h1 class="text-2xl font-bold">🍳 Segelkochbuch</h1>
+      <p class="text-sm text-base-content/50 mt-0.5">Rezepte für die Bordküche</p>
+    </div>
+    {% if user.is_authenticated %}
+    <a href="{% url 'rezept_erstellen' %}" class="btn btn-primary btn-sm gap-1.5">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+      </svg>
+      Rezept hinzufügen
+    </a>
+    {% endif %}
+  </div>
+
+  <!-- Suche & Filter -->
+  <form method="get" class="mb-6 space-y-2">
+    <div class="flex gap-2">
+      <div class="relative flex-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+        </svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Rezept oder Zutat suchen…"
+               class="input input-bordered input-sm w-full pl-9">
+      </div>
+      <button type="submit" class="btn btn-sm btn-primary">Suchen</button>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="?{% if q %}q={{ q }}&{% endif %}sort={{ sort }}"
+         class="badge {% if not kategorie %}badge-primary{% else %}badge-outline{% endif %} cursor-pointer">Alle</a>
+      {% for k_val, k_label in kategorien %}
+      <a href="?{% if q %}q={{ q }}&{% endif %}kategorie={{ k_val }}&sort={{ sort }}"
+         class="badge {% if kategorie == k_val %}badge-primary{% else %}badge-outline{% endif %} cursor-pointer">{{ k_label }}</a>
+      {% endfor %}
+      <div class="ml-auto flex gap-1">
+        <a href="?{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort=neu"
+           class="badge {% if sort != 'beliebt' %}badge-secondary{% else %}badge-outline{% endif %} cursor-pointer">Neueste</a>
+        <a href="?{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort=beliebt"
+           class="badge {% if sort == 'beliebt' %}badge-secondary{% else %}badge-outline{% endif %} cursor-pointer">Beliebteste</a>
+      </div>
+    </div>
+  </form>
+
+  <!-- Rezept-Grid -->
+  {% if page_obj.object_list %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    {% for rezept in page_obj %}
+    <a href="{% url 'rezept_detail' rezept.pk %}" class="group card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-md transition-all overflow-hidden">
+      {% if rezept.bild %}
+      <figure class="h-40 overflow-hidden">
+        <img src="{{ rezept.bild.url }}" alt="{{ rezept.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+      </figure>
+      {% else %}
+      <div class="h-40 bg-base-200 flex items-center justify-center text-4xl">
+        {% if rezept.kategorie == "fruehstueck" %}🥐
+        {% elif rezept.kategorie == "hauptgericht" %}🍽️
+        {% elif rezept.kategorie == "snack" %}🥪
+        {% elif rezept.kategorie == "dessert" %}🍮
+        {% else %}🍳{% endif %}
+      </div>
+      {% endif %}
+      <div class="p-4">
+        <div class="flex items-start justify-between gap-2">
+          <h2 class="font-semibold text-sm leading-tight group-hover:text-primary transition-colors">{{ rezept.name }}</h2>
+          <span class="shrink-0 flex items-center gap-0.5 text-xs text-base-content/40">
+            <span>⭐</span>
+            <span>{{ rezept.anzahl_sterne }}</span>
+          </span>
+        </div>
+        <div class="flex items-center gap-3 mt-2 text-xs text-base-content/40">
+          <span>{{ rezept.get_kategorie_display }}</span>
+          <span>·</span>
+          <span>{{ rezept.zubereitungszeit }} Min.</span>
+          <span>·</span>
+          <span>{{ rezept.portionen }} Pers.</span>
+        </div>
+        <p class="text-xs text-base-content/40 mt-1.5">von {{ rezept.autor.first_name }} {{ rezept.autor.last_name }}</p>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <div class="flex justify-center gap-2 mt-6">
+    {% if page_obj.has_previous %}
+    <a href="?{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort={{ sort }}&page={{ page_obj.previous_page_number }}"
+       class="btn btn-sm btn-ghost">← Zurück</a>
+    {% endif %}
+    <span class="btn btn-sm btn-disabled">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort={{ sort }}&page={{ page_obj.next_page_number }}"
+       class="btn btn-sm btn-ghost">Weiter →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="text-center py-16 text-base-content/30">
+    <p class="text-4xl mb-3">🍳</p>
+    <p class="text-sm">
+      {% if q or kategorie %}Keine Rezepte gefunden.
+      {% else %}Noch keine Rezepte im Kochbuch.{% endif %}
+    </p>
+    {% if user.is_authenticated and not q and not kategorie %}
+    <a href="{% url 'rezept_erstellen' %}" class="btn btn-sm btn-primary mt-4">Erstes Rezept eintragen</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

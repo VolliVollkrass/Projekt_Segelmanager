@@ -10,6 +10,7 @@ urlpatterns = [
     path('accounts/', include('accounts.urls')),
     path('toern/', include('toern.urls')),
     path('boote/', include('boote.urls')),
+    path('kochbuch/', include('rezepte.urls')),
     path('schema-viewer/', include('schema_viewer.urls')),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
