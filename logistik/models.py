@@ -46,6 +46,9 @@ class Mahlzeit(models.Model):
     kochverantwortlich = models.ForeignKey(
         Teilnahme, null=True, blank=True, on_delete=models.SET_NULL, related_name="mahlzeiten"
     )
+    rezept = models.ForeignKey(
+        "rezepte.Rezept", null=True, blank=True, on_delete=models.SET_NULL, related_name="mahlzeiten"
+    )
 
     class Meta:
         ordering = ["datum", "typ"]
