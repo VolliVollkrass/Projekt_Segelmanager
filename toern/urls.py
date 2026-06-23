@@ -55,4 +55,11 @@ urlpatterns = [
     path("pinnwand/<int:nachricht_id>/loeschen/", pinnwand_nachricht_loeschen, name="pinnwand_nachricht_loeschen"),
     path("<int:toern_id>/mitfahrt/add/", mitfahrangebot_erstellen, name="mitfahrangebot_erstellen"),
     path("mitfahrt/<int:eintrag_id>/loeschen/", mitfahrangebot_loeschen, name="mitfahrangebot_loeschen"),
+    # Tagesplan
+    path("<int:toern_id>/boot/<int:boot_id>/tagesplan/aufgabe/add/", tagesaufgabe_add, name="tagesaufgabe_add"),
+    path("tagesplan/aufgabe/<int:aufgabe_id>/delete/", tagesaufgabe_delete, name="tagesaufgabe_delete"),
+    path("<int:toern_id>/boot/<int:boot_id>/tagesplan/impuls/add/", tagesimpuls_add, name="tagesimpuls_add"),
+    path("tagesplan/impuls/<int:impuls_id>/delete/", tagesimpuls_delete, name="tagesimpuls_delete"),
+    path("<int:toern_id>/boot/<int:boot_id>/tagesplan/recht/<int:teilnahme_id>/", tagesplan_recht_toggle, name="tagesplan_recht_toggle"),
+    path("<int:toern_id>/boot/<int:boot_id>/tagesplan/pdf/", tagesplan_pdf, name="tagesplan_pdf"),
 ]
