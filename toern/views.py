@@ -3200,16 +3200,21 @@ def tagesplan_pdf(request, toern_id, boot_id):
 
     elements = [header_tbl]
 
-    # ── Spaltenbreiten: Datum | Mahlzeiten | Aufgaben | Impulse ─────────────
-    COL_W = [38*mm, 72*mm, 90*mm, USABLE_W - 38*mm - 72*mm - 90*mm]
+    # ── Spaltenbreiten: Datum | Mahlzeiten | Aufgaben [| Impulse] ───────────
+    mit_impulse = toern.tagesimpulse_aktiv
+    if mit_impulse:
+        COL_W = [38*mm, 68*mm, 90*mm, USABLE_W - 38*mm - 68*mm - 90*mm]
+    else:
+        COL_W = [38*mm, 80*mm, USABLE_W - 38*mm - 80*mm]
 
     # ── Tabellen-Header ──────────────────────────────────────────────────────
     col_headers = [
         Paragraph('Datum', head_s),
         Paragraph('Mahlzeiten', head_s),
         Paragraph('Aufgaben &amp; Verantwortliche', head_s),
-        Paragraph('Impuls des Tages', head_s),
     ]
+    if mit_impulse:
+        col_headers.append(Paragraph('Impuls des Tages', head_s))
 
     rows = [col_headers]
 
@@ -3238,7 +3243,7 @@ def tagesplan_pdf(request, toern_id, boot_id):
                 date_cell.append(Paragraph('½ Anfahrt', badge_s))
             if is_abfahrt:
                 date_cell.append(Paragraph('½ Abreise', badge_s))
-            if thema:
+            if thema and mit_impulse:
                 date_cell.append(Spacer(1, 1*mm))
                 date_cell.append(Paragraph(f'„{thema}"', thema_s))
 
@@ -3266,17 +3271,21 @@ def tagesplan_pdf(request, toern_id, boot_id):
             else:
                 auf_cell = [Paragraph('–', empty_s)]
 
-            # Impulse-Zelle
-            if day_impulse:
-                imp_cell = []
-                for imp in day_impulse:
-                    person = f"  <font color='#888888'>({imp.verantwortlich.user.first_name})</font>" \
-                             if imp.verantwortlich else ''
-                    imp_cell.append(Paragraph(f"✦ {imp.thema}{person}", cell_s))
-            else:
-                imp_cell = [Paragraph('–', empty_s)]
+            row = [date_cell, meal_cell, auf_cell]
 
-            rows.append([date_cell, meal_cell, auf_cell, imp_cell])
+            if mit_impulse:
+                if day_impulse:
+                    imp_cell = []
+                    for imp in day_impulse:
+                        slot_label = 'Vm:' if imp.slot == 'vormittag' else 'Nm:'
+                        person = f"  <font color='#888888'>({imp.verantwortlich.user.first_name})</font>" \
+                                 if imp.verantwortlich else ''
+                        imp_cell.append(Paragraph(f"<b>{slot_label}</b> {imp.thema}{person}", cell_s))
+                else:
+                    imp_cell = [Paragraph('–', empty_s)]
+                row.append(imp_cell)
+
+            rows.append(row)
 
     main_table = Table(rows, colWidths=COL_W, repeatRows=1)
     row_count = len(rows)
