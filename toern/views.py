@@ -1887,9 +1887,11 @@ def boot_dashboard(request, toern_id):
 
     tagesplan_tage = []
     if toern.startdatum and toern.enddatum:
-        delta = (toern.enddatum - toern.startdatum).days
+        _start = toern.startdatum.date() if hasattr(toern.startdatum, 'date') else toern.startdatum
+        _end   = toern.enddatum.date()   if hasattr(toern.enddatum,   'date') else toern.enddatum
+        delta = (_end - _start).days
         for i in range(delta + 1):
-            datum = toern.startdatum + timedelta(days=i)
+            datum = _start + timedelta(days=i)
             tagesthema_obj = tagesthemen_map.get(datum)
             tagesplan_tage.append({
                 'datum': datum,
@@ -3212,9 +3214,11 @@ def tagesplan_pdf(request, toern_id, boot_id):
     rows = [col_headers]
 
     if toern.startdatum and toern.enddatum:
-        delta = (toern.enddatum - toern.startdatum).days
+        _start = toern.startdatum.date() if hasattr(toern.startdatum, 'date') else toern.startdatum
+        _end   = toern.enddatum.date()   if hasattr(toern.enddatum,   'date') else toern.enddatum
+        delta = (_end - _start).days
         for i in range(delta + 1):
-            datum = toern.startdatum + timedelta(days=i)
+            datum = _start + timedelta(days=i)
             is_anfahrt = i == 0
             is_abfahrt = i == delta
 
