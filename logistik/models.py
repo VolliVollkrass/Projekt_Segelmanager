@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from toern.models import Teilnahme, Boot, Toern
 
@@ -122,6 +123,48 @@ class TagesplanBearbeitungsrecht(models.Model):
 
     class Meta:
         unique_together = ('boot', 'toern', 'teilnahme')
+
+
+# Einkaufsliste pro Boot/Törn (neue Version)
+class EinkaufslistenEintrag(models.Model):
+    KATEGORIE_CHOICES = [
+        ('obst_gemuese',  'Obst & Gemüse'),
+        ('fleisch_fisch', 'Fleisch & Fisch'),
+        ('milch_kase',    'Milch, Käse & Eier'),
+        ('brot',          'Brot & Backwaren'),
+        ('nudeln_reis',   'Nudeln, Reis & Hülsenfrüchte'),
+        ('konserven',     'Konserven & Saucen'),
+        ('gewurze_ol',    'Gewürze, Öle & Essig'),
+        ('getranke',      'Getränke'),
+        ('tiefkuhl',      'Tiefkühlprodukte'),
+        ('haushalt',      'Haushalt & Hygiene'),
+        ('sonstiges',     'Sonstiges'),
+    ]
+
+    boot         = models.ForeignKey(Boot,  on_delete=models.CASCADE, related_name='einkaufs_eintraege')
+    toern        = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name='einkaufs_eintraege')
+    name         = models.CharField(max_length=200)
+    menge        = models.CharField(max_length=100, blank=True)
+    kategorie    = models.CharField(max_length=20, choices=KATEGORIE_CHOICES, default='sonstiges')
+    quelle       = models.CharField(max_length=20, default='manuell')   # rezept | standard | manuell
+    rezept_info  = models.CharField(max_length=500, blank=True)          # "Pasta Napoli, Tomaten-Suppe"
+    erledigt     = models.BooleanField(default=False)
+    erledigt_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+'
+    )
+    erledigt_am  = models.DateTimeField(null=True, blank=True)
+    einkaufer    = models.ForeignKey(
+        Teilnahme, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='einkaufs_items'
+    )
+    erstellt_am  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['kategorie', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.menge})" if self.menge else self.name
 
 
 # Persönliche Packliste
