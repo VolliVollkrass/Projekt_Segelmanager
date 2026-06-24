@@ -89,10 +89,44 @@ def detail(request, pk):
 @require_POST
 def bearbeiten(request, pk):
     andacht = get_object_or_404(Andacht, pk=pk, user=request.user)
+
+    andacht.titel = request.POST.get('titel', andacht.titel).strip()
     andacht.einstieg = request.POST.get('einstieg', andacht.einstieg).strip()
     andacht.entfaltung = request.POST.get('entfaltung', andacht.entfaltung).strip()
     andacht.abschluss = request.POST.get('abschluss', andacht.abschluss).strip()
-    andacht.save(update_fields=['einstieg', 'entfaltung', 'abschluss'])
+    andacht.geschichte = request.POST.get('geschichte', andacht.geschichte).strip()
+
+    # Lieder: bis zu 3 Einträge, Position aus dem Original erhalten
+    bestehende_lieder = andacht.lieder()
+    neue_lieder = []
+    for i, lied in enumerate(bestehende_lieder):
+        titel = request.POST.get(f'lied_{i}_titel', lied.get('titel', '')).strip()
+        eg = request.POST.get(f'lied_{i}_eg_nummer', lied.get('eg_nummer', '')).strip()
+        neue_lieder.append({'position': lied.get('position', ''), 'titel': titel, 'eg_nummer': eg})
+    andacht.lieder_json = json.dumps(neue_lieder, ensure_ascii=False)
+
+    # Gebete
+    bestehende_gebete = andacht.gebete()
+    if bestehende_gebete:
+        andacht.gebete_json = json.dumps({
+            'eroeffnung': request.POST.get('gebet_eroeffnung', bestehende_gebete.get('eroeffnung', '')).strip(),
+            'fuerbitten': request.POST.get('gebet_fuerbitten', bestehende_gebete.get('fuerbitten', '')).strip(),
+            'abschluss': request.POST.get('gebet_abschluss', bestehende_gebete.get('abschluss', '')).strip(),
+        }, ensure_ascii=False)
+
+    # Gesprächsimpulse
+    bestehende_impulse = andacht.gespraechsimpulse()
+    if bestehende_impulse:
+        neue_impulse = [
+            request.POST.get(f'impuls_{i}', imp).strip()
+            for i, imp in enumerate(bestehende_impulse)
+        ]
+        andacht.gespraechsimpulse_json = json.dumps(neue_impulse, ensure_ascii=False)
+
+    andacht.save(update_fields=[
+        'titel', 'einstieg', 'entfaltung', 'abschluss', 'geschichte',
+        'lieder_json', 'gebete_json', 'gespraechsimpulse_json',
+    ])
     return redirect('andacht_detail', pk=andacht.pk)
 
 
