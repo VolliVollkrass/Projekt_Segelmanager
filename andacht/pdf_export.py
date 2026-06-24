@@ -5,11 +5,11 @@ from io import BytesIO
 from django.conf import settings
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable, Image, Table, TableStyle
+from reportlab.lib.utils import ImageReader
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 
 
 LOGO_PATH = os.path.join(settings.BASE_DIR, 'static', 'medien', 'Logo_Meer_erleben.png')
@@ -21,57 +21,64 @@ GRAY = colors.HexColor('#9ca3af')
 GRAY_LIGHT = colors.HexColor('#d1d5db')
 AMBER_GOLD = colors.HexColor('#fcd34d')
 
+FOOTER_TEXT = 'Erstellt mit dem Andachtsgenerator · Segelmanager.undmeererleben.de'
 
-def _header_footer(canvas, doc, andacht):
+
+def _footer(canvas, doc):
     canvas.saveState()
-    w, h = A4
+    w, _h = A4
     margin = 2.5 * cm
-
-    # ── Header: Logo links ──────────────────────────────────────
-    if os.path.exists(LOGO_PATH):
-        logo_h = 1.0 * cm
-        canvas.drawImage(
-            LOGO_PATH,
-            margin,
-            h - margin - logo_h + 0.15 * cm,
-            height=logo_h,
-            preserveAspectRatio=True,
-            mask='auto',
-        )
-
-    # ── Footer ──────────────────────────────────────────────────
     footer_y = margin - 0.8 * cm
+
     canvas.setStrokeColor(GRAY_LIGHT)
     canvas.setLineWidth(0.5)
     canvas.line(margin, footer_y + 0.5 * cm, w - margin, footer_y + 0.5 * cm)
 
     canvas.setFont('Helvetica', 7)
     canvas.setFillColor(GRAY)
+    canvas.drawString(margin, footer_y, FOOTER_TEXT)
 
-    # Links: App-Referenz
-    canvas.drawString(
-        margin,
-        footer_y,
-        f'Erstellt mit dem Andachtsgenerator · Meer erleben · undmeererleben.de',
-    )
-
-    # Rechts: Datum + Seite
     seite_text = f'{date.today().strftime("%d.%m.%Y")}  |  Seite {canvas.getPageNumber()}'
     canvas.drawRightString(w - margin, footer_y, seite_text)
 
     canvas.restoreState()
 
 
+def _first_page(canvas, doc, andacht):
+    """Erste Seite: zentriertes Logo als Briefkopf + Fußzeile."""
+    canvas.saveState()
+    w, h = A4
+    margin = 2.5 * cm
+
+    if os.path.exists(LOGO_PATH):
+        logo_h = 1.8 * cm
+        # Breite ergibt sich aus dem Seitenverhältnis — wir zeichnen in der Mitte
+        orig_w, orig_h = ImageReader(LOGO_PATH).getSize()
+        logo_w = logo_h * orig_w / orig_h
+        logo_x = (w - logo_w) / 2
+        logo_y = h - margin - logo_h
+        canvas.drawImage(
+            LOGO_PATH,
+            logo_x,
+            logo_y,
+            width=logo_w,
+            height=logo_h,
+            mask='auto',
+        )
+
+    canvas.restoreState()
+    _footer(canvas, doc)
+
+
 def erstelle_andacht_pdf(andacht):
     buffer = BytesIO()
 
-    # Etwas mehr oben für Logo-Platz
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
         leftMargin=2.5 * cm,
         rightMargin=2.5 * cm,
-        topMargin=3.5 * cm,
+        topMargin=4.0 * cm,   # Platz für das zentrierte Logo auf Seite 1
         bottomMargin=2.5 * cm,
     )
 
@@ -165,8 +172,8 @@ def erstelle_andacht_pdf(andacht):
 
     doc.build(
         story,
-        onFirstPage=lambda c, d: _header_footer(c, d, andacht),
-        onLaterPages=lambda c, d: _header_footer(c, d, andacht),
+        onFirstPage=lambda c, d: _first_page(c, d, andacht),
+        onLaterPages=_footer,
     )
     buffer.seek(0)
     return buffer
