@@ -1,12 +1,17 @@
 {% load static %}
 
+<style>
+  .logo-img { filter: brightness(0) invert(1); transition: filter 0.2s ease; }
+  .logo-link:hover .logo-img { filter: none; }
+</style>
+
 <div class="navbar bg-primary text-primary-content">
 
   <!-- LEFT: Logo -->
   <div class="navbar-start">
-    <a class="btn btn-ghost text-lg font-bold normal-case flex items-center gap-2 group" href="/">
+    <a class="btn btn-ghost text-lg font-bold normal-case flex items-center gap-2 logo-link" href="/">
       <img src="{% static 'medien/Logo_Meer_erleben.png' %}" alt="Logo"
-           class="h-7 brightness-0 invert group-hover:brightness-100 group-hover:invert-0 transition-all duration-200">
+           class="h-7 logo-img">
       <span class="hidden sm:inline">Meer erleben</span>
     </a>
   </div>
