@@ -5,50 +5,6 @@
      style="padding-bottom: env(safe-area-inset-bottom, 0px)">
   <div class="flex justify-around items-center h-16">
 
-    <!-- Meine Törns -->
-    <a href="{% url 'crew_overview' %}"
-       class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
-              {% if request.resolver_match.url_name == 'crew_overview' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-        <path stroke-linecap="round" stroke-linejoin="round"
-              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-      </svg>
-      <span class="text-[9px] font-medium leading-tight">Törns</span>
-    </a>
-
-    <!-- Kochbuch -->
-    <a href="{% url 'kochbuch_liste' %}"
-       class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
-              {% if request.resolver_match.url_name == 'kochbuch_liste' or request.resolver_match.url_name == 'rezept_detail' or request.resolver_match.url_name == 'rezept_erstellen' or request.resolver_match.url_name == 'rezept_bearbeiten' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
-      </svg>
-      <span class="text-[9px] font-medium leading-tight">Kochbuch</span>
-    </a>
-
-    <!-- Segelwissen -->
-    <a href="{% url 'segelwissen_uebersicht' %}"
-       class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
-              {% if request.resolver_match.url_name == 'segelwissen_uebersicht' or request.resolver_match.url_name == 'knoten_detail' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-      </svg>
-      <span class="text-[9px] font-medium leading-tight">Wissen</span>
-    </a>
-
-    {% if nav_boot_toern_id %}
-    <!-- Mein Boot -->
-    <a href="{% url 'boot_dashboard' nav_boot_toern_id %}"
-       class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
-              {% if request.resolver_match.url_name == 'boot_dashboard' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3L4 20h16L12 3z"/>
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4 20H2m20 0h-2M12 3v6"/>
-      </svg>
-      <span class="text-[9px] font-medium leading-tight">Mein Boot</span>
-    </a>
-    {% endif %}
-
     <!-- Entdecken -->
     <a href="{% url 'index' %}"
        class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
@@ -72,6 +28,50 @@
       <span class="text-[9px] font-medium leading-tight">Anbieter</span>
     </a>
     {% endif %}
+
+    <!-- Meine Törns -->
+    <a href="{% url 'crew_overview' %}"
+       class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
+              {% if request.resolver_match.url_name == 'crew_overview' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+      </svg>
+      <span class="text-[9px] font-medium leading-tight">Törns</span>
+    </a>
+
+    {% if nav_boot_toern_id %}
+    <!-- Boot-Dashboard -->
+    <a href="{% url 'boot_dashboard' nav_boot_toern_id %}"
+       class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
+              {% if request.resolver_match.url_name == 'boot_dashboard' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3L4 20h16L12 3z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 20H2m20 0h-2M12 3v6"/>
+      </svg>
+      <span class="text-[9px] font-medium leading-tight">Boot</span>
+    </a>
+    {% endif %}
+
+    <!-- Kochbuch -->
+    <a href="{% url 'kochbuch_liste' %}"
+       class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
+              {% if request.resolver_match.url_name == 'kochbuch_liste' or request.resolver_match.url_name == 'rezept_detail' or request.resolver_match.url_name == 'rezept_erstellen' or request.resolver_match.url_name == 'rezept_bearbeiten' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+      </svg>
+      <span class="text-[9px] font-medium leading-tight">Kochbuch</span>
+    </a>
+
+    <!-- Segelwissen -->
+    <a href="{% url 'segelwissen_uebersicht' %}"
+       class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
+              {% if request.resolver_match.url_name == 'segelwissen_uebersicht' or request.resolver_match.url_name == 'knoten_detail' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+      </svg>
+      <span class="text-[9px] font-medium leading-tight">Wissen</span>
+    </a>
 
     <!-- Profil -->
     <a href="{% url 'my_account' %}"
