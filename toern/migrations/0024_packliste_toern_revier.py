@@ -4,6 +4,10 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
 
+    # atomic=False weil PostgreSQL kein ALTER TABLE innerhalb derselben
+    # Transaktion erlaubt, wenn es pending deferred FK trigger events gibt
+    atomic = False
+
     dependencies = [
         ('toern', '0023_toern_praeferenz_modus'),
     ]
