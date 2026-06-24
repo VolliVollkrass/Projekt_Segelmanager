@@ -534,17 +534,23 @@
     <!-- ========================= TAB: PACKLISTE ========================= -->
     <div id="tab-packliste" class="hidden space-y-4">
 
-        <div>
-            <p class="text-sm text-base-content/60">Passe die Vorlage für dein Segelgebiet an. Beim Anwenden werden nur fehlende Einträge ergänzt — individuelle Änderungen der Crew bleiben erhalten.</p>
-        </div>
-
-        <!-- Revier-Auswahl -->
-        <div>
-            <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Segelgebiet</p>
-            <div class="flex flex-wrap gap-2">
-                <button id="btn-revier-standard" class="btn btn-sm btn-primary vorlage-revier-btn" onclick="setRevier('standard')">Standard</button>
-                <button id="btn-revier-warm" class="btn btn-sm btn-outline vorlage-revier-btn" onclick="setRevier('warm')">Warm (Mittelmeer)</button>
-                <button id="btn-revier-kalt" class="btn btn-sm btn-outline vorlage-revier-btn" onclick="setRevier('kalt')">Kalt (Nordsee)</button>
+        <!-- Segelgebiet-Auswahl -->
+        <div class="bg-base-200 rounded-2xl p-4 space-y-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-1">Segelgebiet</p>
+                <p class="text-sm text-base-content/60">Wechsel setzt die Vorlage auf die Standard-Liste für dieses Revier zurück (nach Bestätigung).</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="btn-revier-warm"
+                    class="btn btn-sm flex-1 {% if toern.packliste_revier_typ == 'warm' %}btn-primary{% else %}btn-outline{% endif %}"
+                    onclick="wechselRevier('warm')">
+                    ☀️ Warm (Mittelmeer)
+                </button>
+                <button id="btn-revier-kalt"
+                    class="btn btn-sm flex-1 {% if toern.packliste_revier_typ == 'kalt' %}btn-primary{% else %}btn-outline{% endif %}"
+                    onclick="wechselRevier('kalt')">
+                    🌊 Kalt (Nordsee)
+                </button>
             </div>
         </div>
 
@@ -567,9 +573,9 @@
             <button onclick="addVorlageItem()" class="btn btn-primary btn-sm">Hinzufügen</button>
         </div>
 
-        <!-- Vorlage anwenden -->
+        <!-- An Crew schicken -->
         <button onclick="document.getElementById('vorlageAnwendenModal').showModal()" class="btn btn-success w-full">
-            Vorlage auf diesen Törn anwenden
+            An Crew schicken
         </button>
 
     </div>
@@ -736,8 +742,8 @@
 <!-- Vorlage Anwenden Modal -->
 <dialog id="vorlageAnwendenModal" class="modal">
     <div class="modal-box">
-        <h3 class="font-bold text-lg mb-2">Vorlage anwenden</h3>
-        <p class="text-sm opacity-70 mb-4">Nur fehlende Einträge werden ergänzt. Bestehende Änderungen bleiben erhalten.</p>
+        <h3 class="font-bold text-lg mb-2">An Crew schicken</h3>
+        <p class="text-sm opacity-70 mb-4">Fehlende Einträge werden ergänzt. Bestehende Änderungen der Crew bleiben erhalten.</p>
         <div class="space-y-3">
             <label class="flex items-center gap-3 cursor-pointer bg-base-200 p-3 rounded-lg">
                 <input type="checkbox" id="apply-personal" class="checkbox checkbox-primary" checked/>
@@ -757,7 +763,24 @@
         <div id="vorlage-result" class="hidden mt-4 alert alert-success text-sm"></div>
         <div class="modal-action mt-4">
             <button class="btn btn-ghost" onclick="vorlageAnwendenModal.close()">Abbrechen</button>
-            <button class="btn btn-success" onclick="submitVorlageAnwenden()">Anwenden</button>
+            <button class="btn btn-success" onclick="submitVorlageAnwenden()">Senden</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Revier-Wechsel Bestätigungs-Modal -->
+<dialog id="revierWechselModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-2">Segelgebiet wechseln</h3>
+        <p class="text-sm opacity-70 mb-4" id="revierWechselText"></p>
+        <div class="alert alert-warning text-sm mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            Die aktuelle Vorlage wird durch die Standard-Liste des neuen Segelgebiets ersetzt.
+        </div>
+        <div class="modal-action">
+            <button class="btn btn-ghost" onclick="revierWechselModal.close()">Abbrechen</button>
+            <button class="btn btn-primary" onclick="bestaetigeRevierWechsel()">Ja, wechseln & zurücksetzen</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -1085,16 +1108,34 @@ function submitAutoAssign() {
 }
 
 // ===================== PACKLISTEN-VORLAGEN =====================
-let vorlageRevier = 'standard';
 let vorlageTyp = 'personal';
 let vorlageId = null;
+let pendingRevierTyp = null;
 
-function setRevier(revier) {
-    vorlageRevier = revier;
-    document.querySelectorAll('.vorlage-revier-btn').forEach(b => { b.classList.remove('btn-primary'); b.classList.add('btn-outline'); });
-    const active = document.getElementById('btn-revier-' + revier);
-    if (active) { active.classList.add('btn-primary'); active.classList.remove('btn-outline'); }
-    loadVorlage();
+function wechselRevier(revier) {
+    if (revier === '{{ toern.packliste_revier_typ }}' && vorlageId) return; // schon aktiv
+    pendingRevierTyp = revier;
+    const label = revier === 'warm' ? 'Warm (Mittelmeer)' : 'Kalt (Nordsee)';
+    document.getElementById('revierWechselText').textContent =
+        `Das Segelgebiet wird auf "${label}" gewechselt.`;
+    document.getElementById('revierWechselModal').showModal();
+}
+
+function bestaetigeRevierWechsel() {
+    document.getElementById('revierWechselModal').close();
+    fetch("{% url 'packl_revier_set' toern.id %}", {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ revier_typ: pendingRevierTyp, reset: true })
+    }).then(r => r.json()).then(() => {
+        // Buttons aktualisieren
+        ['warm', 'kalt'].forEach(r => {
+            const btn = document.getElementById('btn-revier-' + r);
+            btn.classList.toggle('btn-primary', r === pendingRevierTyp);
+            btn.classList.toggle('btn-outline', r !== pendingRevierTyp);
+        });
+        loadVorlage();
+    });
 }
 
 function setTyp(typ) {
@@ -1106,7 +1147,7 @@ function setTyp(typ) {
 function loadVorlage() {
     document.getElementById('vorlage-loading').classList.remove('hidden');
     document.getElementById('vorlage-list').classList.add('hidden');
-    fetch(`{% url 'vorlage_items_get' toern.id 'REVIER' 'TYP' %}`.replace('REVIER', vorlageRevier).replace('TYP', vorlageTyp))
+    fetch(`{% url 'vorlage_items_get' toern.id 'TYP' %}`.replace('TYP', vorlageTyp))
         .then(r => r.json()).then(data => { vorlageId = data.vorlage_id; renderVorlageItems(data.items); });
 }
 
@@ -1181,7 +1222,6 @@ function submitVorlageAnwenden() {
     fetch("{% url 'vorlage_anwenden' toern.id %}", {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
         body: JSON.stringify({
-            revier_typ: vorlageRevier,
             apply_personal: document.getElementById('apply-personal').checked,
             apply_boot: document.getElementById('apply-boot').checked
         })
