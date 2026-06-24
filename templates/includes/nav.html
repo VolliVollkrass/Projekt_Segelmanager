@@ -14,6 +14,7 @@
   <div class="navbar-center hidden lg:flex">
     <ul class="menu menu-horizontal px-1 gap-1">
       <li><a href="{% url 'index' %}" class="rounded-lg">Törns entdecken</a></li>
+      <li><a href="{% url 'segelwissen_uebersicht' %}" class="rounded-lg">Segelwissen</a></li>
 
       {% if user.is_authenticated %}
         <li><a href="{% url 'crew_overview' %}" class="rounded-lg">Meine Törns</a></li>

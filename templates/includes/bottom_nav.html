@@ -26,6 +26,16 @@
       <span class="text-[9px] font-medium leading-tight">Kochbuch</span>
     </a>
 
+    <!-- Segelwissen -->
+    <a href="{% url 'segelwissen_uebersicht' %}"
+       class="flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg transition-colors min-w-0
+              {% if request.resolver_match.url_name == 'segelwissen_uebersicht' or request.resolver_match.url_name == 'knoten_detail' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+      </svg>
+      <span class="text-[9px] font-medium leading-tight">Wissen</span>
+    </a>
+
     {% if nav_boot_toern_id %}
     <!-- Mein Boot -->
     <a href="{% url 'boot_dashboard' nav_boot_toern_id %}"
@@ -90,6 +100,16 @@
               d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"/>
       </svg>
       <span class="text-[10px] font-medium leading-tight">Entdecken</span>
+    </a>
+
+    <a href="{% url 'segelwissen_uebersicht' %}"
+       class="flex flex-col items-center gap-0.5 px-3 py-2 rounded-lg
+              {% if request.resolver_match.url_name == 'segelwissen_uebersicht' or request.resolver_match.url_name == 'knoten_detail' %}text-primary{% else %}text-base-content/50 hover:text-primary{% endif %}
+              transition-colors min-w-0">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+      </svg>
+      <span class="text-[10px] font-medium leading-tight">Wissen</span>
     </a>
 
     <a href="{% url 'login' %}"

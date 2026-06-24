@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'logistik',
     'finance',
     'rezepte',
+    'segelwissen',
 ]
 
 # schema_viewer nur lokal (zeigt DB-Schema — nie in Production!)
