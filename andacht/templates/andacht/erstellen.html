@@ -57,12 +57,11 @@
       <div>
         <label class="label label-text text-xs font-medium pb-1">Dauer (Minuten)</label>
         <div class="flex gap-2 flex-wrap" id="dauer-buttons">
-          {% for d in "5,10,15,20,30"|split:"," %}
-          <button type="button" data-dauer="{{ d }}"
-                  class="btn btn-sm btn-outline dauer-btn {% if post.dauer_minuten == d %}btn-primary{% endif %}">
-            {{ d }} Min
-          </button>
-          {% endfor %}
+          <button type="button" data-dauer="5"  class="btn btn-sm btn-outline dauer-btn">5 Min</button>
+          <button type="button" data-dauer="10" class="btn btn-sm btn-outline dauer-btn">10 Min</button>
+          <button type="button" data-dauer="15" class="btn btn-sm btn-outline dauer-btn">15 Min</button>
+          <button type="button" data-dauer="20" class="btn btn-sm btn-outline dauer-btn">20 Min</button>
+          <button type="button" data-dauer="30" class="btn btn-sm btn-outline dauer-btn">30 Min</button>
           <button type="button" id="dauer-andere-btn" class="btn btn-sm btn-outline">Andere</button>
         </div>
         <input type="number" name="dauer_minuten" id="dauer-input" min="1" max="120"
