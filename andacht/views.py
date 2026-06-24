@@ -35,6 +35,7 @@ def erstellen(request):
             dauer_minuten=dauer,
             thema=request.POST.get('thema', '').strip(),
             stichpunkte=request.POST.get('stichpunkte', '').strip(),
+            kontext=request.POST.get('kontext', '').strip(),
             bibelstelle_eingabe=request.POST.get('bibelstelle_eingabe', '').strip(),
             tageslosung_verwendet='tageslosung_verwendet' in request.POST,
             kirchenjahr=request.POST.get('kirchenjahr', ''),
@@ -65,6 +66,7 @@ def erstellen(request):
         andacht.entfaltung = ergebnis.get('entfaltung', '')
         andacht.abschluss = ergebnis.get('abschluss', '')
         andacht.geschichte = ergebnis.get('geschichte', '')
+        andacht.geschichte_quelle = ergebnis.get('geschichte_quelle', '')
         andacht.lieder_json = json.dumps(ergebnis.get('lieder', []), ensure_ascii=False)
         andacht.gebete_json = json.dumps(ergebnis.get('gebete', {}), ensure_ascii=False)
         andacht.gespraechsimpulse_json = json.dumps(ergebnis.get('gespraechsimpulse', []), ensure_ascii=False)
@@ -80,6 +82,18 @@ def erstellen(request):
 def detail(request, pk):
     andacht = get_object_or_404(Andacht, pk=pk, user=request.user)
     return render(request, 'andacht/detail.html', {'andacht': andacht})
+
+
+@login_required
+@andacht_required
+@require_POST
+def bearbeiten(request, pk):
+    andacht = get_object_or_404(Andacht, pk=pk, user=request.user)
+    andacht.einstieg = request.POST.get('einstieg', andacht.einstieg).strip()
+    andacht.entfaltung = request.POST.get('entfaltung', andacht.entfaltung).strip()
+    andacht.abschluss = request.POST.get('abschluss', andacht.abschluss).strip()
+    andacht.save(update_fields=['einstieg', 'entfaltung', 'abschluss'])
+    return redirect('andacht_detail', pk=andacht.pk)
 
 
 @login_required

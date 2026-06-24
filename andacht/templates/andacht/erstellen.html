@@ -88,6 +88,17 @@
                   placeholder="z.B. Ablegen, neue Welten erkunden, Unbekanntes wahrnehmen..."
                   class="textarea textarea-bordered w-full text-sm">{{ post.stichpunkte|default:'' }}</textarea>
       </div>
+
+      <div>
+        <label class="label label-text text-xs font-medium pb-1">
+          Kontext / Gruppe
+          <span class="text-base-content/40 font-normal">(optional)</span>
+        </label>
+        <textarea name="kontext" rows="2" maxlength="500"
+                  placeholder="z.B. Erste Nacht im Hafen nach langer Überfahrt, Gruppe aus der Brüderschaft, alle durch den gemeinsamen Törn verbunden …"
+                  class="textarea textarea-bordered w-full text-sm">{{ post.kontext|default:'' }}</textarea>
+        <p class="text-xs text-base-content/40 mt-1">Die KI passt Ton, Anspielungen und Illustrationen an diese Situation an.</p>
+      </div>
     </div>
 
     <!-- Bibelstelle + Tageslosung -->
