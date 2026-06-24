@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}{{ andacht.titel|default:andacht.thema }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+
+  <!-- Header -->
+  <div class="flex items-start gap-3">
+    <a href="{% url 'andacht_dashboard' %}" class="btn btn-ghost btn-sm btn-circle mt-0.5">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div class="flex-1">
+      <h1 class="text-xl font-bold leading-snug">{{ andacht.titel|default:andacht.thema }}</h1>
+      <p class="text-xs text-base-content/50 mt-1">
+        {{ andacht.get_typ_display }} · {{ andacht.get_zielgruppe_display }} · ca. {{ andacht.dauer_minuten }} Min.
+        {% if andacht.kirchenjahr %} · {{ andacht.get_kirchenjahr_display }}{% endif %}
+      </p>
+    </div>
+  </div>
+
+  <!-- Aktionen -->
+  <div class="flex gap-2">
+    <a href="{% url 'andacht_pdf' andacht.pk %}" class="btn btn-outline btn-sm gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 9.414V19a2 2 0 01-2 2z"/>
+      </svg>
+      PDF herunterladen
+    </a>
+    <form method="post" action="{% url 'andacht_loeschen' andacht.pk %}"
+          onsubmit="return confirm('Diese Andacht wirklich löschen?')">
+      {% csrf_token %}
+      <button class="btn btn-ghost btn-sm text-error gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+        </svg>
+        Löschen
+      </button>
+    </form>
+  </div>
+
+  <!-- Exegese (Accordion – nur für den Andachtshaltenden) -->
+  {% if andacht.exegese %}
+  <details class="bg-amber-50 border border-amber-200 rounded-2xl group">
+    <summary class="flex items-center justify-between px-5 py-4 cursor-pointer list-none">
+      <div class="flex items-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+        </svg>
+        <span class="font-semibold text-sm text-amber-800">Exegese – Nur für den Andachtshaltenden</span>
+      </div>
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-amber-600 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+      </svg>
+    </summary>
+    <div class="px-5 pb-5">
+      <p class="text-sm leading-relaxed text-amber-900 whitespace-pre-line">{{ andacht.exegese }}</p>
+    </div>
+  </details>
+  {% endif %}
+
+  <!-- Eröffnungslied -->
+  {% with lieder=andacht.lieder %}
+  {% for lied in lieder %}{% if lied.position == 'einstieg' %}
+  <div class="bg-base-100 border border-base-300 rounded-2xl p-4 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+      </svg>
+    </div>
+    <div>
+      <p class="text-xs text-base-content/40 font-medium uppercase tracking-wide">Eröffnungslied</p>
+      <p class="font-semibold text-sm">{{ lied.titel }}{% if lied.eg_nummer %} <span class="text-base-content/40 font-normal">(EG {{ lied.eg_nummer }})</span>{% endif %}</p>
+    </div>
+  </div>
+  {% endif %}{% endfor %}
+  {% endwith %}
+
+  <!-- Eröffnungsgebet -->
+  {% with gebete=andacht.gebete %}
+  {% if gebete.eroeffnung %}
+  <div class="bg-base-100 border border-base-300 rounded-2xl p-5">
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-3">Eröffnungsgebet</h2>
+    <p class="text-sm leading-relaxed whitespace-pre-line italic">{{ gebete.eroeffnung }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Bibelstelle -->
+  <div class="bg-primary/5 border border-primary/20 rounded-2xl p-5">
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-primary/60 mb-2">Bibelstelle</h2>
+    <p class="font-bold text-primary text-lg mb-3">{{ andacht.bibelstelle }}</p>
+    {% if andacht.bibeltext %}
+    <p class="text-sm leading-relaxed text-base-content/80 whitespace-pre-line italic border-l-4 border-primary/30 pl-4">{{ andacht.bibeltext }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Geschichte -->
+  {% if andacht.geschichte %}
+  <div class="bg-base-100 border border-base-300 rounded-2xl p-5">
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-3">Geschichte / Illustration</h2>
+    <p class="text-sm leading-relaxed whitespace-pre-line">{{ andacht.geschichte }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Andachtstext -->
+  <div class="bg-base-100 border border-base-300 rounded-2xl p-5 space-y-4">
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/40">Andacht</h2>
+    {% if andacht.einstieg %}
+    <p class="text-sm leading-relaxed whitespace-pre-line">{{ andacht.einstieg }}</p>
+    {% endif %}
+    {% if andacht.entfaltung %}
+    <div class="divider my-2"></div>
+    <p class="text-sm leading-relaxed whitespace-pre-line">{{ andacht.entfaltung }}</p>
+    {% endif %}
+    {% if andacht.abschluss %}
+    <div class="divider my-2"></div>
+    <p class="text-sm leading-relaxed whitespace-pre-line">{{ andacht.abschluss }}</p>
+    {% endif %}
+  </div>
+
+  <!-- Fürbitten -->
+  {% if gebete.fuerbitten %}
+  <div class="bg-base-100 border border-base-300 rounded-2xl p-5">
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-3">Fürbitten</h2>
+    <p class="text-sm leading-relaxed whitespace-pre-line italic">{{ gebete.fuerbitten }}</p>
+  </div>
+  {% endif %}
+
+  <!-- Abschlussgebet -->
+  {% if gebete.abschluss %}
+  <div class="bg-base-100 border border-base-300 rounded-2xl p-5">
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-3">Abschlussgebet</h2>
+    <p class="text-sm leading-relaxed whitespace-pre-line italic">{{ gebete.abschluss }}</p>
+  </div>
+  {% endif %}
+  {% endwith %}
+
+  <!-- Schlusslied -->
+  {% with lieder=andacht.lieder %}
+  {% for lied in lieder %}{% if lied.position == 'schluss' %}
+  <div class="bg-base-100 border border-base-300 rounded-2xl p-4 flex items-center gap-3">
+    <div class="w-9 h-9 rounded-full bg-secondary/10 flex items-center justify-center shrink-0">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/>
+      </svg>
+    </div>
+    <div>
+      <p class="text-xs text-base-content/40 font-medium uppercase tracking-wide">Schlusslied</p>
+      <p class="font-semibold text-sm">{{ lied.titel }}{% if lied.eg_nummer %} <span class="text-base-content/40 font-normal">(EG {{ lied.eg_nummer }})</span>{% endif %}</p>
+    </div>
+  </div>
+  {% endif %}{% endfor %}
+  {% endwith %}
+
+  <!-- Gesprächsimpulse -->
+  {% with impulse=andacht.gespraechsimpulse %}
+  {% if impulse %}
+  <div class="bg-base-100 border border-base-300 rounded-2xl p-5">
+    <h2 class="text-xs font-semibold uppercase tracking-wide text-base-content/40 mb-3">Gesprächsimpulse</h2>
+    <ol class="space-y-3">
+      {% for imp in impulse %}
+      <li class="flex gap-3 text-sm">
+        <span class="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">{{ forloop.counter }}</span>
+        <p class="leading-relaxed">{{ imp }}</p>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  {% endif %}
+  {% endwith %}
+
+</div>
+{% endblock %}
