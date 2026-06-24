@@ -41,6 +41,17 @@ class Toern(models.Model):
     logbuch_pdf = models.FileField(upload_to='toern/logbuch/', blank=True, null=True)
     tagesimpulse_aktiv = models.BooleanField(default=True, verbose_name="Tagesthema & Impulse aktiv")
 
+    PACKLISTE_REVIER_CHOICES = [
+        ('warm', 'Warm (Mittelmeer)'),
+        ('kalt', 'Kalt (Nordsee)'),
+    ]
+    packliste_revier_typ = models.CharField(
+        max_length=10,
+        choices=PACKLISTE_REVIER_CHOICES,
+        default='warm',
+        verbose_name="Segelgebiet Packliste",
+    )
+
     PRAEFERENZ_MODUS_CHOICES = [
         ("alle", "Beide Präferenztypen"),
         ("nur_ausschluss", "Nur Ausschlüsse"),
@@ -256,27 +267,19 @@ class CrewPraeferenz(models.Model):
         return f"{self.from_user} -> {self.to_user} ({self.typ})"
 
 
-REVIER_TYP_CHOICES = [
-    ('standard', 'Standard'),
-    ('warm', 'Warmes Segelgebiet'),
-    ('kalt', 'Kaltes Segelgebiet'),
-]
-
-
 class PacklisteVorlage(models.Model):
-    erstellt_von = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    toern = models.ForeignKey(
+        'Toern',
         on_delete=models.CASCADE,
         related_name='packliste_vorlagen'
     )
-    revier_typ = models.CharField(max_length=20, choices=REVIER_TYP_CHOICES, default='standard')
     typ = models.CharField(max_length=10, choices=[('personal', 'Persönlich'), ('boot', 'Boot')])
 
     class Meta:
-        unique_together = [('erstellt_von', 'revier_typ', 'typ')]
+        unique_together = [('toern', 'typ')]
 
     def __str__(self):
-        return f"{self.get_typ_display()} - {self.get_revier_typ_display()} ({self.erstellt_von.username})"
+        return f"{self.get_typ_display()} – {self.toern}"
 
 
 class PacklisteVorlageEintrag(models.Model):

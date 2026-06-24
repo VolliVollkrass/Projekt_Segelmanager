@@ -2626,12 +2626,9 @@ def teilnehmerliste_pdf(request, toern_id):
 # PACKLISTEN-VORLAGEN
 # =========================
 
-def _get_or_create_vorlage(user, revier_typ, typ):
-    vorlage, created = PacklisteVorlage.objects.get_or_create(
-        erstellt_von=user,
-        revier_typ=revier_typ,
-        typ=typ
-    )
+def _get_or_create_vorlage(toern, typ):
+    revier_typ = toern.packliste_revier_typ
+    vorlage, created = PacklisteVorlage.objects.get_or_create(toern=toern, typ=typ)
     if created:
         if typ == 'personal':
             source = KALT_PACKLISTE if revier_typ == 'kalt' else BASIS_PACKLISTE
@@ -2644,31 +2641,56 @@ def _get_or_create_vorlage(user, revier_typ, typ):
     return vorlage
 
 
-def _check_skipper(request, toern):
+def _hat_skipper_oder_anbieter(request, toern):
+    if toern.anbieter == request.user:
+        return
     t = Teilnahme.objects.filter(user=request.user, toern=toern).first()
     if not t or t.rolle not in ["skipper", "coskipper"]:
         raise PermissionDenied
-    return t
 
 
 @login_required
-def vorlage_items_get(request, toern_id, revier_typ, typ):
+@require_POST
+def packl_revier_set(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
-    _check_skipper(request, toern)
+    _hat_skipper_oder_anbieter(request, toern)
 
-    if revier_typ not in ('standard', 'warm', 'kalt') or typ not in ('personal', 'boot'):
-        return JsonResponse({'error': 'Ungültige Parameter'}, status=400)
+    data = json.loads(request.body)
+    revier_typ = data.get('revier_typ')
+    reset = data.get('reset', False)
 
-    vorlage = _get_or_create_vorlage(request.user, revier_typ, typ)
+    if revier_typ not in ('warm', 'kalt'):
+        return JsonResponse({'error': 'Ungültiger Reviertyp'}, status=400)
+
+    toern.packliste_revier_typ = revier_typ
+    toern.save(update_fields=['packliste_revier_typ'])
+
+    if reset:
+        for typ in ('personal', 'boot'):
+            PacklisteVorlage.objects.filter(toern=toern, typ=typ).delete()
+            _get_or_create_vorlage(toern, typ)
+
+    return JsonResponse({'status': 'ok', 'revier_typ': revier_typ})
+
+
+@login_required
+def vorlage_items_get(request, toern_id, typ):
+    toern = get_object_or_404(Toern, id=toern_id)
+    _hat_skipper_oder_anbieter(request, toern)
+
+    if typ not in ('personal', 'boot'):
+        return JsonResponse({'error': 'Ungültiger Typ'}, status=400)
+
+    vorlage = _get_or_create_vorlage(toern, typ)
     items = list(vorlage.eintraege.values('id', 'name', 'menge').order_by('id'))
-    return JsonResponse({'items': items, 'vorlage_id': vorlage.id})
+    return JsonResponse({'items': items, 'vorlage_id': vorlage.id, 'revier_typ': toern.packliste_revier_typ})
 
 
 @login_required
 @require_POST
 def vorlage_item_add(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
-    _check_skipper(request, toern)
+    _hat_skipper_oder_anbieter(request, toern)
 
     data = json.loads(request.body)
     vorlage_id = data.get('vorlage_id')
@@ -2678,7 +2700,7 @@ def vorlage_item_add(request, toern_id):
     if not name:
         return JsonResponse({'error': 'Name fehlt'}, status=400)
 
-    vorlage = get_object_or_404(PacklisteVorlage, id=vorlage_id, erstellt_von=request.user)
+    vorlage = get_object_or_404(PacklisteVorlage, id=vorlage_id, toern=toern)
     eintrag = PacklisteVorlageEintrag.objects.create(vorlage=vorlage, name=name, menge=menge)
     return JsonResponse({'status': 'ok', 'id': eintrag.id, 'name': eintrag.name, 'menge': eintrag.menge})
 
@@ -2687,9 +2709,9 @@ def vorlage_item_add(request, toern_id):
 @require_POST
 def vorlage_item_update(request, toern_id, item_id):
     toern = get_object_or_404(Toern, id=toern_id)
-    _check_skipper(request, toern)
+    _hat_skipper_oder_anbieter(request, toern)
 
-    eintrag = get_object_or_404(PacklisteVorlageEintrag, id=item_id, vorlage__erstellt_von=request.user)
+    eintrag = get_object_or_404(PacklisteVorlageEintrag, id=item_id, vorlage__toern=toern)
     data = json.loads(request.body)
     eintrag.name = data.get('name', eintrag.name).strip()
     eintrag.menge = max(1, int(data.get('menge', eintrag.menge)))
@@ -2701,9 +2723,9 @@ def vorlage_item_update(request, toern_id, item_id):
 @require_POST
 def vorlage_item_delete(request, toern_id, item_id):
     toern = get_object_or_404(Toern, id=toern_id)
-    _check_skipper(request, toern)
+    _hat_skipper_oder_anbieter(request, toern)
 
-    eintrag = get_object_or_404(PacklisteVorlageEintrag, id=item_id, vorlage__erstellt_von=request.user)
+    eintrag = get_object_or_404(PacklisteVorlageEintrag, id=item_id, vorlage__toern=toern)
     eintrag.delete()
     return JsonResponse({'status': 'ok'})
 
@@ -2712,21 +2734,18 @@ def vorlage_item_delete(request, toern_id, item_id):
 @require_POST
 def vorlage_anwenden(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
-    _check_skipper(request, toern)
+    _hat_skipper_oder_anbieter(request, toern)
 
     data = json.loads(request.body)
-    revier_typ = data.get('revier_typ', 'standard')
     apply_personal = data.get('apply_personal', True)
     apply_boot = data.get('apply_boot', True)
 
     added = {'personal': 0, 'boot': 0}
 
     if apply_personal:
-        vorlage = _get_or_create_vorlage(request.user, revier_typ, 'personal')
+        vorlage = _get_or_create_vorlage(toern, 'personal')
         template_items = list(vorlage.eintraege.values_list('name', 'menge'))
         for t in toern.teilnahmen.filter(status='bestaetigt'):
-            if not t.persoenliche_packliste.exists():
-                continue
             existing = set(t.persoenliche_packliste.values_list('name', flat=True))
             to_create = [
                 PersönlicherGegenstand(participation=t, name=name, menge=menge)
@@ -2737,7 +2756,7 @@ def vorlage_anwenden(request, toern_id):
             added['personal'] += len(to_create)
 
     if apply_boot:
-        vorlage = _get_or_create_vorlage(request.user, revier_typ, 'boot')
+        vorlage = _get_or_create_vorlage(toern, 'boot')
         template_items = list(vorlage.eintraege.values_list('name', 'menge'))
         for boot in toern.boote.all():
             existing = set(Gegenstand.objects.filter(boot=boot, toern=toern).values_list('name', flat=True))
