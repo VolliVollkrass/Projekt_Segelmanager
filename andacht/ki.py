@@ -57,6 +57,11 @@ def generiere_andacht(andacht_obj):
             'geschichte: Eine kurze, passende Geschichte oder Anekdote (ca. 80–120 Wörter) '
             'die als Illustration oder Einstieg dient.'
         )
+        optionale_teile.append(
+            'geschichte_quelle: Kurze Quellenangabe — entweder "KI-generierte Illustration" '
+            'wenn die Geschichte frei erfunden ist, oder z.B. "Angelehnt an: [Name/Ereignis/Werk]" '
+            'wenn sie auf einer realen Begebenheit basiert.'
+        )
     if andacht_obj.mit_gebeten:
         optionale_teile.append(
             'gebete: Objekt mit drei Gebeten: "eroeffnung" (kurzes Eröffnungsgebet), '
@@ -81,6 +86,10 @@ def generiere_andacht(andacht_obj):
     if andacht_obj.stichpunkte:
         stichpunkte_hinweis = f'\n- Gedanken/Stichpunkte des Nutzers: {andacht_obj.stichpunkte}'
 
+    kontext_hinweis = ''
+    if andacht_obj.kontext:
+        kontext_hinweis = f'\n- Kontext / Gruppe: {andacht_obj.kontext}'
+
     optionale_felder_text = '\n'.join(f'- {t}' for t in optionale_teile)
 
     prompt = f"""Du bist ein erfahrener evangelischer Gemeindepädagoge und Prediger.
@@ -89,7 +98,7 @@ Erstelle eine vollständige, inhaltlich reiche {andacht_obj.get_typ_display()} m
 **Vorgaben:**
 - Zielgruppe: {ZIELGRUPPE_BESCHREIBUNG.get(andacht_obj.zielgruppe, andacht_obj.zielgruppe)}
 - Geplante Dauer: ca. {andacht_obj.dauer_minuten} Minuten{kirchenjahr_hinweis}{stil_hinweis}
-- Thema: {andacht_obj.thema}{stichpunkte_hinweis}
+- Thema: {andacht_obj.thema}{stichpunkte_hinweis}{kontext_hinweis}
 - Bibelstelle: {bibelstelle_info}
 
 **Pflichtfelder im JSON:**

@@ -22,15 +22,23 @@ def erstelle_andacht_pdf(andacht):
     primary = colors.HexColor('#1e3a5f')
     secondary = colors.HexColor('#0D9488')
 
+    amber = colors.HexColor('#92400e')
+    amber_bg = colors.HexColor('#fffbeb')
+
     titel_style = ParagraphStyle('Titel', parent=styles['Title'], textColor=primary, fontSize=20, spaceAfter=6)
     untertitel_style = ParagraphStyle('Untertitel', parent=styles['Normal'], textColor=secondary, fontSize=11, spaceAfter=16)
     h2_style = ParagraphStyle('H2', parent=styles['Heading2'], textColor=primary, fontSize=13, spaceBefore=14, spaceAfter=6)
+    h2_amber_style = ParagraphStyle('H2Amber', parent=styles['Heading2'], textColor=amber, fontSize=12, spaceBefore=14, spaceAfter=6)
     body_style = ParagraphStyle('Body', parent=styles['Normal'], fontSize=10, leading=15, spaceAfter=8)
+    exegese_style = ParagraphStyle('Exegese', parent=styles['Normal'], fontSize=9, leading=14,
+                                   textColor=amber, leftIndent=12, rightIndent=12, spaceAfter=8)
     bibelvers_style = ParagraphStyle('Bibelvers', parent=styles['Normal'], fontSize=11, leading=16,
                                      leftIndent=20, rightIndent=20, textColor=colors.HexColor('#374151'),
                                      spaceAfter=12, spaceBefore=4)
     impuls_style = ParagraphStyle('Impuls', parent=styles['Normal'], fontSize=10, leading=14,
                                   leftIndent=16, spaceAfter=4)
+    quelle_style = ParagraphStyle('Quelle', parent=styles['Normal'], fontSize=8, leading=12,
+                                  textColor=colors.HexColor('#9ca3af'), spaceAfter=6)
 
     story = []
 
@@ -61,6 +69,8 @@ def erstelle_andacht_pdf(andacht):
     if andacht.geschichte:
         story.append(Paragraph('Geschichte / Illustration', h2_style))
         story.append(Paragraph(andacht.geschichte.replace('\n', '<br/>'), body_style))
+        if andacht.geschichte_quelle:
+            story.append(Paragraph(f'Quelle: {andacht.geschichte_quelle}', quelle_style))
 
     story.append(Paragraph('Andacht', h2_style))
     if andacht.einstieg:
@@ -85,6 +95,13 @@ def erstelle_andacht_pdf(andacht):
         story.append(Paragraph('Schlusslied', h2_style))
         eg = f' (EG {schlusslied["eg_nummer"]})' if schlusslied.get('eg_nummer') else ''
         story.append(Paragraph(f'{schlusslied.get("titel", "")}{eg}', body_style))
+
+    if andacht.exegese:
+        story.append(Spacer(1, 8))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=colors.HexColor('#fcd34d'), spaceAfter=10))
+        story.append(Paragraph('Exegese – Nur für den Andachtshaltenden', h2_amber_style))
+        story.append(Paragraph(andacht.exegese.replace('\n', '<br/>'), exegese_style))
+        story.append(HRFlowable(width='100%', thickness=0.5, color=colors.HexColor('#fcd34d'), spaceAfter=10))
 
     impulse = andacht.gespraechsimpulse()
     if impulse:
