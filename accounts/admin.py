@@ -8,13 +8,16 @@ from django.contrib.auth.models import Group
 @admin.register(User)
 class CustomUserAdmin(UserAdmin):
     filter_horizontal = ("groups", "user_permissions")
-    list_display = ("email", "first_name", "last_name", "email_verified", "is_staff", "is_active")
-    list_filter = ("email_verified", "is_staff", "is_active")
-    list_editable = ("email_verified",)
+    list_display = ("email", "first_name", "last_name", "email_verified", "is_andacht", "is_staff", "is_active")
+    list_filter = ("email_verified", "is_andacht", "is_staff", "is_active")
+    list_editable = ("email_verified", "is_andacht")
 
     fieldsets = UserAdmin.fieldsets + (
         ("E-Mail-Verifikation", {
             "fields": ("email_verified",)
+        }),
+        ("Berechtigungen & Features", {
+            "fields": ("is_andacht",)
         }),
         ("Zusätzliche Informationen", {
             "fields": (

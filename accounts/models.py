@@ -40,6 +40,7 @@ class User(AbstractUser):
     REQUIRED_FIELDS = ["username"]
 
     email_verified = models.BooleanField(default=False)
+    is_andacht = models.BooleanField(default=False)
 
     profilbild_uuid = models.UUIDField(
         default=uuid.uuid4,

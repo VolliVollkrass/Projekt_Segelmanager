@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block title %}Neue Andacht erstellen{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+
+  <div class="flex items-center gap-3">
+    <a href="{% url 'andacht_dashboard' %}" class="btn btn-ghost btn-sm btn-circle">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+      </svg>
+    </a>
+    <div>
+      <h1 class="text-xl font-bold">Neue Andacht</h1>
+      <p class="text-xs text-base-content/50">Angaben für die KI-Generierung</p>
+    </div>
+  </div>
+
+  {% if fehler %}
+  <div class="alert alert-error">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <span>{{ fehler }}</span>
+  </div>
+  {% endif %}
+
+  <form method="post" id="andacht-form" class="space-y-5">
+    {% csrf_token %}
+
+    <!-- Typ + Zielgruppe -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl p-5 space-y-4">
+      <h2 class="font-semibold text-sm uppercase tracking-wide text-base-content/50">Grundeinstellungen</h2>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="label label-text text-xs font-medium pb-1">Typ</label>
+          <select name="typ" class="select select-bordered w-full select-sm">
+            <option value="morgen" {% if post.typ == 'morgen' %}selected{% endif %}>Morgenandacht</option>
+            <option value="abend" {% if post.typ == 'abend' %}selected{% endif %}>Abendandacht</option>
+          </select>
+        </div>
+        <div>
+          <label class="label label-text text-xs font-medium pb-1">Zielgruppe</label>
+          <select name="zielgruppe" class="select select-bordered w-full select-sm">
+            <option value="maritim" {% if post.zielgruppe == 'maritim' %}selected{% endif %}>⚓ Maritime Andacht</option>
+            <option value="kinder" {% if post.zielgruppe == 'kinder' %}selected{% endif %}>Kinder</option>
+            <option value="jugendliche" {% if post.zielgruppe == 'jugendliche' %}selected{% endif %}>Jugendliche</option>
+            <option value="junge_erwachsene" {% if post.zielgruppe == 'junge_erwachsene' %}selected{% endif %}>Junge Erwachsene</option>
+            <option value="erwachsene" {% if post.zielgruppe == 'erwachsene' %}selected{% endif %}>Erwachsene</option>
+            <option value="gemischt" {% if post.zielgruppe == 'gemischt' %}selected{% endif %}>Gemischt / Alle</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Dauer -->
+      <div>
+        <label class="label label-text text-xs font-medium pb-1">Dauer (Minuten)</label>
+        <div class="flex gap-2 flex-wrap" id="dauer-buttons">
+          {% for d in "5,10,15,20,30"|split:"," %}
+          <button type="button" data-dauer="{{ d }}"
+                  class="btn btn-sm btn-outline dauer-btn {% if post.dauer_minuten == d %}btn-primary{% endif %}">
+            {{ d }} Min
+          </button>
+          {% endfor %}
+          <button type="button" id="dauer-andere-btn" class="btn btn-sm btn-outline">Andere</button>
+        </div>
+        <input type="number" name="dauer_minuten" id="dauer-input" min="1" max="120"
+               value="{{ post.dauer_minuten|default:'15' }}"
+               class="input input-bordered input-sm w-32 mt-2 hidden" placeholder="z.B. 45">
+      </div>
+    </div>
+
+    <!-- Thema + Stichpunkte -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl p-5 space-y-4">
+      <h2 class="font-semibold text-sm uppercase tracking-wide text-base-content/50">Inhalt</h2>
+
+      <div>
+        <label class="label label-text text-xs font-medium pb-1">Thema <span class="text-error">*</span></label>
+        <input type="text" name="thema" required maxlength="300"
+               value="{{ post.thema|default:'' }}"
+               placeholder="z.B. Aufbruch und neues Wagen"
+               class="input input-bordered w-full input-sm">
+      </div>
+
+      <div>
+        <label class="label label-text text-xs font-medium pb-1">Gedanken / Stichpunkte <span class="text-base-content/40 font-normal">(optional)</span></label>
+        <textarea name="stichpunkte" rows="3" maxlength="1000"
+                  placeholder="z.B. Ablegen, neue Welten erkunden, Unbekanntes wahrnehmen..."
+                  class="textarea textarea-bordered w-full text-sm">{{ post.stichpunkte|default:'' }}</textarea>
+      </div>
+    </div>
+
+    <!-- Bibelstelle + Tageslosung -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl p-5 space-y-4">
+      <h2 class="font-semibold text-sm uppercase tracking-wide text-base-content/50">Bibelstelle</h2>
+
+      <div>
+        <label class="label label-text text-xs font-medium pb-1">Bibelstelle <span class="text-base-content/40 font-normal">(leer lassen = KI wählt)</span></label>
+        <input type="text" name="bibelstelle_eingabe" id="bibelstelle-input" maxlength="100"
+               value="{{ post.bibelstelle_eingabe|default:'' }}"
+               placeholder="z.B. Johannes 3,16 oder Psalm 107"
+               class="input input-bordered w-full input-sm">
+      </div>
+
+      <div>
+        <button type="button" id="tageslosung-btn"
+                class="btn btn-outline btn-sm gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+          </svg>
+          Heutige Tageslosung verwenden
+        </button>
+        <div id="tageslosung-box" class="hidden mt-3 bg-base-200 rounded-xl p-4 text-sm space-y-2">
+          <p class="font-semibold text-xs text-base-content/50 uppercase tracking-wide">Tageslosung</p>
+          <p id="tageslosung-vers" class="font-medium"></p>
+          <p id="tageslosung-text" class="text-base-content/70 italic leading-relaxed"></p>
+          <p class="font-semibold text-xs text-base-content/50 uppercase tracking-wide mt-2">Lehrtext</p>
+          <p id="lehrvers" class="font-medium"></p>
+          <p id="lehrtext" class="text-base-content/70 italic leading-relaxed"></p>
+          <button type="button" id="losung-uebernehmen-btn"
+                  class="btn btn-primary btn-xs mt-2">Bibelstelle übernehmen</button>
+        </div>
+        <div id="tageslosung-fehler" class="hidden mt-2 text-xs text-error"></div>
+        <input type="hidden" name="tageslosung_verwendet" id="tageslosung-verwendet-input">
+      </div>
+    </div>
+
+    <!-- Optionale Einstellungen -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl p-5 space-y-4">
+      <h2 class="font-semibold text-sm uppercase tracking-wide text-base-content/50">Weitere Einstellungen <span class="text-base-content/40 font-normal">(optional)</span></h2>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="label label-text text-xs font-medium pb-1">Kirchenjahr / Saison</label>
+          <select name="kirchenjahr" class="select select-bordered w-full select-sm">
+            <option value="">Keine Angabe</option>
+            <option value="advent" {% if post.kirchenjahr == 'advent' %}selected{% endif %}>Advent</option>
+            <option value="weihnacht" {% if post.kirchenjahr == 'weihnacht' %}selected{% endif %}>Weihnacht</option>
+            <option value="passion" {% if post.kirchenjahr == 'passion' %}selected{% endif %}>Passion / Fastenzeit</option>
+            <option value="ostern" {% if post.kirchenjahr == 'ostern' %}selected{% endif %}>Ostern</option>
+            <option value="pfingsten" {% if post.kirchenjahr == 'pfingsten' %}selected{% endif %}>Pfingsten</option>
+            <option value="normale_zeit" {% if post.kirchenjahr == 'normale_zeit' %}selected{% endif %}>Trinitatiszeit</option>
+          </select>
+        </div>
+        <div>
+          <label class="label label-text text-xs font-medium pb-1">Stil</label>
+          <select name="stil" class="select select-bordered w-full select-sm">
+            <option value="">Keine Vorgabe</option>
+            <option value="meditativ" {% if post.stil == 'meditativ' %}selected{% endif %}>Meditativ</option>
+            <option value="erzaehlend" {% if post.stil == 'erzaehlend' %}selected{% endif %}>Erzählend</option>
+            <option value="liturgisch" {% if post.stil == 'liturgisch' %}selected{% endif %}>Liturgisch</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Elemente-Toggles -->
+    <div class="bg-base-100 border border-base-300 rounded-2xl p-5 space-y-3">
+      <h2 class="font-semibold text-sm uppercase tracking-wide text-base-content/50">Elemente der Andacht</h2>
+
+      <label class="flex items-center justify-between cursor-pointer py-1">
+        <div>
+          <span class="text-sm font-medium">Lieder</span>
+          <p class="text-xs text-base-content/40">KI schlägt EG-Nummern vor</p>
+        </div>
+        <input type="checkbox" name="mit_liedern" class="toggle toggle-primary toggle-sm" id="toggle-lieder"
+               {% if post.mit_liedern != 'off' %}checked{% endif %}>
+      </label>
+
+      <div id="liedwunsch-box" class="pl-2 {% if post.mit_liedern == 'off' %}hidden{% endif %}">
+        <input type="text" name="eigener_liedwunsch" maxlength="200"
+               value="{{ post.eigener_liedwunsch|default:'' }}"
+               placeholder="Eigener Liedwunsch (optional, z.B. EG 165)"
+               class="input input-bordered input-xs w-full">
+      </div>
+
+      <div class="divider my-1"></div>
+
+      <label class="flex items-center justify-between cursor-pointer py-1">
+        <div>
+          <span class="text-sm font-medium">Geschichte / Illustration</span>
+          <p class="text-xs text-base-content/40">Kurze Erzählung als Einstieg oder Vertiefung</p>
+        </div>
+        <input type="checkbox" name="mit_geschichte" class="toggle toggle-primary toggle-sm"
+               {% if post.mit_geschichte != 'off' %}checked{% endif %}>
+      </label>
+
+      <div class="divider my-1"></div>
+
+      <label class="flex items-center justify-between cursor-pointer py-1">
+        <div>
+          <span class="text-sm font-medium">Gebete</span>
+          <p class="text-xs text-base-content/40">Eröffnungsgebet, Fürbitten, Abschlussgebet</p>
+        </div>
+        <input type="checkbox" name="mit_gebeten" class="toggle toggle-primary toggle-sm"
+               {% if post.mit_gebeten != 'off' %}checked{% endif %}>
+      </label>
+
+      <div class="divider my-1"></div>
+
+      <label class="flex items-center justify-between cursor-pointer py-1">
+        <div>
+          <span class="text-sm font-medium">Gesprächsimpulse</span>
+          <p class="text-xs text-base-content/40">3 Diskussionsfragen für die Gruppe</p>
+        </div>
+        <input type="checkbox" name="mit_gespraechsimpulsen" class="toggle toggle-primary toggle-sm"
+               {% if post.mit_gespraechsimpulsen != 'off' %}checked{% endif %}>
+      </label>
+    </div>
+
+    <!-- Submit -->
+    <button type="submit" id="submit-btn" class="btn btn-primary w-full gap-2">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+      </svg>
+      Andacht generieren
+    </button>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden fixed inset-0 bg-base-100/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center gap-4">
+      <span class="loading loading-spinner loading-lg text-primary"></span>
+      <p class="text-sm font-medium text-base-content/70">KI erstellt deine Andacht …</p>
+      <p class="text-xs text-base-content/40">Das kann 15–30 Sekunden dauern</p>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  // Dauer-Buttons
+  const dauerInput = document.getElementById('dauer-input');
+  const dauerBtns = document.querySelectorAll('.dauer-btn');
+  const andereBtn = document.getElementById('dauer-andere-btn');
+
+  function selectDauer(val) {
+    dauerInput.value = val;
+    dauerInput.classList.add('hidden');
+    dauerBtns.forEach(b => b.classList.toggle('btn-primary', b.dataset.dauer === String(val)));
+    andereBtn.classList.remove('btn-primary');
+  }
+
+  dauerBtns.forEach(btn => {
+    btn.addEventListener('click', () => selectDauer(btn.dataset.dauer));
+  });
+
+  andereBtn.addEventListener('click', () => {
+    dauerInput.classList.remove('hidden');
+    dauerInput.focus();
+    dauerBtns.forEach(b => b.classList.remove('btn-primary'));
+    andereBtn.classList.add('btn-primary');
+  });
+
+  // Initialer Wert
+  const initialDauer = '{{ post.dauer_minuten|default:"15" }}';
+  if (['5','10','15','20','30'].includes(initialDauer)) selectDauer(initialDauer);
+  else { andereBtn.click(); dauerInput.value = initialDauer; }
+
+  // Lieder-Toggle
+  document.getElementById('toggle-lieder').addEventListener('change', function() {
+    document.getElementById('liedwunsch-box').classList.toggle('hidden', !this.checked);
+  });
+
+  // Tageslosung
+  let losungDaten = null;
+  document.getElementById('tageslosung-btn').addEventListener('click', async function() {
+    this.classList.add('loading');
+    document.getElementById('tageslosung-fehler').classList.add('hidden');
+    try {
+      const resp = await fetch('{% url "andacht_tageslosung_api" %}');
+      if (!resp.ok) throw new Error();
+      losungDaten = await resp.json();
+      document.getElementById('tageslosung-vers').textContent = losungDaten.losungsvers || '';
+      document.getElementById('tageslosung-text').textContent = losungDaten.losungstext || '';
+      document.getElementById('lehrvers').textContent = losungDaten.lehrvers || '';
+      document.getElementById('lehrtext').textContent = losungDaten.lehrtext || '';
+      document.getElementById('tageslosung-box').classList.remove('hidden');
+    } catch {
+      document.getElementById('tageslosung-fehler').textContent = 'Tageslosung konnte nicht geladen werden.';
+      document.getElementById('tageslosung-fehler').classList.remove('hidden');
+    }
+    this.classList.remove('loading');
+  });
+
+  document.getElementById('losung-uebernehmen-btn').addEventListener('click', function() {
+    if (losungDaten) {
+      document.getElementById('bibelstelle-input').value = losungDaten.losungsvers || '';
+      document.getElementById('tageslosung-verwendet-input').value = '1';
+    }
+  });
+
+  // Submit + Loading
+  document.getElementById('andacht-form').addEventListener('submit', function() {
+    document.getElementById('submit-btn').disabled = true;
+    document.getElementById('loading-overlay').classList.remove('hidden');
+  });
+</script>
+{% endblock %}
