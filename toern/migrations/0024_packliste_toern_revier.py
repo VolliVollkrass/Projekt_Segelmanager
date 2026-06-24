@@ -27,9 +27,9 @@ class Migration(migrations.Migration):
             unique_together=set(),
         ),
 
-        # 3. Alle alten Vorlagen löschen (werden per Törn neu angelegt)
+        # 3. Alle alten Einträge + Vorlagen löschen (werden per Törn neu angelegt)
         migrations.RunSQL(
-            "DELETE FROM toern_packlistevorlage;",
+            "DELETE FROM toern_packlistevorlageeintrag; DELETE FROM toern_packlistevorlage;",
             reverse_sql=migrations.RunSQL.noop,
         ),
 
