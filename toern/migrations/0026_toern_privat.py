@@ -26,10 +26,13 @@ class Migration(migrations.Migration):
                 verbose_name="Privater Törn",
             ),
         ),
+        # WICHTIG: erst OHNE Default anlegen — ein callable Default würde beim
+        # ALTER TABLE einmal berechnet und für ALLE bestehenden Zeilen derselbe
+        # Wert eingetragen (UNIQUE-Verletzung im AlterField-Schritt)
         migrations.AddField(
             model_name="toern",
             name="privat_token",
-            field=models.UUIDField(default=uuid.uuid4, editable=False, null=True),
+            field=models.UUIDField(editable=False, null=True),
         ),
         migrations.RunPython(fill_privat_token, migrations.RunPython.noop),
         migrations.AlterField(
