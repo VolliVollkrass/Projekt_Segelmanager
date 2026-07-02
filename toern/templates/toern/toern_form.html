@@ -16,6 +16,21 @@
       <form method="post" enctype="multipart/form-data" class="w-full">
         {% csrf_token %}
 
+        {% if form.non_field_errors or form.errors %}
+          <div class="alert alert-error mb-4">
+            <ul class="list-disc list-inside text-sm">
+              {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+              {% endfor %}
+              {% for field in form %}
+                {% for error in field.errors %}
+                  <li>{{ field.label }}: {{ error }}</li>
+                {% endfor %}
+              {% endfor %}
+            </ul>
+          </div>
+        {% endif %}
+
         <!-- Titel -->
         <div class="form-control mb-4">
           <label class="label">

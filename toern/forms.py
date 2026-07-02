@@ -41,7 +41,11 @@ class ToernForm(forms.ModelForm):
 
     class Meta:
         model = Toern
-        exclude = ["anbieter"]  # wird im View gesetzt
+        # anbieter: wird im View gesetzt
+        # tagesimpulse_aktiv, packliste_revier_typ, praeferenz_modus: werden separat
+        # im Skipper-Dashboard gepflegt und nicht im Formular gerendert — als
+        # required-Felder ohne Eingabemöglichkeit würden sie jedes Speichern blockieren
+        exclude = ["anbieter", "tagesimpulse_aktiv", "packliste_revier_typ", "praeferenz_modus"]
 
         STATUS_CHOICES = [
             ("DRAFT", "Entwurf"),
