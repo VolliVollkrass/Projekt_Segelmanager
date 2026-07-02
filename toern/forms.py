@@ -45,7 +45,8 @@ class ToernForm(forms.ModelForm):
         # tagesimpulse_aktiv, packliste_revier_typ, praeferenz_modus: werden separat
         # im Skipper-Dashboard gepflegt und nicht im Formular gerendert — als
         # required-Felder ohne Eingabemöglichkeit würden sie jedes Speichern blockieren
-        exclude = ["anbieter", "tagesimpulse_aktiv", "packliste_revier_typ", "praeferenz_modus"]
+        # ist_privat: wird per Toggle im Anbieter-Dashboard geschaltet
+        exclude = ["anbieter", "tagesimpulse_aktiv", "packliste_revier_typ", "praeferenz_modus", "ist_privat"]
 
         STATUS_CHOICES = [
             ("DRAFT", "Entwurf"),
