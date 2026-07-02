@@ -28,7 +28,7 @@ from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_POST
 from django.utils.timezone import now
 import json
-from django.http import JsonResponse
+from django.http import JsonResponse, Http404
 from datetime import date, timedelta
 
 
@@ -51,8 +51,37 @@ def get_partner_map(toern):
 
     return partner_map
 
+def check_privat_zugang(request, toern):
+    """Zugriff auf einen privaten Törn prüfen — Http404 wenn nicht berechtigt.
+
+    Berechtigt: Anbieter, Teilnehmer, Staff, oder Besucher mit gültigem
+    ?key=<privat_token> (wird in der Session gemerkt, damit Registrierung
+    und Anmeldung danach ohne Link funktionieren).
+    """
+    if not toern.ist_privat:
+        return
+
+    session_key = f"toern_privat_key_{toern.pk}"
+    key = request.GET.get("key") or request.session.get(session_key)
+
+    ist_anbieter = request.user.is_authenticated and request.user == toern.anbieter
+    ist_teilnehmer = request.user.is_authenticated and Teilnahme.objects.filter(
+        toern=toern, user=request.user
+    ).exists()
+    hat_gueltigen_key = key == str(toern.privat_token)
+
+    if not (ist_anbieter or ist_teilnehmer or hat_gueltigen_key or request.user.is_staff):
+        raise Http404
+
+    if hat_gueltigen_key:
+        request.session[session_key] = str(toern.privat_token)
+
+
 def toern_detail(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
+
+    # 🔒 Privater Törn: nur Anbieter, Teilnehmer oder Besucher mit gültigem Link
+    check_privat_zugang(request, toern)
 
     # optional: alle Boote des Törns laden
     boote = toern.boote.all()
@@ -86,6 +115,9 @@ def toern_detail(request, pk):
 
 def toern_anmeldung(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
+
+    # 🔒 Privater Törn: gleiche Zugangsprüfung wie auf der Detailseite
+    check_privat_zugang(request, toern)
 
     if request.method == "POST":
         form = TeilnahmeForm(request.POST)
@@ -283,6 +315,26 @@ def toern_edit(request, pk):
         "form": form,
         "title": "Törn bearbeiten"
     })
+
+@login_required
+@anbieter_required
+@require_POST
+def toern_privat_toggle(request, pk):
+    toern = get_object_or_404(Toern, pk=pk)
+
+    if toern.anbieter != request.user:
+        raise PermissionDenied
+
+    toern.ist_privat = not toern.ist_privat
+    toern.save(update_fields=["ist_privat"])
+
+    if toern.ist_privat:
+        messages.success(request, f"„{toern.titel}“ ist jetzt privat — nur über den Einladungslink erreichbar.")
+    else:
+        messages.success(request, f"„{toern.titel}“ ist jetzt öffentlich sichtbar.")
+
+    return redirect("anbieter_dashboard")
+
 
 @login_required
 @anbieter_required

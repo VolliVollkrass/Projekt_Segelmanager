@@ -24,9 +24,17 @@ def index(request):
         .values('total')[:1]
     )
 
+    # 🔒 Private Törns nur für den eigenen Anbieter bzw. Teilnehmer anzeigen
+    sichtbar = Q(ist_privat=False)
+    if request.user.is_authenticated:
+        sichtbar |= Q(anbieter=request.user)
+        sichtbar |= Q(teilnahmen__user=request.user)
+
     toerns = (
         Toern.objects
         .filter(status='ANMELDUNG_OFFEN')
+        .filter(sichtbar)
+        .distinct()
         .annotate(
             _belegte_plaetze=Coalesce(Subquery(belegte_sq, output_field=IntegerField()), 0),
             _gesamtplaetze=Coalesce(Subquery(gesamtplaetze_sq, output_field=IntegerField()), 0),

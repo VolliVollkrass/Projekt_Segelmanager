@@ -6,6 +6,7 @@ from django.db.models import Sum
 from django.utils import timezone
 
 import os
+import uuid
 
 from utils.image_optimizer import optimize_image
 from utils.file_cleanup import delete_file
@@ -51,6 +52,13 @@ class Toern(models.Model):
         default='warm',
         verbose_name="Segelgebiet Packliste",
     )
+
+    ist_privat = models.BooleanField(
+        default=False,
+        verbose_name="Privater Törn",
+        help_text="Nur über den geheimen Einladungslink erreichbar, nicht öffentlich gelistet",
+    )
+    privat_token = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
 
     skipper_budget = models.DecimalField(
         max_digits=8,
