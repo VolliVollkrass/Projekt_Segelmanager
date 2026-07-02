@@ -76,6 +76,7 @@ class ToernForm(forms.ModelForm):
             }),
             "preis_pro_person": forms.NumberInput(attrs={"class": "input input-bordered w-full"}),
             "nebenkosten": forms.NumberInput(attrs={"class": "input input-bordered w-full"}),
+            "skipper_budget": forms.NumberInput(attrs={"class": "input input-bordered w-full", "step": "0.01"}),
 
             "kurzbeschreibung": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
             "beschreibung": forms.Textarea(attrs={"class": "textarea textarea-bordered w-full"}),

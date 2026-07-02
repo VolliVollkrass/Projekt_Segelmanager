@@ -806,25 +806,149 @@
     <!-- ========================= TAB: BOOTSKASSE ========================= -->
     <div id="tab-kasse" class="space-y-5 hidden">
 
+        <!-- Stats -->
         <div class="bg-base-100 border border-base-300 rounded-xl p-5">
             <div class="grid grid-cols-3 gap-4 text-center">
                 <div>
-                    <p class="text-2xl font-bold">0 €</p>
+                    <p class="text-2xl font-bold">{{ kasse_gesamt|floatformat:2 }} €</p>
                     <p class="text-xs text-base-content/40 mt-0.5">Gesamt</p>
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-warning">0 €</p>
-                    <p class="text-xs text-base-content/40 mt-0.5">Offen</p>
+                    <p class="text-2xl font-bold {% if mein_kasse_saldo > 0 %}text-success{% elif mein_kasse_saldo < 0 %}text-error{% endif %}">
+                        {% if mein_kasse_saldo > 0 %}+{% endif %}{{ mein_kasse_saldo|floatformat:2 }} €
+                    </p>
+                    <p class="text-xs text-base-content/40 mt-0.5">Mein Saldo</p>
                 </div>
                 <div>
-                    <p class="text-2xl font-bold">0 €</p>
+                    <p class="text-2xl font-bold">{{ kasse_pro_person|floatformat:2 }} €</p>
                     <p class="text-xs text-base-content/40 mt-0.5">Pro Person</p>
                 </div>
             </div>
         </div>
 
-        <div class="bg-base-200/60 border border-base-300 rounded-xl p-5 text-center">
-            <p class="text-sm text-base-content/40">Der Finanzbereich wird bald verfügbar sein.</p>
+        <!-- Neue Ausgabe -->
+        <div class="collapse collapse-arrow bg-base-100 border border-base-300 rounded-xl">
+            <input type="checkbox">
+            <div class="collapse-title font-semibold text-sm">➕ Neue Ausgabe erfassen</div>
+            <div class="collapse-content">
+                <form method="post" action="{% url 'ausgabe_erstellen' toern.id boot.id %}" class="space-y-3">
+                    {% csrf_token %}
+
+                    <div class="grid md:grid-cols-2 gap-3">
+                        <div class="form-control">
+                            <label class="label py-1"><span class="label-text text-xs">Beschreibung</span></label>
+                            <input type="text" name="beschreibung" required maxlength="200"
+                                   placeholder="z.B. Einkauf Hafen, Eis für alle …"
+                                   class="input input-bordered input-sm w-full">
+                        </div>
+                        <div class="form-control">
+                            <label class="label py-1"><span class="label-text text-xs">Betrag (€)</span></label>
+                            <input type="text" name="betrag" required inputmode="decimal"
+                                   placeholder="z.B. 42,50"
+                                   class="input input-bordered input-sm w-full">
+                        </div>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label py-1"><span class="label-text text-xs">Bezahlt von</span></label>
+                        <select name="bezahlt_von" class="select select-bordered select-sm w-full">
+                            {% for t in crew_bestaetigt %}
+                                <option value="{{ t.id }}" {% if t.id == teilnahme.id %}selected{% endif %}>
+                                    {{ t.user.first_name }} {{ t.user.last_name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-control">
+                        <label class="label py-1"><span class="label-text text-xs">Beteiligt (Kosten werden geteilt)</span></label>
+                        <div class="grid grid-cols-2 gap-2">
+                            {% for t in crew_bestaetigt %}
+                                <label class="flex items-center gap-2 cursor-pointer text-sm">
+                                    <input type="checkbox" name="beteiligt" value="{{ t.id }}" checked
+                                           class="checkbox checkbox-sm checkbox-primary">
+                                    {{ t.user.first_name }}
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary btn-sm">Ausgabe speichern</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Ausgleich -->
+        {% if kasse_transfers %}
+            <div class="bg-base-100 border border-base-300 rounded-xl p-5">
+                <h3 class="font-semibold text-sm mb-3">💸 So gleicht ihr aus</h3>
+                <div class="space-y-2">
+                    {% for t in kasse_transfers %}
+                        <div class="flex items-center justify-between bg-base-200/60 rounded-lg px-3 py-2 text-sm">
+                            <span>
+                                <span class="font-medium">{{ t.von.user.first_name }} {{ t.von.user.last_name }}</span>
+                                <span class="text-base-content/40 mx-1">→</span>
+                                <span class="font-medium">{{ t.an.user.first_name }} {{ t.an.user.last_name }}</span>
+                            </span>
+                            <span class="font-bold">{{ t.betrag|floatformat:2 }} €</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% elif kasse_ausgaben %}
+            <div class="alert alert-success text-sm">✓ Alles ausgeglichen — niemand schuldet jemandem etwas.</div>
+        {% endif %}
+
+        <!-- Salden -->
+        {% if kasse_ausgaben %}
+            <div class="bg-base-100 border border-base-300 rounded-xl p-5">
+                <h3 class="font-semibold text-sm mb-3">Salden</h3>
+                <div class="space-y-1.5">
+                    {% for s in kasse_salden %}
+                        <div class="flex items-center justify-between text-sm">
+                            <span>{{ s.teilnahme.user.first_name }} {{ s.teilnahme.user.last_name }}
+                                <span class="text-xs text-base-content/40">(gezahlt {{ s.gezahlt|floatformat:2 }} €, Anteil {{ s.anteil|floatformat:2 }} €)</span>
+                            </span>
+                            <span class="badge {% if s.saldo > 0 %}badge-success{% elif s.saldo < 0 %}badge-error{% else %}badge-ghost{% endif %} badge-sm font-semibold">
+                                {% if s.saldo > 0 %}+{% endif %}{{ s.saldo|floatformat:2 }} €
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Ausgabenliste -->
+        <div class="bg-base-100 border border-base-300 rounded-xl p-5">
+            <h3 class="font-semibold text-sm mb-3">Ausgaben</h3>
+            {% if kasse_ausgaben %}
+                <div class="space-y-2">
+                    {% for a in kasse_ausgaben %}
+                        <div class="flex items-start justify-between gap-3 bg-base-200/40 rounded-lg px-3 py-2">
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium">{{ a.beschreibung }}</p>
+                                <p class="text-xs text-base-content/50 mt-0.5">
+                                    {{ a.bezahlt_von.user.first_name }} zahlte für
+                                    {% for b in a.beteiligt.all %}{{ b.user.first_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                                    · {{ a.created_at|date:"d.m.Y" }}
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="font-bold text-sm whitespace-nowrap">{{ a.betrag|floatformat:2 }} €</span>
+                                {% if request.user == a.erstellt_von or request.user == a.bezahlt_von.user or kasse_darf_verwalten %}
+                                    <form method="post" action="{% url 'ausgabe_loeschen' a.id %}"
+                                          onsubmit="return confirm('Ausgabe „{{ a.beschreibung|escapejs }}“ wirklich löschen?');">
+                                        {% csrf_token %}
+                                        <button class="btn btn-ghost btn-xs text-error" title="Löschen">✕</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-sm text-base-content/40">Noch keine Ausgaben erfasst.</p>
+            {% endif %}
         </div>
 
     </div>

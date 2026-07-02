@@ -13,6 +13,7 @@ urlpatterns = [
     path('kochbuch/', include('rezepte.urls')),
     path('segelwissen/', include('segelwissen.urls')),
     path('andacht/', include('andacht.urls')),
+    path('finance/', include('finance.urls')),
     path('schema-viewer/', include('schema_viewer.urls')),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
