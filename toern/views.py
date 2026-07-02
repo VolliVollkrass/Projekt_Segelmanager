@@ -3,8 +3,12 @@ import os
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 
+from decimal import Decimal
+
 from boote.models import Boot, Kabine
 from config import settings
+from finance.models import Ausgabe, TopfAusgabe
+from finance.utils import berechne_salden, berechne_ausgleich
 from logistik.models import Einkaufspunkt, EinkaufslistenEintrag, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
@@ -931,6 +935,13 @@ def skipper_dashboard(request, toern_id):
         ).select_related("user").order_by("user__last_name", "user__first_name")
         abschluss_data.append({"boot": boot, "crew": list(crew)})
 
+    # =========================
+    # 9. Skipper-Topf
+    # =========================
+    topf_ausgaben = TopfAusgabe.objects.filter(toern=toern).select_related("erstellt_von")
+    topf_summe = sum((a.betrag for a in topf_ausgaben), Decimal("0"))
+    topf_rest = toern.skipper_budget - topf_summe
+
     context = {
         "toern": toern,
 
@@ -960,6 +971,11 @@ def skipper_dashboard(request, toern_id):
 
         # Präferenz-Modus
         "boote_count": boote.count(),
+
+        # Skipper-Topf
+        "topf_ausgaben": topf_ausgaben,
+        "topf_summe": topf_summe,
+        "topf_rest": topf_rest,
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)
@@ -1966,6 +1982,29 @@ def boot_dashboard(request, toern_id):
     einkauf_gesamt   = einkaufs_qs.count()
     einkauf_erledigt = einkaufs_qs.filter(erledigt=True).count()
 
+    # 💰 Bootskasse
+    kasse_ausgaben = Ausgabe.objects.filter(
+        boot=boot, toern=toern
+    ).select_related("bezahlt_von__user", "erstellt_von").prefetch_related("beteiligt__user")
+
+    crew_liste = list(crew_bestaetigt)
+    kasse_salden = berechne_salden(kasse_ausgaben, crew_liste)
+    kasse_transfers = berechne_ausgleich(kasse_salden)
+    kasse_gesamt = sum((a.betrag for a in kasse_ausgaben), Decimal("0"))
+    kasse_pro_person = (
+        (kasse_gesamt / len(crew_liste)).quantize(Decimal("0.01"))
+        if crew_liste else Decimal("0")
+    )
+    mein_kasse_saldo = next(
+        (s["saldo"].quantize(Decimal("0.01")) for s in kasse_salden
+         if s["teilnahme"].id == teilnahme.id),
+        Decimal("0"),
+    )
+    kasse_darf_verwalten = (
+        teilnahme.rolle in ("skipper", "coskipper")
+        or request.user == toern.anbieter
+    )
+
     context = {
         "toern": toern,
         "boot": boot,
@@ -1989,6 +2028,14 @@ def boot_dashboard(request, toern_id):
         "einkauf_gruppen": einkauf_gruppen,
         "einkauf_gesamt": einkauf_gesamt,
         "einkauf_erledigt": einkauf_erledigt,
+        # Bootskasse
+        "kasse_ausgaben": kasse_ausgaben,
+        "kasse_salden": kasse_salden,
+        "kasse_transfers": kasse_transfers,
+        "kasse_gesamt": kasse_gesamt,
+        "kasse_pro_person": kasse_pro_person,
+        "mein_kasse_saldo": mein_kasse_saldo,
+        "kasse_darf_verwalten": kasse_darf_verwalten,
     }
 
     return render(request, "boot/boot_dashboard.html", context)

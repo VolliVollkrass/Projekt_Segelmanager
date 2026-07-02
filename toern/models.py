@@ -52,6 +52,14 @@ class Toern(models.Model):
         verbose_name="Segelgebiet Packliste",
     )
 
+    skipper_budget = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        default=0,
+        verbose_name="Skipper-Topf (€)",
+        help_text="Budget für Skipper/Co-Skipper (z.B. Crewshirts, Fahrtkosten, Crew-Essen)",
+    )
+
     PRAEFERENZ_MODUS_CHOICES = [
         ("alle", "Beide Präferenztypen"),
         ("nur_ausschluss", "Nur Ausschlüsse"),
