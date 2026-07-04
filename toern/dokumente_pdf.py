@@ -11,6 +11,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from boote.models import Boot
+from utils.dokumente import DOKUMENT_MIT_UNTERSCHRIFT
 from .models import Teilnahme
 
 ROT = colors.HexColor("#B91C1C")
@@ -313,6 +314,104 @@ def notrollen_plakat_pdf(request, boot_id):
 
     elements.append(Paragraph("MERKSATZ: „Koordination, Kommunikation, Sicherheit zuerst!“", merksatz))
     elements.append(Spacer(1, 4 * mm))
+    elements.append(_fusszeile(boot))
+
+    doc.build(elements)
+    return response
+
+
+# =========================
+# CHECKLISTEN (Übernahme, Ablegen, Anlegen, Rückgabe)
+# =========================
+
+@login_required
+def dokument_checkliste_pdf(request, boot_id, typ):
+    from .dokumente_views import DOKUMENT_TYPEN_KEYS, get_or_create_dokument_vorlage
+
+    boot = get_object_or_404(Boot, id=boot_id)
+    if not _hat_dokument_zugang(request.user, boot):
+        raise PermissionDenied
+    if typ not in DOKUMENT_TYPEN_KEYS:
+        raise PermissionDenied
+
+    vorlage = get_or_create_dokument_vorlage(boot.toern, typ)
+    typ_label = vorlage.get_typ_display()
+
+    # Einträge nach Sektion gruppieren (Reihenfolge des ersten Auftretens)
+    sektionen = {}
+    for e in vorlage.eintraege.all():
+        sektionen.setdefault(e.sektion, []).append(e.text)
+
+    response = _pdf_response(f"{typ}_{boot.name.replace(' ', '_')}.pdf")
+    doc = SimpleDocTemplate(
+        response, pagesize=portrait(A4),
+        rightMargin=14 * mm, leftMargin=14 * mm, topMargin=12 * mm, bottomMargin=12 * mm,
+    )
+
+    titel = ParagraphStyle("titel", fontSize=17, leading=21, fontName="Helvetica-Bold",
+                           textColor=DUNKELBLAU)
+    sub = ParagraphStyle("sub", fontSize=9, leading=12, textColor=GRAU)
+    sektion_stil = ParagraphStyle("sektion", fontSize=10.5, leading=13, fontName="Helvetica-Bold",
+                                  textColor=colors.white)
+    item_stil = ParagraphStyle("item", fontSize=9.5, leading=12)
+    klein = ParagraphStyle("klein", fontSize=7.5, leading=9, textColor=GRAU)
+
+    elements = []
+
+    toern = boot.toern
+    charter = boot.charterunternehmen.name if boot.charterunternehmen else "—"
+    elements.append(Paragraph(f"{typ_label} — {boot.name}", titel))
+    elements.append(Spacer(1, 1.5 * mm))
+    elements.append(Paragraph(
+        f"{toern.titel} · {toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')}"
+        f" &nbsp;|&nbsp; Charter: {charter}"
+        f" &nbsp;|&nbsp; Hafen: {boot.hafen or '—'}"
+        f" &nbsp;|&nbsp; Datum: ______________",
+        sub,
+    ))
+    elements.append(Spacer(1, 4 * mm))
+
+    # Tabelle: Checkbox | Punkt | Bemerkung/Zuständigkeit — Sektionen als Trennzeilen
+    rows = [[
+        "",
+        Paragraph("<b>Punkt</b>", item_stil),
+        Paragraph("<b>Bemerkung / Zuständigkeit</b>", item_stil),
+    ]]
+    stil = [
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CCCCCC")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("BACKGROUND", (0, 0), (-1, 0), HELLGRAU),
+    ]
+    for sektion, texte in sektionen.items():
+        rows.append([Paragraph(sektion, sektion_stil), "", ""])
+        zeile = len(rows) - 1
+        stil.append(("BACKGROUND", (0, zeile), (-1, zeile), DUNKELBLAU))
+        stil.append(("SPAN", (0, zeile), (-1, zeile)))
+        for text in texte:
+            rows.append(["", Paragraph(text, item_stil), ""])
+
+    tbl = Table(rows, colWidths=[9 * mm, 108 * mm, 65 * mm], repeatRows=1)
+    tbl.setStyle(TableStyle(stil))
+    elements.append(tbl)
+
+    if typ in DOKUMENT_MIT_UNTERSCHRIFT:
+        elements.append(Spacer(1, 10 * mm))
+        unterschrift = Table([
+            [Paragraph("_______________________________", item_stil),
+             Paragraph("_______________________________", item_stil)],
+            [Paragraph("Ort, Datum, Unterschrift Charterbasis", klein),
+             Paragraph("Ort, Datum, Unterschrift Skipper", klein)],
+        ], colWidths=[91 * mm, 91 * mm])
+        unterschrift.setStyle(TableStyle([
+            ("TOPPADDING", (0, 0), (-1, -1), 1),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 1),
+        ]))
+        elements.append(unterschrift)
+
+    elements.append(Spacer(1, 5 * mm))
     elements.append(_fusszeile(boot))
 
     doc.build(elements)

@@ -1,6 +1,10 @@
 from django.urls import path
 from .views import *
-from .dokumente_pdf import mayday_plakat_pdf, notrollen_plakat_pdf
+from .dokumente_pdf import mayday_plakat_pdf, notrollen_plakat_pdf, dokument_checkliste_pdf
+from .dokumente_views import (
+    dokument_items_get, dokument_item_add, dokument_item_update,
+    dokument_item_delete, dokument_reset,
+)
 
 urlpatterns = [
     path('detail/<int:pk>/', toern_detail, name='toern_detail'),  # Detailseite
@@ -45,6 +49,12 @@ urlpatterns = [
     path("crewlist/<int:boot_id>/pdf/", crewlist_pdf, name="crewlist_pdf"),
     path("boot/<int:boot_id>/mayday/pdf/", mayday_plakat_pdf, name="mayday_plakat_pdf"),
     path("boot/<int:boot_id>/notrollen/pdf/", notrollen_plakat_pdf, name="notrollen_plakat_pdf"),
+    path("boot/<int:boot_id>/checkliste/<str:typ>/pdf/", dokument_checkliste_pdf, name="dokument_checkliste_pdf"),
+    path("<int:toern_id>/dokument/item/add/", dokument_item_add, name="dokument_item_add"),
+    path("<int:toern_id>/dokument/item/<int:item_id>/update/", dokument_item_update, name="dokument_item_update"),
+    path("<int:toern_id>/dokument/item/<int:item_id>/delete/", dokument_item_delete, name="dokument_item_delete"),
+    path("<int:toern_id>/dokument/reset/", dokument_reset, name="dokument_reset"),
+    path("<int:toern_id>/dokument/<str:typ>/", dokument_items_get, name="dokument_items_get"),
     path("<int:toern_id>/teilnehmerliste/pdf/", teilnehmerliste_pdf, name="teilnehmerliste_pdf"),
     path("<int:toern_id>/vorlage/revier/", packl_revier_set, name="packl_revier_set"),
     path("<int:toern_id>/vorlage/item/add/", vorlage_item_add, name="vorlage_item_add"),
