@@ -369,6 +369,41 @@ class DokumentEintrag(models.Model):
         return f"[{self.sektion}] {self.text}"
 
 
+class DokumentStandard(models.Model):
+    """Persönliche, benannte Checklisten-Standards eines Skippers — törnunabhängig wiederverwendbar."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='dokument_standards'
+    )
+    name = models.CharField(max_length=100)
+    typ = models.CharField(max_length=20, choices=DokumentVorlage.TYP_CHOICES)
+    ist_default = models.BooleanField(
+        default=False,
+        help_text="Wird bei neuen Törns automatisch als Start-Checkliste verwendet (max. einer pro Typ)"
+    )
+    aktualisiert_am = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('user', 'typ', 'name')]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_typ_display()}) – {self.user}"
+
+
+class DokumentStandardEintrag(models.Model):
+    standard = models.ForeignKey(DokumentStandard, on_delete=models.CASCADE, related_name='eintraege')
+    sektion = models.CharField(max_length=100)
+    text = models.CharField(max_length=255)
+    reihenfolge = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['reihenfolge', 'id']
+
+    def __str__(self):
+        return f"[{self.sektion}] {self.text}"
+
+
 class PinnwandNachricht(models.Model):
     toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="pinnwand_nachrichten")
     autor = models.ForeignKey(

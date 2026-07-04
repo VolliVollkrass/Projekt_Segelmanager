@@ -334,7 +334,7 @@ def dokument_checkliste_pdf(request, boot_id, typ):
     if typ not in DOKUMENT_TYPEN_KEYS:
         raise PermissionDenied
 
-    vorlage = get_or_create_dokument_vorlage(boot.toern, typ)
+    vorlage = get_or_create_dokument_vorlage(boot.toern, typ, user=request.user)
     typ_label = vorlage.get_typ_display()
 
     # Einträge nach Sektion gruppieren (Reihenfolge des ersten Auftretens)
