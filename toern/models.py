@@ -338,6 +338,37 @@ class PacklisteStandardEintrag(models.Model):
         return f"{self.menge}x {self.name}"
 
 
+class DokumentVorlage(models.Model):
+    """Editierbare Boots-Checkliste pro Törn (Übernahme, Ablegen, Anlegen, Rückgabe)."""
+    TYP_CHOICES = [
+        ('uebernahme', 'Charterübernahme'),
+        ('ablegen', 'Bevor wir ablegen'),
+        ('anlegen', 'Nach dem Anlegen'),
+        ('rueckgabe', 'Rückgabe'),
+    ]
+    toern = models.ForeignKey('Toern', on_delete=models.CASCADE, related_name='dokument_vorlagen')
+    typ = models.CharField(max_length=20, choices=TYP_CHOICES)
+
+    class Meta:
+        unique_together = [('toern', 'typ')]
+
+    def __str__(self):
+        return f"{self.get_typ_display()} – {self.toern}"
+
+
+class DokumentEintrag(models.Model):
+    vorlage = models.ForeignKey(DokumentVorlage, on_delete=models.CASCADE, related_name='eintraege')
+    sektion = models.CharField(max_length=100)
+    text = models.CharField(max_length=255)
+    reihenfolge = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['reihenfolge', 'id']
+
+    def __str__(self):
+        return f"[{self.sektion}] {self.text}"
+
+
 class PinnwandNachricht(models.Model):
     toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="pinnwand_nachrichten")
     autor = models.ForeignKey(

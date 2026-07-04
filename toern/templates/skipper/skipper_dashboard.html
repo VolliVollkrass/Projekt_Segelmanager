@@ -651,10 +651,55 @@
                     Notfall-Sofortmaßnahmen (PDF)
                 </a>
             </div>
+
+            <div class="pt-2 border-t border-base-200">
+                <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">Checklisten (PDF)</p>
+                <div class="flex flex-wrap gap-2">
+                    <a href="{% url 'dokument_checkliste_pdf' boot.id 'uebernahme' %}" target="_blank" class="btn btn-xs btn-outline">Charterübernahme</a>
+                    <a href="{% url 'dokument_checkliste_pdf' boot.id 'ablegen' %}" target="_blank" class="btn btn-xs btn-outline">Bevor wir ablegen</a>
+                    <a href="{% url 'dokument_checkliste_pdf' boot.id 'anlegen' %}" target="_blank" class="btn btn-xs btn-outline">Nach dem Anlegen</a>
+                    <a href="{% url 'dokument_checkliste_pdf' boot.id 'rueckgabe' %}" target="_blank" class="btn btn-xs btn-outline">Rückgabe</a>
+                </div>
+            </div>
         </div>
         {% empty %}
         <p class="text-sm text-base-content/40">Diesem Törn sind noch keine Boote zugeordnet.</p>
         {% endfor %}
+
+        <!-- Checklisten bearbeiten -->
+        <div class="bg-base-200 rounded-2xl p-4 space-y-3">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Checklisten bearbeiten</p>
+                <p class="text-xs text-base-content/50 mt-1">
+                    Gilt für alle Boote dieses Törns. Änderungen erscheinen direkt in den PDF-Downloads oben.
+                </p>
+            </div>
+
+            <div role="tablist" class="tabs tabs-boxed">
+                <button role="tab" id="dok-tab-uebernahme" class="tab tab-active" onclick="setDokTyp('uebernahme')">Übernahme</button>
+                <button role="tab" id="dok-tab-ablegen" class="tab" onclick="setDokTyp('ablegen')">Ablegen</button>
+                <button role="tab" id="dok-tab-anlegen" class="tab" onclick="setDokTyp('anlegen')">Anlegen</button>
+                <button role="tab" id="dok-tab-rueckgabe" class="tab" onclick="setDokTyp('rueckgabe')">Rückgabe</button>
+            </div>
+
+            <div id="dok-loading" class="flex justify-center py-6">
+                <span class="loading loading-spinner loading-md"></span>
+            </div>
+            <div id="dok-list" class="hidden space-y-3"></div>
+
+            <!-- Neuen Eintrag hinzufügen -->
+            <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t border-base-300">
+                <input type="text" id="dok-new-sektion" list="dok-sektionen" placeholder="Sektion…"
+                       class="input input-bordered input-sm sm:w-56"/>
+                <datalist id="dok-sektionen"></datalist>
+                <input type="text" id="dok-new-text" placeholder="Neuer Punkt…" class="input input-bordered input-sm flex-1"/>
+                <button onclick="addDokItem()" class="btn btn-primary btn-sm">Hinzufügen</button>
+            </div>
+
+            <button onclick="resetDokument()" class="btn btn-ghost btn-xs text-error">
+                Auf Standard zurücksetzen
+            </button>
+        </div>
 
     </div>
 
@@ -1144,6 +1189,7 @@ const avoidMap = {
         });
         panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + tabId));
         if (tabId === 'packliste') loadVorlage();
+        if (tabId === 'dokumente') loadDokument();
     }
 
     buttons.forEach(btn => {
@@ -1427,6 +1473,116 @@ function submitVorlageAnwenden() {
 }
 function escapeHtml(str) {
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ===================== BOOTS-CHECKLISTEN (DOKUMENTE) =====================
+let dokTyp = 'uebernahme';
+let dokVorlageId = null;
+
+function setDokTyp(typ) {
+    dokTyp = typ;
+    ['uebernahme','ablegen','anlegen','rueckgabe'].forEach(t => {
+        document.getElementById('dok-tab-' + t).classList.toggle('tab-active', t === typ);
+    });
+    loadDokument();
+}
+
+function loadDokument() {
+    document.getElementById('dok-loading').classList.remove('hidden');
+    document.getElementById('dok-list').classList.add('hidden');
+    fetch(`{% url 'dokument_items_get' toern.id 'TYP' %}`.replace('TYP', dokTyp))
+        .then(r => r.json())
+        .then(data => { dokVorlageId = data.vorlage_id; renderDokItems(data.items); });
+}
+
+function renderDokItems(items) {
+    const list = document.getElementById('dok-list');
+    list.innerHTML = '';
+
+    // Nach Sektion gruppieren (Reihenfolge des ersten Auftretens)
+    const sektionen = [];
+    const gruppen = {};
+    items.forEach(item => {
+        if (!gruppen[item.sektion]) { gruppen[item.sektion] = []; sektionen.push(item.sektion); }
+        gruppen[item.sektion].push(item);
+    });
+
+    // Datalist für das Hinzufügen-Feld füllen
+    const datalist = document.getElementById('dok-sektionen');
+    datalist.innerHTML = sektionen.map(s => `<option value="${escapeHtml(s)}">`).join('');
+
+    if (items.length === 0) {
+        list.innerHTML = '<p class="text-sm opacity-50 text-center py-4">Noch keine Einträge.</p>';
+    } else {
+        sektionen.forEach(sektion => {
+            const kopf = document.createElement('p');
+            kopf.className = 'text-xs font-bold uppercase tracking-widest text-base-content/50 pt-1';
+            kopf.textContent = sektion;
+            list.appendChild(kopf);
+            gruppen[sektion].forEach(item => list.appendChild(buildDokRow(item)));
+        });
+    }
+    document.getElementById('dok-loading').classList.add('hidden');
+    list.classList.remove('hidden');
+}
+
+function buildDokRow(item) {
+    const div = document.createElement('div');
+    div.id = 'dok-row-' + item.id;
+    div.className = 'flex items-center gap-2 bg-base-100 rounded-lg px-3 py-2';
+    div.innerHTML = `
+        <span class="flex-1 text-sm view-mode">${escapeHtml(item.text)}</span>
+        <input type="text" value="${escapeHtml(item.sektion)}" class="input input-bordered input-xs w-36 hidden edit-mode" title="Sektion"/>
+        <input type="text" value="${escapeHtml(item.text)}" class="input input-bordered input-xs flex-1 hidden edit-mode"/>
+        <button onclick="editDokRow(${item.id})" class="btn btn-xs btn-ghost view-mode">✏️</button>
+        <button onclick="saveDokRow(${item.id})" class="btn btn-xs btn-primary hidden edit-mode">✓</button>
+        <button onclick="cancelDokEdit(${item.id})" class="btn btn-xs btn-ghost hidden edit-mode">✕</button>
+        <button onclick="deleteDokItem(${item.id})" class="btn btn-xs btn-ghost text-error view-mode">🗑</button>`;
+    return div;
+}
+
+function editDokRow(id) {
+    const row = document.getElementById('dok-row-' + id);
+    row.querySelectorAll('.view-mode').forEach(el => el.classList.add('hidden'));
+    row.querySelectorAll('.edit-mode').forEach(el => el.classList.remove('hidden'));
+}
+function cancelDokEdit(id) {
+    const row = document.getElementById('dok-row-' + id);
+    row.querySelectorAll('.view-mode').forEach(el => el.classList.remove('hidden'));
+    row.querySelectorAll('.edit-mode').forEach(el => el.classList.add('hidden'));
+}
+function saveDokRow(id) {
+    const inputs = document.querySelectorAll('#dok-row-' + id + ' input.edit-mode');
+    const sektion = inputs[0].value.trim();
+    const text = inputs[1].value.trim();
+    if (!sektion || !text) return;
+    fetch(`{% url 'dokument_item_update' toern.id 9999 %}`.replace('9999', id), {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ sektion, text })
+    }).then(() => loadDokument());
+}
+function deleteDokItem(id) {
+    fetch(`{% url 'dokument_item_delete' toern.id 9999 %}`.replace('9999', id), {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(() => loadDokument());
+}
+function addDokItem() {
+    const sektionEl = document.getElementById('dok-new-sektion');
+    const textEl = document.getElementById('dok-new-text');
+    const sektion = sektionEl.value.trim();
+    const text = textEl.value.trim();
+    if (!sektion || !text || !dokVorlageId) return;
+    fetch("{% url 'dokument_item_add' toern.id %}", {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ vorlage_id: dokVorlageId, sektion, text })
+    }).then(() => { textEl.value = ''; loadDokument(); });
+}
+function resetDokument() {
+    if (!confirm('Diese Checkliste auf die Standard-Inhalte zurücksetzen?\nAlle Anpassungen gehen verloren.')) return;
+    fetch("{% url 'dokument_reset' toern.id %}", {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ typ: dokTyp })
+    }).then(() => loadDokument());
 }
 
 // ===================== PERSÖNLICHE STANDARDS =====================
