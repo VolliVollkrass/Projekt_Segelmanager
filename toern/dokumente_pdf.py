@@ -1,7 +1,4 @@
 """Boots-Dokumente als PDF: Mayday-Plakat (fürs Funkgerät) und Notrollen-Plakat (Aushang)."""
-import os
-
-from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
@@ -11,7 +8,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, portrait
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from boote.models import Boot
 from .models import Teilnahme
@@ -20,8 +17,6 @@ ROT = colors.HexColor("#B91C1C")
 DUNKELBLAU = colors.HexColor("#1E3A5F")
 GRAU = colors.HexColor("#666666")
 HELLGRAU = colors.HexColor("#F3F4F6")
-
-LOGO_PATH = os.path.join(settings.BASE_DIR, "static/medien/Logo_Meer_erleben.png")
 
 
 def _hat_dokument_zugang(user, boot):
@@ -66,7 +61,7 @@ def mayday_plakat_pdf(request, boot_id):
     response = _pdf_response(f"mayday_{boot.name.replace(' ', '_')}.pdf")
     doc = SimpleDocTemplate(
         response, pagesize=portrait(A4),
-        rightMargin=15 * mm, leftMargin=15 * mm, topMargin=12 * mm, bottomMargin=10 * mm,
+        rightMargin=15 * mm, leftMargin=15 * mm, topMargin=9 * mm, bottomMargin=7 * mm,
     )
 
     titel = ParagraphStyle("titel", fontSize=30, leading=34, fontName="Helvetica-Bold",
@@ -92,7 +87,7 @@ def mayday_plakat_pdf(request, boot_id):
         ("BOTTOMPADDING", (0, 1), (-1, 1), 8),
     ]))
     elements.append(kopf)
-    elements.append(Spacer(1, 5 * mm))
+    elements.append(Spacer(1, 4 * mm))
 
     # Schiffsdaten
     daten = Table([
@@ -104,59 +99,96 @@ def mayday_plakat_pdf(request, boot_id):
     daten.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (-1, -1), HELLGRAU),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
         ("LINEBELOW", (0, 0), (-1, -2), 0.5, colors.white),
     ]))
     elements.append(daten)
-    elements.append(Spacer(1, 5 * mm))
+    elements.append(Spacer(1, 4 * mm))
 
-    # Schritt 1: DSC
-    elements.append(Paragraph("SCHRITT 1 — DSC-SEENOTALARM (UKW Kanal 70)", box_kopf))
+    # Schritt 1: DSC-Alarm (deutsche Anleitung)
+    elements.append(Paragraph("SCHRITT 1 — DSC-SEENOTALARM AUSLÖSEN", box_kopf))
     elements.append(Spacer(1, 2 * mm))
-    elements.append(Paragraph(
-        "Rote <b>DISTRESS-Taste</b> am Funkgerät <b>5 Sekunden gedrückt halten</b>, "
-        "bis der Alarm bestätigt wird. Danach Sprechfunk-Notruf auf Kanal 16 absetzen.",
-        normal,
-    ))
-    elements.append(Spacer(1, 5 * mm))
+    dsc_schritte = [
+        "Sicherstellen, dass das Funkgerät <b>eingeschaltet</b> ist.",
+        "Abdeckung über der <b>ROTEN DISTRESS-Taste</b> öffnen.",
+        "ROTE DISTRESS-Taste <b>EINMAL drücken</b> und loslassen.",
+        "Zur passenden Notfall-Meldung scrollen (FIRE = Feuer, SINKING = Sinken, MOB = Person über Bord …). "
+        "Wird das übersprungen, sendet das Gerät einen allgemeinen Notalarm — das ist in Ordnung.",
+        "ROTE DISTRESS-Taste <b>5 Sekunden gedrückt halten</b>, um den Alarm zu senden.",
+        "<b>Höchstens 15 Sekunden</b> auf die Bestätigung warten (Anzeige auf dem Display), "
+        "dann die folgende Meldung auf <b>KANAL 16</b> mit <b>HOHER SENDELEISTUNG (HIGH / 25 W)</b> absetzen.",
+    ]
+    dsc_stil = ParagraphStyle("dsc", fontSize=10, leading=13)
+    dsc_tbl = Table(
+        [[Paragraph(f"<b>{i}.</b>", dsc_stil), Paragraph(text, dsc_stil)]
+         for i, text in enumerate(dsc_schritte, start=1)],
+        colWidths=[8 * mm, 172 * mm],
+    )
+    dsc_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 1.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5),
+        ("LEFTPADDING", (0, 0), (0, -1), 0),
+    ]))
+    elements.append(dsc_tbl)
+    elements.append(Spacer(1, 4 * mm))
 
-    # Schritt 2: Sprechfunk
-    elements.append(Paragraph("SCHRITT 2 — SPRECHFUNK-NOTRUF (UKW Kanal 16)", box_kopf))
+    # Schritt 2: Sprechfunk-Notruf — im internationalen englischen Original,
+    # mit deutscher Lesehilfe unter jeder Zeile
+    elements.append(Paragraph("SCHRITT 2 — SPRECHFUNK-NOTRUF (KANAL 16, ENGLISCH ABLESEN)", box_kopf))
     elements.append(Spacer(1, 2 * mm))
+
+    englisch = ParagraphStyle("englisch", fontSize=13, leading=16, fontName="Helvetica-Bold")
+    deutsch = ParagraphStyle("deutsch", fontSize=8.5, leading=10.5, textColor=GRAU)
 
     spruch_zeilen = [
-        "MAYDAY — MAYDAY — MAYDAY",
-        f"HIER IST {name_upper} — {name_upper} — {name_upper}",
-        f"RUFZEICHEN {rufzeichen} — MMSI {mmsi}",
-        f"MAYDAY {name_upper}",
-        "MEINE POSITION IST …&nbsp;&nbsp;<font size=9 color='#666666'>(Breite / Länge vom GPS oder Kartenplotter ablesen)</font>",
-        "WIR HABEN …&nbsp;&nbsp;<font size=9 color='#666666'>(Art der Notlage: Wassereinbruch, Feuer, Person über Bord …)</font>",
-        "WIR BENÖTIGEN SOFORTIGE HILFE",
-        f"AN BORD SIND {personen_text} PERSONEN",
-        "OVER",
+        ("MAYDAY, MAYDAY, MAYDAY",
+         None),
+        (f"THIS IS {name_upper}, {name_upper}, {name_upper}",
+         "Hier ist … (Schiffsname dreimal sprechen)"),
+        (f"MAYDAY {name_upper}",
+         "Mayday + Schiffsname einmal"),
+        (f"MMSI {mmsi}",
+         "MMSI-Nummer vorlesen"),
+        ("MY POSITION IS …",
+         "Meine Position: Breite / Länge vom GPS oder Kartenplotter ablesen — "
+         "oder Peilung &amp; Abstand zu einem bekannten Punkt (z.B. Leuchtturm)"),
+        ("WE ARE …",
+         "Art der Notlage einsetzen: SINKING (wir sinken) · ON FIRE (Feuer an Bord) · "
+         "MAN OVERBOARD (Person über Bord) · ADRIFT (manövrierunfähig)"),
+        ("I REQUIRE IMMEDIATE ASSISTANCE",
+         "Wir benötigen sofortige Hilfe"),
+        (f"WE HAVE {personen_text} PERSONS ON BOARD",
+         f"Wir haben {personen_text} Personen an Bord — Zahl auf Englisch sprechen"),
+        ("ANY OTHER INFORMATION …",
+         "Weitere Angaben, z.B. TYPE OF VESSEL: SAILING YACHT (Segelyacht) · HULL COLOUR (Rumpffarbe): WHITE (weiß)"),
+        ("OVER",
+         "Ende — auf Antwort warten, hörbereit bleiben"),
     ]
-    spruch = Table([[Paragraph(z, funkspruch)] for z in spruch_zeilen], colWidths=[180 * mm])
+    spruch_rows = []
+    for eng, ger in spruch_zeilen:
+        zelle = [Paragraph(eng, englisch)]
+        if ger:
+            zelle.append(Paragraph(ger, deutsch))
+        spruch_rows.append([zelle])
+    spruch = Table(spruch_rows, colWidths=[180 * mm])
     spruch.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 1.5, ROT),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
         ("LEFTPADDING", (0, 0), (-1, -1), 10),
     ]))
     elements.append(spruch)
-    elements.append(Spacer(1, 4 * mm))
+    elements.append(Spacer(1, 3 * mm))
 
     elements.append(Paragraph(
-        "Langsam und deutlich sprechen. Nach dem Notruf auf Kanal 16 hörbereit bleiben. "
-        "Keine Antwort? Notruf wiederholen. Entwarnung ebenfalls über Funk melden.",
+        "Langsam und deutlich sprechen — einfach Zeile für Zeile ablesen. Keine Antwort? Notruf wiederholen. "
+        "Entwarnung ebenfalls über Funk melden.",
         hinweis,
     ))
-    elements.append(Spacer(1, 6 * mm))
-
-    if os.path.exists(LOGO_PATH):
-        elements.append(Image(LOGO_PATH, width=22 * mm, height=22 * mm, kind="proportional"))
-        elements.append(Spacer(1, 2 * mm))
+    elements.append(Spacer(1, 3 * mm))
     elements.append(_fusszeile(boot))
 
     doc.build(elements)
