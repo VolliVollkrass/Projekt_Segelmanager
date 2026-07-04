@@ -261,6 +261,26 @@ class TeilnahmeDetailForm(forms.ModelForm):
         widget=forms.TextInput(attrs={"class": "input input-bordered w-full"})
     )
 
+    keine_unvertraeglichkeiten = forms.BooleanField(
+        label="Keine Unverträglichkeiten und keine Allergien",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "checkbox checkbox-primary"})
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            if (self.instance.lebensmittelunvertraeglichkeiten or "").strip().lower() == "keine" \
+                    and (self.instance.allergien or "").strip().lower() == "keine":
+                self.initial["keine_unvertraeglichkeiten"] = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("keine_unvertraeglichkeiten"):
+            cleaned_data["lebensmittelunvertraeglichkeiten"] = "Keine"
+            cleaned_data["allergien"] = "Keine"
+        return cleaned_data
+
     class Meta:
         model = Teilnahme
         fields = [

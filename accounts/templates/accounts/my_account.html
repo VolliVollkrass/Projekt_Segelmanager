@@ -204,15 +204,16 @@
                         </p>
                         {% if lizenz.dokument_vorne or lizenz.dokument_hinten %}
                         <div class="flex gap-2 mt-2">
+                            {# Lightbox statt Link: in der iOS-WebApp gibt es sonst keinen Weg zurück #}
                             {% if lizenz.dokument_vorne %}
-                            <a href="{{ lizenz.dokument_vorne.url }}" target="_blank" class="block">
+                            <button type="button" onclick="openLizenzBild('{{ lizenz.dokument_vorne.url }}')" class="block">
                                 <img src="{{ lizenz.dokument_vorne.url }}" class="h-14 w-20 object-cover rounded-lg border border-base-300 hover:scale-105 transition-transform">
-                            </a>
+                            </button>
                             {% endif %}
                             {% if lizenz.dokument_hinten %}
-                            <a href="{{ lizenz.dokument_hinten.url }}" target="_blank" class="block">
+                            <button type="button" onclick="openLizenzBild('{{ lizenz.dokument_hinten.url }}')" class="block">
                                 <img src="{{ lizenz.dokument_hinten.url }}" class="h-14 w-20 object-cover rounded-lg border border-base-300 hover:scale-105 transition-transform">
-                            </a>
+                            </button>
                             {% endif %}
                         </div>
                         {% endif %}
@@ -399,4 +400,20 @@
     {% endif %}
 
 </div>
+
+<!-- Lizenz-Bild Lightbox (kein Seitenwechsel — funktioniert auch in der iOS-WebApp) -->
+<dialog id="lizenzBildModal" class="modal">
+    <div class="modal-box max-w-3xl p-2 relative">
+        <button onclick="lizenzBildModal.close()"
+                class="btn btn-circle btn-sm absolute right-3 top-3 z-10">✕</button>
+        <img id="lizenzBildImg" src="" alt="Lizenz" class="w-full rounded-lg">
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+<script>
+function openLizenzBild(url) {
+    document.getElementById('lizenzBildImg').src = url;
+    document.getElementById('lizenzBildModal').showModal();
+}
+</script>
 {% endblock %}
