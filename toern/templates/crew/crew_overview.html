@@ -22,7 +22,7 @@
             </svg>
         </div>
         <div class="flex-1 min-w-0">
-            <p class="text-sm font-semibold text-warning-content">Profil vervollständigen</p>
+            <p class="text-sm font-semibold text-warning-content">{% if naechste_teilnahme %}Törn-Daten vervollständigen{% else %}Profil vervollständigen{% endif %}</p>
             <div class="mt-1 flex items-center gap-2">
                 <progress class="progress progress-warning h-1.5 flex-1" value="{{ profil_prozent }}" max="100"></progress>
                 <span class="text-xs text-base-content/60 shrink-0">{{ profil_prozent }}%</span>
