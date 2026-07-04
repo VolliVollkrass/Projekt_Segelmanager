@@ -145,7 +145,9 @@ def pdf(request, pk):
     buffer = erstelle_andacht_pdf(andacht)
     dateiname = f'andacht_{andacht.pk}.pdf'
     response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="{dateiname}"'
+    # inline + target="_blank" im Template: funktioniert auch in der iOS-WebApp
+    # (attachment-Downloads laufen dort ins Leere)
+    response['Content-Disposition'] = f'inline; filename="{dateiname}"'
     return response
 
 
