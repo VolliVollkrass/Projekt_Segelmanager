@@ -289,7 +289,7 @@ class PacklisteVorlage(models.Model):
         on_delete=models.CASCADE,
         related_name='packliste_vorlagen'
     )
-    typ = models.CharField(max_length=10, choices=[('personal', 'Persönlich'), ('boot', 'Boot')])
+    typ = models.CharField(max_length=10, choices=[('personal', 'Persönlich'), ('boot', 'Boot'), ('skipper', 'Skipper')])
 
     class Meta:
         unique_together = [('toern', 'typ')]
