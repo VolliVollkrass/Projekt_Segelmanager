@@ -1,6 +1,9 @@
+from django.contrib.auth.decorators import login_required
+from django.http import Http404
 from django.shortcuts import render
 from django.db.models import Count, Sum, OuterRef, Subquery, IntegerField, Q
 from django.db.models.functions import Coalesce
+from django.utils.text import slugify
 from toern.models import Toern, Teilnahme
 from boote.models import Kabine
 
@@ -53,4 +56,29 @@ def index(request):
     return render(request, 'home/index.html', {
         'toerns': toerns,
         'user_toern_ids': user_toern_ids,
+    })
+
+
+@login_required
+def pdf_viewer(request):
+    """In-App-PDF-Viewer (PDF.js) mit Zurück- und Teilen-Button.
+
+    Nötig für die iOS-WebApp: dort öffnen PDFs sonst ohne Navigations-Chrome
+    und es gibt keinen Weg zurück. Zeigt nur eigene (same-origin) Pfade an.
+    """
+    src = request.GET.get("src", "")
+    titel = request.GET.get("titel", "").strip() or "Dokument"
+
+    # Nur relative Pfade der eigenen App — keine externen URLs einbetten
+    if not src.startswith("/") or src.startswith("//") or "\\" in src:
+        raise Http404
+
+    dateiname = src.split("?")[0].rstrip("/").split("/")[-1]
+    if not dateiname.endswith(".pdf"):
+        dateiname = f"{slugify(titel) or 'dokument'}.pdf"
+
+    return render(request, "pdf_viewer.html", {
+        "src": src,
+        "titel": titel,
+        "dateiname": dateiname,
     })
