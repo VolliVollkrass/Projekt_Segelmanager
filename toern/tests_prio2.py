@@ -87,6 +87,39 @@ class VervollstaendigenLinkTests(TestCase):
         self.assertContains(resp, reverse("teilnahme_daten_edit", args=[toern.id]))
 
 
+class EmailDatenLinkTests(TestCase):
+    """Bestätigungs- und Erinnerungsmail müssen aufs Törn-Datenformular zeigen
+    (dort liegen auch die Essensunverträglichkeiten), nicht aufs Account-Profil."""
+
+    def setUp(self):
+        from django.test import RequestFactory
+        self.anbieter = _user("anbieter@test.de")
+        self.crew = _user("crew@test.de")
+        self.toern = _toern(self.anbieter)
+        self.teilnahme = Teilnahme.objects.create(
+            toern=self.toern, user=self.crew, status="bestaetigt", rolle="crew"
+        )
+        self.request = RequestFactory().get("/")
+
+    def test_bestaetigungsmail_verlinkt_toern_formular(self):
+        from django.core import mail
+        from .emails import mail_teilnahme_bestaetigt
+        mail_teilnahme_bestaetigt(self.teilnahme, self.request)
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertIn(f"/toern/{self.toern.id}/daten/", body)
+        self.assertNotIn("account-edit", body)
+
+    def test_erinnerungsmail_verlinkt_toern_formular(self):
+        from django.core import mail
+        from .emails import mail_crew_daten_erinnerung
+        mail_crew_daten_erinnerung(self.crew, self.toern, ["Telefonnummer"], self.request)
+        self.assertEqual(len(mail.outbox), 1)
+        body = mail.outbox[0].body
+        self.assertIn(f"/toern/{self.toern.id}/daten/", body)
+        self.assertNotIn("account-edit", body)
+
+
 class AnbieterDashboardTests(TestCase):
     def test_bearbeiten_button_vorhanden(self):
         anbieter_gruppe, _ = Group.objects.get_or_create(name="Anbieter")

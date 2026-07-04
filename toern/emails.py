@@ -45,7 +45,8 @@ def mail_teilnahme_bestaetigt(teilnahme, request):
     toern = teilnahme.toern
     user = teilnahme.user
     dashboard_url = request.build_absolute_uri(f"/toern/{toern.id}/crew/")
-    profil_url = request.build_absolute_uri("/accounts/account-edit/")
+    # Toern-Datenformular (enthaelt auch Essgewohnheiten/Unvertraeglichkeiten) — nicht das Account-Profil
+    daten_url = request.build_absolute_uri(f"/toern/{toern.id}/daten/")
 
     body = (
         f"Hallo {user.first_name},\n\n"
@@ -53,9 +54,10 @@ def mail_teilnahme_bestaetigt(teilnahme, request):
         f"Dein Crew-Dashboard:\n{dashboard_url}\n\n"
         "---\n"
         "Damit der Skipper alle noetigen Daten fuer die Crewliste hat, stelle bitte sicher,\n"
-        "dass dein Profil vollstaendig ausgefuellt ist (Vorname, Nachname, Geburtsdatum,\n"
-        "Geburtsort, Geburtsland, Nationalitaet, Ausweis-/Passnummer, Adresse, Telefon).\n\n"
-        f"Jetzt Profil vervollstaendigen:\n{profil_url}\n"
+        "dass deine Toern-Daten vollstaendig ausgefuellt sind (Vorname, Nachname, Geburtsdatum,\n"
+        "Geburtsort, Geburtsland, Nationalitaet, Ausweis-/Passnummer, Adresse, Telefon,\n"
+        "Essgewohnheiten und Unvertraeglichkeiten).\n\n"
+        f"Jetzt Daten vervollstaendigen:\n{daten_url}\n"
         "---\n\n"
         "Bis bald an Bord,\n"
         "Das Meer erleben Team"
@@ -69,15 +71,16 @@ def mail_teilnahme_bestaetigt(teilnahme, request):
 
 
 def mail_crew_daten_erinnerung(user, toern, fehlende_felder, request):
-    profil_url = request.build_absolute_uri("/accounts/account-edit/")
+    # Toern-Datenformular (enthaelt auch Essgewohnheiten/Unvertraeglichkeiten) — nicht das Account-Profil
+    daten_url = request.build_absolute_uri(f"/toern/{toern.id}/daten/")
     fehlend_str = "\n".join(f"  - {f}" for f in fehlende_felder)
 
     body = (
         f"Hallo {user.first_name or user.email},\n\n"
         f'du bist fuer den Toern \"{toern.titel}\" angemeldet.\n\n'
-        "Fuer die Crewliste fehlen noch folgende Angaben in deinem Profil:\n\n"
+        "Fuer die Crewliste fehlen noch folgende Angaben:\n\n"
         f"{fehlend_str}\n\n"
-        f"Bitte vervollstaendige dein Profil jetzt:\n{profil_url}\n\n"
+        f"Bitte vervollstaendige deine Daten jetzt:\n{daten_url}\n\n"
         "Das dauert nur wenige Minuten!\n\n"
         "Viele Gruesse,\n"
         "Das Meer erleben Team"
