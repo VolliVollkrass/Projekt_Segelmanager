@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Andachtsbuch{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+
+  <!-- Header -->
+  <div>
+    <h1 class="text-2xl font-bold">Andachtsbuch</h1>
+    <p class="text-sm text-base-content/50 mt-0.5">Veröffentlichte Andachten aus der Gemeinschaft — zum Lesen und Weiterverwenden</p>
+  </div>
+
+  <!-- Suche -->
+  <form method="get" class="flex gap-2">
+    <label class="input input-bordered input-sm flex items-center gap-2 flex-1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      </svg>
+      <input type="search" name="q" value="{{ suche }}" placeholder="Titel, Thema, Bibelstelle oder Autor…" class="grow"/>
+    </label>
+    <button class="btn btn-primary btn-sm">Suchen</button>
+    {% if suche %}
+    <a href="{% url 'andacht_buch' %}" class="btn btn-ghost btn-sm">Zurücksetzen</a>
+    {% endif %}
+  </form>
+
+  {% if seite.object_list %}
+    <div class="space-y-3">
+      {% for a in seite.object_list %}
+      <a href="{% url 'andacht_buch_detail' a.pk %}"
+         class="block bg-base-100 border border-base-300 rounded-2xl p-4 hover:border-primary/40 hover:shadow-sm transition-all">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold truncate">{{ a.titel|default:a.thema }}</p>
+            <p class="text-xs text-base-content/50 mt-0.5">
+              {{ a.get_typ_display }} · {{ a.get_zielgruppe_display }} · ca. {{ a.dauer_minuten }} Min.
+            </p>
+            <p class="text-xs text-base-content/30 mt-1">
+              von {{ a.user.first_name }} {{ a.user.last_name }} · {{ a.veroeffentlicht_am|date:"d. M. Y" }}
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="badge badge-outline badge-sm">{{ a.bibelstelle|default:"–" }}</span>
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-base-content/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if seite.paginator.num_pages > 1 %}
+    <div class="flex justify-center items-center gap-2 pt-2">
+      {% if seite.has_previous %}
+      <a href="?seite={{ seite.previous_page_number }}{% if suche %}&q={{ suche|urlencode }}{% endif %}" class="btn btn-sm btn-outline">«</a>
+      {% endif %}
+      <span class="text-sm text-base-content/50">Seite {{ seite.number }} von {{ seite.paginator.num_pages }}</span>
+      {% if seite.has_next %}
+      <a href="?seite={{ seite.next_page_number }}{% if suche %}&q={{ suche|urlencode }}{% endif %}" class="btn btn-sm btn-outline">»</a>
+      {% endif %}
+    </div>
+    {% endif %}
+  {% else %}
+    <div class="text-center py-16 text-base-content/40">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto mb-3 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+      </svg>
+      {% if suche %}
+      <p class="text-sm">Keine Andachten zu „{{ suche }}" gefunden.</p>
+      {% else %}
+      <p class="text-sm">Es wurden noch keine Andachten veröffentlicht.</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,7 +1,10 @@
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponse
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.http import JsonResponse, HttpResponse, Http404
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from utils.permissions import andacht_required
@@ -132,6 +135,46 @@ def bearbeiten(request, pk):
 
 @login_required
 @andacht_required
+@require_POST
+def veroeffentlichen(request, pk):
+    andacht = get_object_or_404(Andacht, pk=pk, user=request.user)
+    andacht.veroeffentlicht = not andacht.veroeffentlicht
+    andacht.veroeffentlicht_am = timezone.now() if andacht.veroeffentlicht else None
+    andacht.save(update_fields=['veroeffentlicht', 'veroeffentlicht_am'])
+    return redirect('andacht_detail', pk=andacht.pk)
+
+
+@login_required
+def buch(request):
+    """Andachtsbuch: alle veröffentlichten Andachten, für alle eingeloggten Nutzer."""
+    andachten = Andacht.objects.filter(veroeffentlicht=True).select_related('user')
+
+    suche = request.GET.get('q', '').strip()
+    if suche:
+        andachten = andachten.filter(
+            Q(titel__icontains=suche)
+            | Q(thema__icontains=suche)
+            | Q(bibelstelle__icontains=suche)
+            | Q(user__first_name__icontains=suche)
+            | Q(user__last_name__icontains=suche)
+        )
+
+    andachten = andachten.order_by('-veroeffentlicht_am')
+    seite = Paginator(andachten, 20).get_page(request.GET.get('seite'))
+    return render(request, 'andacht/buch.html', {'seite': seite, 'suche': suche})
+
+
+@login_required
+def buch_detail(request, pk):
+    """Leseansicht einer veröffentlichten Andacht (Autor sieht auch unveröffentlichte)."""
+    andacht = get_object_or_404(Andacht, pk=pk)
+    if not andacht.veroeffentlicht and andacht.user != request.user:
+        raise Http404
+    return render(request, 'andacht/buch_detail.html', {'andacht': andacht})
+
+
+@login_required
+@andacht_required
 def loeschen(request, pk):
     andacht = get_object_or_404(Andacht, pk=pk, user=request.user)
     andacht.delete()
@@ -139,9 +182,11 @@ def loeschen(request, pk):
 
 
 @login_required
-@andacht_required
 def pdf(request, pk):
-    andacht = get_object_or_404(Andacht, pk=pk, user=request.user)
+    # Eigene Andachten immer, fremde nur wenn im Andachtsbuch veröffentlicht
+    andacht = get_object_or_404(Andacht, pk=pk)
+    if not andacht.veroeffentlicht and andacht.user != request.user:
+        raise Http404
     buffer = erstelle_andacht_pdf(andacht)
     dateiname = f'andacht_{andacht.pk}.pdf'
     response = HttpResponse(buffer, content_type='application/pdf')
