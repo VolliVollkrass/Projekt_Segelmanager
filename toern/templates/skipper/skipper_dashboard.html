@@ -586,6 +586,23 @@
             <button onclick="addVorlageItem()" class="btn btn-primary btn-sm">Hinzufügen</button>
         </div>
 
+        <!-- Meine Standards -->
+        <div class="bg-base-200 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Meine Standards</p>
+                    <p class="text-xs text-base-content/50 mt-1">
+                        Deine gespeicherten Listen — auf jedem Törn wiederverwendbar.
+                        ★ = wird bei deinen neuen Törns automatisch als Start-Vorlage verwendet.
+                    </p>
+                </div>
+                <button onclick="openStandardSpeichern()" class="btn btn-xs btn-outline whitespace-nowrap">Liste speichern…</button>
+            </div>
+            <div id="standard-liste" class="space-y-2">
+                <p class="text-sm text-base-content/40">Noch keine Standards für diese Liste gespeichert.</p>
+            </div>
+        </div>
+
         <!-- An Crew schicken -->
         <button onclick="document.getElementById('vorlageAnwendenModal').showModal()" class="btn btn-success w-full">
             An Crew schicken
@@ -864,6 +881,33 @@
         <div class="modal-action mt-4">
             <button class="btn btn-ghost" onclick="vorlageAnwendenModal.close()">Abbrechen</button>
             <button class="btn btn-success" onclick="submitVorlageAnwenden()">Senden</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Standard-Speichern Modal -->
+<dialog id="standardSpeichernModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-2">Liste als Standard speichern</h3>
+        <p class="text-sm opacity-70 mb-4" id="standardSpeichernHinweis">
+            Die aktuelle Liste wird unter deinem Namen gespeichert und steht dir auf allen Törns zur Verfügung.
+            Ein bestehender Standard mit gleichem Namen wird überschrieben.
+        </p>
+        <div class="space-y-3">
+            <input type="text" id="standard-name" maxlength="100" placeholder="Name, z.B. Mittelmeer-Charter"
+                   class="input input-bordered w-full"/>
+            <label class="flex items-center gap-3 cursor-pointer bg-base-200 p-3 rounded-lg">
+                <input type="checkbox" id="standard-default" class="checkbox checkbox-primary"/>
+                <div>
+                    <p class="font-medium text-sm">Als Standard für neue Törns</p>
+                    <p class="text-xs opacity-60">Wird bei deinen neuen Törns automatisch als Start-Vorlage verwendet</p>
+                </div>
+            </label>
+        </div>
+        <div class="modal-action mt-4">
+            <button class="btn btn-ghost" onclick="standardSpeichernModal.close()">Abbrechen</button>
+            <button class="btn btn-primary" onclick="submitStandardSpeichern()">Speichern</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -1250,6 +1294,7 @@ function loadVorlage() {
     document.getElementById('vorlage-list').classList.add('hidden');
     fetch(`{% url 'vorlage_items_get' toern.id 'TYP' %}`.replace('TYP', vorlageTyp))
         .then(r => r.json()).then(data => { vorlageId = data.vorlage_id; renderVorlageItems(data.items); });
+    loadStandards();
 }
 
 function renderVorlageItems(items) {
@@ -1334,6 +1379,86 @@ function submitVorlageAnwenden() {
 }
 function escapeHtml(str) {
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ===================== PERSÖNLICHE STANDARDS =====================
+let standardsCache = {};
+
+function loadStandards() {
+    fetch(`{% url 'packl_standard_list' %}?typ=${vorlageTyp}`)
+        .then(r => r.json())
+        .then(data => renderStandards(data.standards || []));
+}
+
+function renderStandards(standards) {
+    standardsCache = {};
+    const box = document.getElementById('standard-liste');
+    box.innerHTML = '';
+    if (standards.length === 0) {
+        box.innerHTML = '<p class="text-sm text-base-content/40">Noch keine Standards für diese Liste gespeichert.</p>';
+        return;
+    }
+    standards.forEach(s => {
+        standardsCache[s.id] = s;
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 bg-base-100 rounded-lg px-3 py-2';
+        div.innerHTML = `
+            <button onclick="standardDefault(${s.id})" class="btn btn-xs btn-ghost text-base"
+                title="Für neue Törns automatisch verwenden">${s.ist_default ? '★' : '☆'}</button>
+            <span class="flex-1 text-sm font-medium">${escapeHtml(s.name)}</span>
+            <span class="text-xs text-base-content/40 whitespace-nowrap">${s.anzahl} Einträge</span>
+            <button onclick="standardLaden(${s.id})" class="btn btn-xs btn-outline">Laden</button>
+            <button onclick="standardLoeschen(${s.id})" class="btn btn-xs btn-ghost text-error">🗑</button>`;
+        box.appendChild(div);
+    });
+}
+
+function standardLaden(id) {
+    const s = standardsCache[id];
+    if (!s) return;
+    if (!confirm(`Die aktuelle Törn-Liste durch deinen Standard „${s.name}" ersetzen?\nBestehende Einträge der Törn-Vorlage gehen verloren.`)) return;
+    fetch("{% url 'packl_standard_laden' toern.id %}", {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ standard_id: id })
+    }).then(r => r.json()).then(() => loadVorlage());
+}
+
+function standardLoeschen(id) {
+    const s = standardsCache[id];
+    if (!s) return;
+    if (!confirm(`Standard „${s.name}" wirklich löschen?`)) return;
+    fetch(`{% url 'packl_standard_loeschen' 9999 %}`.replace('9999', id), {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(() => loadStandards());
+}
+
+function standardDefault(id) {
+    fetch(`{% url 'packl_standard_default' 9999 %}`.replace('9999', id), {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(() => loadStandards());
+}
+
+function openStandardSpeichern() {
+    document.getElementById('standard-name').value = '';
+    document.getElementById('standard-default').checked = false;
+    document.getElementById('standardSpeichernModal').showModal();
+}
+
+function submitStandardSpeichern() {
+    const name = document.getElementById('standard-name').value.trim();
+    if (!name) { document.getElementById('standard-name').classList.add('input-error'); return; }
+    document.getElementById('standard-name').classList.remove('input-error');
+    fetch("{% url 'packl_standard_speichern' toern.id %}", {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({
+            typ: vorlageTyp,
+            name: name,
+            ist_default: document.getElementById('standard-default').checked
+        })
+    }).then(r => r.json()).then(() => {
+        document.getElementById('standardSpeichernModal').close();
+        loadStandards();
+    });
 }
 </script>
 

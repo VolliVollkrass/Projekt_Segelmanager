@@ -14,7 +14,7 @@ from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE, SKIPPER_LISTE
-from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage
+from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, PacklisteStandard, PacklisteStandardEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
 from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
@@ -1876,7 +1876,7 @@ def boot_dashboard(request, toern_id):
     # 🔥 Persönliche Packliste nur einmal erstellen — aus der Törn-Vorlage
     # (respektiert Warm/Kalt und Anpassungen des Skippers)
     if not teilnahme.persoenliche_packliste.exists():
-        vorlage = _get_or_create_vorlage(toern, 'personal')
+        vorlage = _get_or_create_vorlage(toern, 'personal', user=request.user)
         PersönlicherGegenstand.objects.bulk_create([
             PersönlicherGegenstand(
                 participation=teilnahme,
@@ -1888,7 +1888,7 @@ def boot_dashboard(request, toern_id):
 
     # 🔥 Skipper/Co-Skipper bekommen zusätzlich die Skipper-Ausrüstung
     if teilnahme.rolle in ("skipper", "coskipper"):
-        skipper_vorlage = _get_or_create_vorlage(toern, 'skipper')
+        skipper_vorlage = _get_or_create_vorlage(toern, 'skipper', user=request.user)
         existing = set(teilnahme.persoenliche_packliste.values_list('name', flat=True))
         PersönlicherGegenstand.objects.bulk_create([
             PersönlicherGegenstand(
@@ -1905,7 +1905,7 @@ def boot_dashboard(request, toern_id):
 
     # 🔥 Boots-Gemeinschaftsliste erstellen, wenn leer — ebenfalls aus der Vorlage
     if not Gegenstand.objects.filter(boot=boot, toern=toern).exists():
-        boot_vorlage = _get_or_create_vorlage(toern, 'boot')
+        boot_vorlage = _get_or_create_vorlage(toern, 'boot', user=request.user)
         Gegenstand.objects.bulk_create([
             Gegenstand(
                 boot=boot,
@@ -2743,16 +2743,25 @@ def teilnehmerliste_pdf(request, toern_id):
 # PACKLISTEN-VORLAGEN
 # =========================
 
-def _get_or_create_vorlage(toern, typ):
+def _get_or_create_vorlage(toern, typ, user=None):
+    """Törn-Vorlage holen oder anlegen. Quelle beim Anlegen (in dieser Reihenfolge):
+    Default-Standard des Users (falls Skipper/Co-Skipper/Anbieter des Törns),
+    sonst die statische Standard-Liste des Reviers."""
     revier_typ = toern.packliste_revier_typ
     vorlage, created = PacklisteVorlage.objects.get_or_create(toern=toern, typ=typ)
     if created:
-        if typ == 'personal':
-            source = KALT_PACKLISTE if revier_typ == 'kalt' else BASIS_PACKLISTE
-        elif typ == 'skipper':
-            source = SKIPPER_LISTE
-        else:
-            source = KALT_BOOT_LISTE if revier_typ == 'kalt' else BOOT_STANDARD_LISTE
+        source = None
+        if user is not None and _ist_skipper_oder_anbieter(user, toern):
+            default = PacklisteStandard.objects.filter(user=user, typ=typ, ist_default=True).first()
+            if default:
+                source = list(default.eintraege.values_list('name', 'menge'))
+        if source is None:
+            if typ == 'personal':
+                source = KALT_PACKLISTE if revier_typ == 'kalt' else BASIS_PACKLISTE
+            elif typ == 'skipper':
+                source = SKIPPER_LISTE
+            else:
+                source = KALT_BOOT_LISTE if revier_typ == 'kalt' else BOOT_STANDARD_LISTE
         PacklisteVorlageEintrag.objects.bulk_create([
             PacklisteVorlageEintrag(vorlage=vorlage, name=name, menge=menge)
             for name, menge in source
@@ -2760,11 +2769,15 @@ def _get_or_create_vorlage(toern, typ):
     return vorlage
 
 
+def _ist_skipper_oder_anbieter(user, toern):
+    if toern.anbieter == user:
+        return True
+    t = Teilnahme.objects.filter(user=user, toern=toern).first()
+    return bool(t and t.rolle in ["skipper", "coskipper"])
+
+
 def _hat_skipper_oder_anbieter(request, toern):
-    if toern.anbieter == request.user:
-        return
-    t = Teilnahme.objects.filter(user=request.user, toern=toern).first()
-    if not t or t.rolle not in ["skipper", "coskipper"]:
+    if not _ist_skipper_oder_anbieter(request.user, toern):
         raise PermissionDenied
 
 
@@ -2800,7 +2813,7 @@ def vorlage_items_get(request, toern_id, typ):
     if typ not in ('personal', 'boot', 'skipper'):
         return JsonResponse({'error': 'Ungültiger Typ'}, status=400)
 
-    vorlage = _get_or_create_vorlage(toern, typ)
+    vorlage = _get_or_create_vorlage(toern, typ, user=request.user)
     items = list(vorlage.eintraege.values('id', 'name', 'menge').order_by('id'))
     return JsonResponse({'items': items, 'vorlage_id': vorlage.id, 'revier_typ': toern.packliste_revier_typ})
 
@@ -2863,7 +2876,7 @@ def vorlage_anwenden(request, toern_id):
     added = {'personal': 0, 'boot': 0, 'skipper': 0}
 
     if apply_personal:
-        vorlage = _get_or_create_vorlage(toern, 'personal')
+        vorlage = _get_or_create_vorlage(toern, 'personal', user=request.user)
         template_items = list(vorlage.eintraege.values_list('name', 'menge'))
         for t in toern.teilnahmen.filter(status='bestaetigt'):
             existing = set(t.persoenliche_packliste.values_list('name', flat=True))
@@ -2876,7 +2889,7 @@ def vorlage_anwenden(request, toern_id):
             added['personal'] += len(to_create)
 
     if apply_skipper:
-        vorlage = _get_or_create_vorlage(toern, 'skipper')
+        vorlage = _get_or_create_vorlage(toern, 'skipper', user=request.user)
         template_items = list(vorlage.eintraege.values_list('name', 'menge'))
         for t in toern.teilnahmen.filter(status='bestaetigt', rolle__in=['skipper', 'coskipper']):
             existing = set(t.persoenliche_packliste.values_list('name', flat=True))
@@ -2889,7 +2902,7 @@ def vorlage_anwenden(request, toern_id):
             added['skipper'] += len(to_create)
 
     if apply_boot:
-        vorlage = _get_or_create_vorlage(toern, 'boot')
+        vorlage = _get_or_create_vorlage(toern, 'boot', user=request.user)
         template_items = list(vorlage.eintraege.values_list('name', 'menge'))
         for boot in toern.boote.all():
             existing = set(Gegenstand.objects.filter(boot=boot, toern=toern).values_list('name', flat=True))
@@ -2902,6 +2915,90 @@ def vorlage_anwenden(request, toern_id):
             added['boot'] += len(to_create)
 
     return JsonResponse({'status': 'ok', 'added': added})
+
+
+# =========================
+# PERSÖNLICHE PACKLISTEN-STANDARDS
+# =========================
+
+@login_required
+def packl_standard_list(request):
+    typ = request.GET.get('typ')
+    if typ not in ('personal', 'boot', 'skipper'):
+        return JsonResponse({'error': 'Ungültiger Typ'}, status=400)
+    standards = [
+        {'id': s.id, 'name': s.name, 'ist_default': s.ist_default, 'anzahl': s.eintraege.count()}
+        for s in PacklisteStandard.objects.filter(user=request.user, typ=typ).order_by('name')
+    ]
+    return JsonResponse({'standards': standards})
+
+
+@login_required
+@require_POST
+def packl_standard_speichern(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    _hat_skipper_oder_anbieter(request, toern)
+
+    data = json.loads(request.body)
+    typ = data.get('typ')
+    name = (data.get('name') or '').strip()
+    ist_default = bool(data.get('ist_default', False))
+
+    if typ not in ('personal', 'boot', 'skipper'):
+        return JsonResponse({'error': 'Ungültiger Typ'}, status=400)
+    if not name:
+        return JsonResponse({'error': 'Name fehlt'}, status=400)
+
+    vorlage = _get_or_create_vorlage(toern, typ, user=request.user)
+    standard, created = PacklisteStandard.objects.get_or_create(user=request.user, typ=typ, name=name)
+    standard.eintraege.all().delete()
+    PacklisteStandardEintrag.objects.bulk_create([
+        PacklisteStandardEintrag(standard=standard, name=n, menge=m)
+        for n, m in vorlage.eintraege.values_list('name', 'menge')
+    ])
+    if ist_default:
+        PacklisteStandard.objects.filter(user=request.user, typ=typ).exclude(id=standard.id).update(ist_default=False)
+    standard.ist_default = ist_default
+    standard.save()
+    return JsonResponse({'status': 'ok', 'id': standard.id, 'created': created})
+
+
+@login_required
+@require_POST
+def packl_standard_laden(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    _hat_skipper_oder_anbieter(request, toern)
+
+    data = json.loads(request.body)
+    standard = get_object_or_404(PacklisteStandard, id=data.get('standard_id'), user=request.user)
+
+    vorlage, _ = PacklisteVorlage.objects.get_or_create(toern=toern, typ=standard.typ)
+    vorlage.eintraege.all().delete()
+    PacklisteVorlageEintrag.objects.bulk_create([
+        PacklisteVorlageEintrag(vorlage=vorlage, name=n, menge=m)
+        for n, m in standard.eintraege.values_list('name', 'menge')
+    ])
+    return JsonResponse({'status': 'ok', 'typ': standard.typ})
+
+
+@login_required
+@require_POST
+def packl_standard_loeschen(request, standard_id):
+    standard = get_object_or_404(PacklisteStandard, id=standard_id, user=request.user)
+    standard.delete()
+    return JsonResponse({'status': 'ok'})
+
+
+@login_required
+@require_POST
+def packl_standard_default(request, standard_id):
+    standard = get_object_or_404(PacklisteStandard, id=standard_id, user=request.user)
+    standard.ist_default = not standard.ist_default
+    if standard.ist_default:
+        PacklisteStandard.objects.filter(user=request.user, typ=standard.typ).exclude(id=standard.id).update(ist_default=False)
+    standard.save()
+    return JsonResponse({'status': 'ok', 'ist_default': standard.ist_default})
+
 
 # ========================= MAHLZEITEN =========================
 

@@ -307,6 +307,37 @@ class PacklisteVorlageEintrag(models.Model):
         return f"{self.menge}x {self.name}"
 
 
+class PacklisteStandard(models.Model):
+    """Persönliche, benannte Packlisten-Standards eines Skippers — törnunabhängig wiederverwendbar."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='packliste_standards'
+    )
+    name = models.CharField(max_length=100)
+    typ = models.CharField(max_length=10, choices=[('personal', 'Persönlich'), ('boot', 'Boot'), ('skipper', 'Skipper')])
+    ist_default = models.BooleanField(
+        default=False,
+        help_text="Wird bei neuen Törns automatisch als Start-Vorlage verwendet (max. einer pro Typ)"
+    )
+    aktualisiert_am = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('user', 'typ', 'name')]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_typ_display()}) – {self.user}"
+
+
+class PacklisteStandardEintrag(models.Model):
+    standard = models.ForeignKey(PacklisteStandard, on_delete=models.CASCADE, related_name='eintraege')
+    name = models.CharField(max_length=255)
+    menge = models.PositiveIntegerField(default=1)
+
+    def __str__(self):
+        return f"{self.menge}x {self.name}"
+
+
 class PinnwandNachricht(models.Model):
     toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="pinnwand_nachrichten")
     autor = models.ForeignKey(
