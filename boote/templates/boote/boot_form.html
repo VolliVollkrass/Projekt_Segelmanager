@@ -71,7 +71,14 @@
 
                         {{ form.laenge.label_tag }} {{ form.laenge }}
                         {{ form.tiefe.label_tag }} {{ form.tiefe }}
+
+                        {{ form.funkrufzeichen.label_tag }} {{ form.funkrufzeichen }}
+                        {{ form.mmsi.label_tag }} {{ form.mmsi }}
                     </div>
+                    <p class="text-xs text-base-content/50 mt-2">
+                        Funkrufzeichen und MMSI stehen in den Schiffspapieren / im Chartervertrag —
+                        sie werden für das Mayday-Plakat am Funkgerät benötigt.
+                    </p>
 
                     <div class="mt-4">
                         {{ form.bild_boot.label_tag }}

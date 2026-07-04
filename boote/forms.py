@@ -63,6 +63,18 @@ class BootForm(forms.ModelForm):
                 "placeholder": "Google Maps Link"
             }),
 
+            "funkrufzeichen": forms.TextInput(attrs={
+                "class": "input input-bordered w-full",
+                "placeholder": "z.B. DGXY2"
+            }),
+
+            "mmsi": forms.TextInput(attrs={
+                "class": "input input-bordered w-full",
+                "placeholder": "9-stellig, z.B. 211234560",
+                "inputmode": "numeric",
+                "maxlength": "9"
+            }),
+
             "baujahr": forms.NumberInput(attrs={
                 "class": "input input-bordered w-full"
             }),
@@ -94,6 +106,12 @@ class BootForm(forms.ModelForm):
             return float(wert)
         except ValueError:
             raise forms.ValidationError("Bitte eine gültige Zahl eingeben (z.B. 13,5).")
+
+    def clean_mmsi(self):
+        mmsi = (self.cleaned_data.get("mmsi") or "").strip()
+        if mmsi and (not mmsi.isdigit() or len(mmsi) != 9):
+            raise forms.ValidationError("Die MMSI besteht aus genau 9 Ziffern.")
+        return mmsi
 
     def clean_laenge(self):
         return self._parse_dezimal(self.cleaned_data.get("laenge", ""))
