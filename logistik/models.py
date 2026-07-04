@@ -174,6 +174,7 @@ class PersönlicherGegenstand(models.Model):
     menge = models.PositiveIntegerField(default=1)
     erledigt = models.BooleanField(default=False)
     ist_vom_boot = models.BooleanField(default=False)
+    ist_skipper = models.BooleanField(default=False)
 
     def __str__(self):        
         return f"Von {self.participation.user.username}: {self.name} ({self.menge})  - {'vom Boot' if self.ist_vom_boot else 'persönlich'}"

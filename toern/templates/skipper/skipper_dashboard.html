@@ -564,7 +564,14 @@
         <div role="tablist" class="tabs tabs-boxed">
             <button role="tab" id="tab-personal" class="tab tab-active" onclick="setTyp('personal')">Persönlich</button>
             <button role="tab" id="tab-boot" class="tab" onclick="setTyp('boot')">Boot</button>
+            <button role="tab" id="tab-skipper" class="tab" onclick="setTyp('skipper')">Skipper</button>
         </div>
+
+        <!-- Hinweis Skipper-Liste -->
+        <p id="skipper-typ-hinweis" class="text-xs text-base-content/50 hidden">
+            Diese Liste geht nur an Skipper &amp; Co-Skipper und ist unabhängig vom Segelgebiet
+            (ein Revier-Wechsel setzt sie nicht zurück).
+        </p>
 
         <!-- Item-Liste -->
         <div id="vorlage-loading" class="flex justify-center py-6">
@@ -843,6 +850,13 @@
                 <div>
                     <p class="font-medium text-sm">Boot-Packliste</p>
                     <p class="text-xs opacity-60">Für alle Boote dieses Törns</p>
+                </div>
+            </label>
+            <label class="flex items-center gap-3 cursor-pointer bg-base-200 p-3 rounded-lg">
+                <input type="checkbox" id="apply-skipper" class="checkbox checkbox-primary" checked/>
+                <div>
+                    <p class="font-medium text-sm">Skipper-Packliste</p>
+                    <p class="text-xs opacity-60">Nur für Skipper &amp; Co-Skipper</p>
                 </div>
             </label>
         </div>
@@ -1226,7 +1240,8 @@ function bestaetigeRevierWechsel() {
 
 function setTyp(typ) {
     vorlageTyp = typ;
-    ['personal','boot'].forEach(t => { document.getElementById('tab-' + t).classList.toggle('tab-active', t === typ); });
+    ['personal','boot','skipper'].forEach(t => { document.getElementById('tab-' + t).classList.toggle('tab-active', t === typ); });
+    document.getElementById('skipper-typ-hinweis').classList.toggle('hidden', typ !== 'skipper');
     loadVorlage();
 }
 
@@ -1309,10 +1324,11 @@ function submitVorlageAnwenden() {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
         body: JSON.stringify({
             apply_personal: document.getElementById('apply-personal').checked,
-            apply_boot: document.getElementById('apply-boot').checked
+            apply_boot: document.getElementById('apply-boot').checked,
+            apply_skipper: document.getElementById('apply-skipper').checked
         })
     }).then(r => r.json()).then(data => {
-        resultEl.textContent = `✓ ${data.added.personal} persönliche & ${data.added.boot} Boot-Einträge ergänzt.`;
+        resultEl.textContent = `✓ ${data.added.personal} persönliche, ${data.added.boot} Boot- & ${data.added.skipper} Skipper-Einträge ergänzt.`;
         resultEl.classList.remove('hidden');
     });
 }

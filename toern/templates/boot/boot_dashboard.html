@@ -209,11 +209,35 @@
             </div>
         </div>
 
+        <!-- Skipper-Ausrüstung (nur Skipper/Co-Skipper, nicht editierbar) -->
+        {% if teilnahme.rolle == "skipper" or teilnahme.rolle == "coskipper" %}
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Skipper-Ausrüstung</h2>
+            <div id="packliste-skipper" class="flex flex-col gap-2">
+                {% for p in teilnahme.persoenliche_packliste.all %}
+                {% if p.ist_skipper %}
+                <div id="item-{{ p.id }}" class="flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors
+                    {% if p.erledigt %}bg-success/5 border-success/20{% else %}bg-base-100 border-base-300{% endif %}">
+                    <input type="checkbox" class="checkbox checkbox-sm"
+                        {% if p.erledigt %}checked{% endif %}
+                        onchange="toggleDone({{ p.id }})">
+                    <span class="flex-1 text-sm {% if p.erledigt %}line-through text-base-content/30{% endif %}">
+                        {{ p.name }}
+                    </span>
+                    <span class="text-xs text-base-content/40">({{ p.menge }})</span>
+                    <span class="badge badge-secondary badge-xs">Skipper</span>
+                </div>
+                {% endif %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
         <!-- Boot-Items (nicht editierbar) -->
         {% with boot_items=teilnahme.persoenliche_packliste.all %}
         {% if boot_items %}
         <div>
-            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Vom Boot vorgegeben</h2>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Ich bringe fürs Boot mit</h2>
             <div id="packliste-boot" class="flex flex-col gap-2">
                 {% for p in teilnahme.persoenliche_packliste.all %}
                 {% if p.ist_vom_boot %}
@@ -240,7 +264,7 @@
             <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Eigene Gegenstände</h2>
             <div id="packliste" class="flex flex-col gap-2">
                 {% for p in teilnahme.persoenliche_packliste.all %}
-                {% if not p.ist_vom_boot %}
+                {% if not p.ist_vom_boot and not p.ist_skipper %}
                 <div id="item-{{ p.id }}" class="flex items-center gap-3 px-4 py-3 rounded-xl border transition-colors
                     {% if p.erledigt %}bg-success/5 border-success/20{% else %}bg-base-100 border-base-300{% endif %}">
                     <input type="checkbox" class="checkbox checkbox-sm"
@@ -1166,7 +1190,7 @@ function removeAll(id) {
 }
 
 function updateProgress() {
-    const checkboxes = document.querySelectorAll('#packliste input[type="checkbox"], #packliste-boot input[type="checkbox"]');
+    const checkboxes = document.querySelectorAll('#packliste input[type="checkbox"], #packliste-boot input[type="checkbox"], #packliste-skipper input[type="checkbox"]');
     const total = checkboxes.length;
     const done = [...checkboxes].filter(cb => cb.checked).length;
     const percent = total > 0 ? Math.round((done / total) * 100) : 0;

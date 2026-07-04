@@ -13,7 +13,7 @@ from logistik.models import Einkaufspunkt, EinkaufslistenEintrag, Gegenstand, Ma
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
-from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE
+from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE, SKIPPER_LISTE
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
 from .crew_utils import fehlende_crew_felder
@@ -1865,17 +1865,6 @@ def boot_dashboard(request, toern_id):
     if not teilnahme:
         raise PermissionDenied
 
-    # 🔥 Basis-Packliste nur einmal erstellen
-    if not teilnahme.persoenliche_packliste.exists():
-        PersönlicherGegenstand.objects.bulk_create([
-            PersönlicherGegenstand(
-                participation=teilnahme,
-                name=name,
-                menge=menge
-            )
-            for name, menge in BASIS_PACKLISTE
-        ])
-
     # 🔐 Zugriff
     if not (
         teilnahme.status == "bestaetigt"
@@ -1884,11 +1873,39 @@ def boot_dashboard(request, toern_id):
     ):
         raise PermissionDenied
 
+    # 🔥 Persönliche Packliste nur einmal erstellen — aus der Törn-Vorlage
+    # (respektiert Warm/Kalt und Anpassungen des Skippers)
+    if not teilnahme.persoenliche_packliste.exists():
+        vorlage = _get_or_create_vorlage(toern, 'personal')
+        PersönlicherGegenstand.objects.bulk_create([
+            PersönlicherGegenstand(
+                participation=teilnahme,
+                name=name,
+                menge=menge
+            )
+            for name, menge in vorlage.eintraege.values_list('name', 'menge')
+        ])
+
+    # 🔥 Skipper/Co-Skipper bekommen zusätzlich die Skipper-Ausrüstung
+    if teilnahme.rolle in ("skipper", "coskipper"):
+        skipper_vorlage = _get_or_create_vorlage(toern, 'skipper')
+        existing = set(teilnahme.persoenliche_packliste.values_list('name', flat=True))
+        PersönlicherGegenstand.objects.bulk_create([
+            PersönlicherGegenstand(
+                participation=teilnahme,
+                name=name,
+                menge=menge,
+                ist_skipper=True
+            )
+            for name, menge in skipper_vorlage.eintraege.values_list('name', 'menge')
+            if name not in existing
+        ])
+
     boot = teilnahme.boot
 
-    # 🔥 Standardliste erstellen, wenn leer
+    # 🔥 Boots-Gemeinschaftsliste erstellen, wenn leer — ebenfalls aus der Vorlage
     if not Gegenstand.objects.filter(boot=boot, toern=toern).exists():
-
+        boot_vorlage = _get_or_create_vorlage(toern, 'boot')
         Gegenstand.objects.bulk_create([
             Gegenstand(
                 boot=boot,
@@ -1896,7 +1913,7 @@ def boot_dashboard(request, toern_id):
                 name=name,
                 menge=menge
             )
-            for name, menge in BOOT_STANDARD_LISTE
+            for name, menge in boot_vorlage.eintraege.values_list('name', 'menge')
         ])
 
     # 👥 Crew
@@ -2190,18 +2207,19 @@ def add_packitem(request, toern_id):
     if not teilnahme:
         raise PermissionDenied
 
-    name = request.POST.get("name")
+    name = (request.POST.get("name") or "").strip()
     menge = request.POST.get("menge") or 1
 
-    PersönlicherGegenstand.objects.create(
+    if not name:
+        return JsonResponse({"error": "Name fehlt"}, status=400)
+
+    item = PersönlicherGegenstand.objects.create(
         participation=teilnahme,
         name=name,
         menge=int(menge)
     )
 
-    name = request.POST.get("name")
-    if not name:
-        return JsonResponse({"error": "Name fehlt"}, status=400)
+    return JsonResponse({"status": "ok", "id": item.id})
 
 @login_required
 @require_POST
@@ -2731,6 +2749,8 @@ def _get_or_create_vorlage(toern, typ):
     if created:
         if typ == 'personal':
             source = KALT_PACKLISTE if revier_typ == 'kalt' else BASIS_PACKLISTE
+        elif typ == 'skipper':
+            source = SKIPPER_LISTE
         else:
             source = KALT_BOOT_LISTE if revier_typ == 'kalt' else BOOT_STANDARD_LISTE
         PacklisteVorlageEintrag.objects.bulk_create([
@@ -2777,7 +2797,7 @@ def vorlage_items_get(request, toern_id, typ):
     toern = get_object_or_404(Toern, id=toern_id)
     _hat_skipper_oder_anbieter(request, toern)
 
-    if typ not in ('personal', 'boot'):
+    if typ not in ('personal', 'boot', 'skipper'):
         return JsonResponse({'error': 'Ungültiger Typ'}, status=400)
 
     vorlage = _get_or_create_vorlage(toern, typ)
@@ -2838,8 +2858,9 @@ def vorlage_anwenden(request, toern_id):
     data = json.loads(request.body)
     apply_personal = data.get('apply_personal', True)
     apply_boot = data.get('apply_boot', True)
+    apply_skipper = data.get('apply_skipper', True)
 
-    added = {'personal': 0, 'boot': 0}
+    added = {'personal': 0, 'boot': 0, 'skipper': 0}
 
     if apply_personal:
         vorlage = _get_or_create_vorlage(toern, 'personal')
@@ -2853,6 +2874,19 @@ def vorlage_anwenden(request, toern_id):
             ]
             PersönlicherGegenstand.objects.bulk_create(to_create)
             added['personal'] += len(to_create)
+
+    if apply_skipper:
+        vorlage = _get_or_create_vorlage(toern, 'skipper')
+        template_items = list(vorlage.eintraege.values_list('name', 'menge'))
+        for t in toern.teilnahmen.filter(status='bestaetigt', rolle__in=['skipper', 'coskipper']):
+            existing = set(t.persoenliche_packliste.values_list('name', flat=True))
+            to_create = [
+                PersönlicherGegenstand(participation=t, name=name, menge=menge, ist_skipper=True)
+                for name, menge in template_items
+                if name not in existing
+            ]
+            PersönlicherGegenstand.objects.bulk_create(to_create)
+            added['skipper'] += len(to_create)
 
     if apply_boot:
         vorlage = _get_or_create_vorlage(toern, 'boot')
