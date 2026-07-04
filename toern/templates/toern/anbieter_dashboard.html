@@ -183,6 +183,7 @@
 
                 <div class="flex flex-wrap gap-2">
                     <a href="{% url 'skipper_dashboard' toern.id %}" class="btn btn-sm btn-outline">Skipper Dashboard</a>
+                    <a href="{% url 'toern_edit' toern.id %}" class="btn btn-sm btn-outline">Bearbeiten</a>
                     <a href="{% url 'toern_detail' toern.id %}" class="btn btn-sm btn-ghost">Details</a>
                     <form method="post" action="{% url 'toern_delete' toern.id %}" onsubmit="return confirm('Törn \'{{ toern.titel }}\' wirklich löschen? Alle Anmeldungen werden ebenfalls gelöscht.')">
                         {% csrf_token %}

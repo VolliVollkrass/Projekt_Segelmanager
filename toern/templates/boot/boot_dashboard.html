@@ -960,6 +960,8 @@
                             <div class="flex items-center gap-2 shrink-0">
                                 <span class="font-bold text-sm whitespace-nowrap">{{ a.betrag|floatformat:2 }} €</span>
                                 {% if request.user == a.erstellt_von or request.user == a.bezahlt_von.user or kasse_darf_verwalten %}
+                                    <button type="button" class="btn btn-ghost btn-xs" title="Bearbeiten"
+                                            onclick="openAusgabeEdit({{ a.id }}, '{{ a.beschreibung|escapejs }}', '{{ a.betrag|floatformat:2 }}', {{ a.bezahlt_von.id }}, '{% for b in a.beteiligt.all %}{{ b.id }}{% if not forloop.last %},{% endif %}{% endfor %}')">✏️</button>
                                     <form method="post" action="{% url 'ausgabe_loeschen' a.id %}"
                                           onsubmit="return confirm('Ausgabe „{{ a.beschreibung|escapejs }}“ wirklich löschen?');">
                                         {% csrf_token %}
@@ -978,6 +980,66 @@
     </div>
 
 </div>
+
+<!-- Ausgabe-Bearbeiten Modal -->
+<dialog id="ausgabeEditModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-4">Ausgabe bearbeiten</h3>
+        <form id="ausgabe-edit-form" method="post" action="" class="space-y-3">
+            {% csrf_token %}
+            <div class="grid md:grid-cols-2 gap-3">
+                <div class="form-control">
+                    <label class="label py-1"><span class="label-text text-xs">Beschreibung</span></label>
+                    <input type="text" name="beschreibung" id="ae-beschreibung" required maxlength="200"
+                           class="input input-bordered input-sm w-full">
+                </div>
+                <div class="form-control">
+                    <label class="label py-1"><span class="label-text text-xs">Betrag (€)</span></label>
+                    <input type="text" name="betrag" id="ae-betrag" required inputmode="decimal"
+                           class="input input-bordered input-sm w-full">
+                </div>
+            </div>
+            <div class="form-control">
+                <label class="label py-1"><span class="label-text text-xs">Bezahlt von</span></label>
+                <select name="bezahlt_von" id="ae-bezahlt-von" class="select select-bordered select-sm w-full">
+                    {% for t in crew_bestaetigt %}
+                        <option value="{{ t.id }}">{{ t.user.first_name }} {{ t.user.last_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-control">
+                <label class="label py-1"><span class="label-text text-xs">Beteiligt (Kosten werden geteilt)</span></label>
+                <div class="grid grid-cols-2 gap-2">
+                    {% for t in crew_bestaetigt %}
+                        <label class="flex items-center gap-2 cursor-pointer text-sm">
+                            <input type="checkbox" name="beteiligt" value="{{ t.id }}"
+                                   class="checkbox checkbox-sm checkbox-primary ae-beteiligt">
+                            {{ t.user.first_name }}
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="modal-action mt-2">
+                <button type="button" class="btn btn-ghost" onclick="ausgabeEditModal.close()">Abbrechen</button>
+                <button type="submit" class="btn btn-primary">Speichern</button>
+            </div>
+        </form>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+<script>
+function openAusgabeEdit(id, beschreibung, betrag, bezahltVonId, beteiligtIds) {
+    document.getElementById('ausgabe-edit-form').action = `/finance/ausgabe/${id}/bearbeiten/`;
+    document.getElementById('ae-beschreibung').value = beschreibung;
+    document.getElementById('ae-betrag').value = betrag;
+    document.getElementById('ae-bezahlt-von').value = String(bezahltVonId);
+    const ids = beteiligtIds.split(',').filter(Boolean);
+    document.querySelectorAll('.ae-beteiligt').forEach(cb => {
+        cb.checked = ids.includes(cb.value);
+    });
+    document.getElementById('ausgabeEditModal').showModal();
+}
+</script>
 
 <!-- ========================= JS ========================= -->
 <script>

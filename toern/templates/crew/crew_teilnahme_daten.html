@@ -175,18 +175,40 @@
                         </div>
 
                         <div class="form-control md:col-span-2">
+                            <label class="flex items-center gap-3 cursor-pointer bg-base-200 rounded-lg p-3">
+                                {{ form.keine_unvertraeglichkeiten }}
+                                <span class="label-text font-medium">Keine Unverträglichkeiten und keine Allergien</span>
+                            </label>
+                        </div>
+
+                        <div class="form-control md:col-span-2" id="feld-unvertraeglichkeiten">
                             <label class="label">
                                 <span class="label-text">Lebensmittelunverträglichkeiten</span>
                             </label>
                             {{ form.lebensmittelunvertraeglichkeiten }}
                         </div>
 
-                        <div class="form-control md:col-span-2">
+                        <div class="form-control md:col-span-2" id="feld-allergien">
                             <label class="label">
                                 <span class="label-text">Sonstige Allergien</span>
                             </label>
                             {{ form.allergien }}
                         </div>
+
+                        <script>
+                        (function () {
+                            const cb = document.getElementById("{{ form.keine_unvertraeglichkeiten.id_for_label }}");
+                            const felder = [
+                                document.getElementById("feld-unvertraeglichkeiten"),
+                                document.getElementById("feld-allergien"),
+                            ];
+                            function toggle() {
+                                felder.forEach(f => f.classList.toggle("hidden", cb.checked));
+                            }
+                            cb.addEventListener("change", toggle);
+                            toggle();
+                        })();
+                        </script>
 
                     </div>
                 </div>

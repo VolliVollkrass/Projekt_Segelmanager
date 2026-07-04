@@ -13,7 +13,8 @@
 
     <!-- Profil-Banner -->
     {% if profil_prozent < 100 %}
-    <a href="{% url 'account_edit' %}"
+    {# Zeigt aufs Törn-Formular (inkl. Essenspräferenzen), solange ein kommender Törn existiert #}
+    <a href="{% if naechste_teilnahme %}{% url 'teilnahme_daten_edit' naechste_teilnahme.toern.id %}{% else %}{% url 'account_edit' %}{% endif %}"
        class="flex items-center gap-3 bg-warning/10 border border-warning/30 rounded-xl p-4 mb-6 hover:bg-warning/20 transition-colors">
         <div class="shrink-0 w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">

@@ -86,6 +86,59 @@ def ausgabe_erstellen(request, toern_id, boot_id):
 
 @login_required
 @require_POST
+def ausgabe_bearbeiten(request, ausgabe_id):
+    ausgabe = get_object_or_404(
+        Ausgabe.objects.select_related("toern", "boot", "bezahlt_von__user"),
+        id=ausgabe_id,
+    )
+    toern, boot = ausgabe.toern, ausgabe.boot
+
+    darf_bearbeiten = (
+        request.user == ausgabe.erstellt_von
+        or request.user == ausgabe.bezahlt_von.user
+        or request.user == toern.anbieter
+        or _ist_toern_skipper(request.user, toern)
+    )
+    if not darf_bearbeiten:
+        raise PermissionDenied
+
+    kasse_url = f"{reverse('boot_dashboard', args=[toern.id])}?tab=kasse"
+
+    beschreibung = request.POST.get("beschreibung", "").strip()
+    betrag = _parse_betrag(request.POST.get("betrag"))
+    bezahlt_von_id = request.POST.get("bezahlt_von")
+    beteiligt_ids = request.POST.getlist("beteiligt")
+
+    if not beschreibung or betrag is None:
+        messages.error(request, "Bitte Beschreibung und einen gültigen Betrag angeben.")
+        return redirect(kasse_url)
+
+    zahler = Teilnahme.objects.filter(
+        id=bezahlt_von_id, toern=toern, boot=boot, status="bestaetigt"
+    ).first()
+    if not zahler:
+        messages.error(request, "Ungültiger Zahler.")
+        return redirect(kasse_url)
+
+    beteiligte = Teilnahme.objects.filter(
+        id__in=beteiligt_ids, toern=toern, boot=boot, status="bestaetigt"
+    )
+    if not beteiligte.exists():
+        messages.error(request, "Bitte mindestens eine beteiligte Person auswählen.")
+        return redirect(kasse_url)
+
+    ausgabe.beschreibung = beschreibung
+    ausgabe.betrag = betrag
+    ausgabe.bezahlt_von = zahler
+    ausgabe.save()
+    ausgabe.beteiligt.set(beteiligte)
+
+    messages.success(request, f"Ausgabe „{beschreibung}“ aktualisiert.")
+    return redirect(kasse_url)
+
+
+@login_required
+@require_POST
 def ausgabe_loeschen(request, ausgabe_id):
     ausgabe = get_object_or_404(
         Ausgabe.objects.select_related("toern", "boot", "bezahlt_von__user"),
