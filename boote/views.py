@@ -3,7 +3,7 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from .models import Boot
 from .forms import BootForm, KabineFormSet
-from toern.models import Toern
+from toern.models import Toern, Teilnahme
 from django.contrib.auth.decorators import login_required
 from utils.permissions import anbieter_required
 from django.core.exceptions import PermissionDenied
@@ -11,6 +11,15 @@ from django.core.exceptions import PermissionDenied
 
 def is_owner_or_admin(user, obj):
     return user == obj.toern.anbieter or user.is_superuser
+
+
+def _darf_boot_bearbeiten(user, boot):
+    """Anbieter des Törns, Superuser oder Skipper/Co-Skipper des Törns."""
+    if is_owner_or_admin(user, boot):
+        return True
+    return Teilnahme.objects.filter(
+        user=user, toern=boot.toern, rolle__in=["skipper", "coskipper"]
+    ).exists()
 
 
 # =========================
@@ -54,11 +63,11 @@ def boot_create(request, toern_id):
 # UPDATE
 # =========================
 @login_required
-@anbieter_required
 def boot_update(request, pk):
     boot = get_object_or_404(Boot, pk=pk)
 
-    if request.user != boot.toern.anbieter and not request.user.is_superuser:
+    # Auch Skipper/Co-Skipper des Törns dürfen Bootsdaten pflegen (z.B. Funkrufzeichen/MMSI)
+    if not _darf_boot_bearbeiten(request.user, boot):
         raise PermissionDenied
 
     if request.method == "POST":

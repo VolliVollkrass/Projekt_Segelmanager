@@ -28,6 +28,8 @@ class Boot(models.Model):
         ) 
     hafen = models.CharField(max_length=100, blank=True)
     hafen_googlemaps = models.CharField(max_length=100, blank=True)  # für Google Maps Suche
+    funkrufzeichen = models.CharField(max_length=20, blank=True, verbose_name="Funkrufzeichen (Call Sign)")
+    mmsi = models.CharField(max_length=9, blank=True, verbose_name="MMSI")
     baujahr = models.PositiveIntegerField(blank=True, null=True)
     laenge = models.FloatField(blank=True, null=True)
     tiefe = models.FloatField(blank=True, null=True)
