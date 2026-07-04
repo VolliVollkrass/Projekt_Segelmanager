@@ -53,5 +53,33 @@
 
     {% include "includes/bottom_nav.html" %}
     <script src="https://unpkg.com/cropperjs"></script>
+
+    <script>
+    // In der iOS-WebApp (Standalone) öffnen PDFs ohne Navigations-Chrome und ohne Weg zurück.
+    // Daher werden dort alle PDF-Links durch den In-App-Viewer (/pdf-viewer/) geleitet —
+    // mit Zurück-, Teilen- und Download-Button. Im normalen Browser bleibt alles wie gewohnt.
+    (function () {
+        const standalone = window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true;
+        if (!standalone) return;
+
+        document.addEventListener('click', function (e) {
+            const a = e.target.closest('a[href]');
+            if (!a || a.dataset.noPdfViewer !== undefined) return;
+            let url;
+            try { url = new URL(a.href, location.origin); } catch { return; }
+            if (url.origin !== location.origin) return;
+            const pfad = url.pathname;
+            if (pfad.startsWith('/pdf-viewer/')) return;
+            if (!(pfad.endsWith('/pdf/') || pfad.toLowerCase().endsWith('.pdf'))) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+            const titel = (a.title || a.textContent || 'Dokument').trim().slice(0, 80);
+            location.href = '/pdf-viewer/?src=' + encodeURIComponent(pfad + url.search)
+                + '&titel=' + encodeURIComponent(titel);
+        }, true);
+    })();
+    </script>
   </body>
 </html>

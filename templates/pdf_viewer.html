@@ -1,0 +1,125 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="de" data-theme="segelmanager">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{{ titel }} — Meer erleben</title>
+    <link rel="stylesheet" href="{% static 'css/src/output.css' %}">
+    <style>
+        body { background: #e5e7eb; }
+        #pdf-seiten canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            margin: 0 auto 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+            background: white;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div class="sticky top-0 z-20 bg-primary text-primary-content shadow-md"
+     style="padding-top: env(safe-area-inset-top);">
+    <div class="flex items-center gap-2 px-3 py-2.5">
+        <button onclick="zurueck()" class="btn btn-ghost btn-sm text-primary-content px-2 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+            </svg>
+            Zurück
+        </button>
+        <p class="flex-1 text-sm font-semibold truncate text-center">{{ titel }}</p>
+        <button onclick="teilen()" id="btn-teilen" class="btn btn-ghost btn-sm text-primary-content px-2 shrink-0" title="Teilen (z.B. Signal, WhatsApp, Mail)">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/>
+            </svg>
+        </button>
+        <a href="{{ src }}" download="{{ dateiname }}" class="btn btn-ghost btn-sm text-primary-content px-2 shrink-0" title="Herunterladen">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+        </a>
+    </div>
+</div>
+
+<!-- Inhalt -->
+<div class="max-w-3xl mx-auto px-2 py-3" style="padding-bottom: calc(env(safe-area-inset-bottom) + 12px);">
+    <div id="pdf-laden" class="flex flex-col items-center gap-3 py-16 text-base-content/60">
+        <span class="loading loading-spinner loading-lg"></span>
+        <p class="text-sm">PDF wird geladen …</p>
+    </div>
+    <div id="pdf-fehler" class="hidden text-center py-16">
+        <p class="font-semibold text-error mb-2">PDF konnte nicht geladen werden.</p>
+        <a href="{{ src }}" class="btn btn-sm btn-outline">Direkt öffnen</a>
+    </div>
+    <div id="pdf-seiten"></div>
+</div>
+
+<script>
+const PDF_SRC = "{{ src|escapejs }}";
+const PDF_DATEINAME = "{{ dateiname|escapejs }}";
+const PDF_TITEL = "{{ titel|escapejs }}";
+
+function zurueck() {
+    if (history.length > 1) { history.back(); }
+    else { location.href = "/"; }
+}
+
+async function teilen() {
+    const btn = document.getElementById('btn-teilen');
+    try {
+        const resp = await fetch(PDF_SRC);
+        const blob = await resp.blob();
+        const file = new File([blob], PDF_DATEINAME, { type: 'application/pdf' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: PDF_TITEL });
+            return;
+        }
+    } catch (e) {
+        if (e.name === 'AbortError') return; // Nutzer hat das Teilen-Menü geschlossen
+    }
+    // Fallback: Download anstoßen (Desktop-Browser ohne Web-Share)
+    const a = document.createElement('a');
+    a.href = PDF_SRC;
+    a.download = PDF_DATEINAME;
+    a.click();
+}
+</script>
+
+<script type="module">
+import * as pdfjsLib from "{% static 'js/pdfjs/pdf.min.mjs' %}";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "{% static 'js/pdfjs/pdf.worker.min.mjs' %}";
+
+const container = document.getElementById('pdf-seiten');
+
+try {
+    // PDF.js v6 erwartet ein Parameter-Objekt mit absoluter URL
+    const pdf = await pdfjsLib.getDocument({ url: new URL(PDF_SRC, location.origin).href }).promise;
+    document.getElementById('pdf-laden').classList.add('hidden');
+
+    const breite = Math.min(container.clientWidth, 900);
+    const pixelRatio = window.devicePixelRatio || 1;
+
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const base = page.getViewport({ scale: 1 });
+        const scale = (breite / base.width) * pixelRatio;
+        const viewport = page.getViewport({ scale });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        container.appendChild(canvas);
+
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    }
+} catch (e) {
+    document.getElementById('pdf-laden').classList.add('hidden');
+    document.getElementById('pdf-fehler').classList.remove('hidden');
+}
+</script>
+
+</body>
+</html>
