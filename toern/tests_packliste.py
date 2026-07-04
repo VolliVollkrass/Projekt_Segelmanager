@@ -11,7 +11,7 @@ from django.utils import timezone
 from boote.models import Boot
 from logistik.models import PersönlicherGegenstand
 from utils.packliste import SKIPPER_LISTE
-from .models import Toern, Teilnahme, PacklisteVorlage
+from .models import Toern, Teilnahme, PacklisteVorlage, PacklisteStandard, PacklisteStandardEintrag
 from .views import _get_or_create_vorlage
 
 User = get_user_model()
@@ -143,6 +143,109 @@ class BootDashboardInitTests(PacklisteTestBase):
         resp = self.client.get(reverse("boot_dashboard", args=[self.toern.id]))
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(t.persoenliche_packliste.exists())
+
+
+class PacklisteStandardTests(PacklisteTestBase):
+    def _speichern(self, user, **payload):
+        self.client.force_login(user)
+        return self.client.post(
+            reverse("packl_standard_speichern", args=[self.toern.id]),
+            data=json.dumps(payload),
+            content_type="application/json",
+        )
+
+    def test_speichern_kopiert_toern_vorlage(self):
+        vorlage = _get_or_create_vorlage(self.toern, "skipper")
+        vorlage.eintraege.create(name="Extra-Item", menge=3)
+        resp = self._speichern(self.skipper, typ="skipper", name="Mein Charter-Set")
+        self.assertEqual(resp.status_code, 200)
+        standard = PacklisteStandard.objects.get(user=self.skipper, typ="skipper", name="Mein Charter-Set")
+        self.assertTrue(standard.eintraege.filter(name="Extra-Item", menge=3).exists())
+        self.assertEqual(standard.eintraege.count(), len(SKIPPER_LISTE) + 1)
+
+    def test_speichern_gleicher_name_ueberschreibt(self):
+        self._speichern(self.skipper, typ="personal", name="Mittelmeer")
+        self._speichern(self.skipper, typ="personal", name="Mittelmeer")
+        self.assertEqual(
+            PacklisteStandard.objects.filter(user=self.skipper, typ="personal", name="Mittelmeer").count(), 1
+        )
+
+    def test_default_ist_exklusiv_pro_typ(self):
+        self._speichern(self.skipper, typ="personal", name="A", ist_default=True)
+        self._speichern(self.skipper, typ="personal", name="B", ist_default=True)
+        defaults = PacklisteStandard.objects.filter(user=self.skipper, typ="personal", ist_default=True)
+        self.assertEqual(defaults.count(), 1)
+        self.assertEqual(defaults.first().name, "B")
+
+    def test_crew_darf_nicht_speichern(self):
+        resp = self._speichern(self.crew, typ="personal", name="Hack")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_laden_ersetzt_toern_vorlage(self):
+        standard = PacklisteStandard.objects.create(user=self.skipper, typ="personal", name="Minimal")
+        PacklisteStandardEintrag.objects.create(standard=standard, name="Zahnbürste", menge=1)
+        self.client.force_login(self.skipper)
+        resp = self.client.post(
+            reverse("packl_standard_laden", args=[self.toern.id]),
+            data=json.dumps({"standard_id": standard.id}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        vorlage = PacklisteVorlage.objects.get(toern=self.toern, typ="personal")
+        self.assertEqual(list(vorlage.eintraege.values_list("name", flat=True)), ["Zahnbürste"])
+
+    def test_fremder_standard_laden_404(self):
+        fremd = PacklisteStandard.objects.create(user=self.coskipper, typ="personal", name="Fremd")
+        self.client.force_login(self.skipper)
+        resp = self.client.post(
+            reverse("packl_standard_laden", args=[self.toern.id]),
+            data=json.dumps({"standard_id": fremd.id}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_fremder_standard_loeschen_404(self):
+        fremd = PacklisteStandard.objects.create(user=self.coskipper, typ="personal", name="Fremd")
+        self.client.force_login(self.skipper)
+        resp = self.client.post(reverse("packl_standard_loeschen", args=[fremd.id]))
+        self.assertEqual(resp.status_code, 404)
+        self.assertTrue(PacklisteStandard.objects.filter(id=fremd.id).exists())
+
+    def test_default_standard_wird_bei_neuem_toern_verwendet(self):
+        standard = PacklisteStandard.objects.create(
+            user=self.skipper, typ="personal", name="Meins", ist_default=True
+        )
+        PacklisteStandardEintrag.objects.create(standard=standard, name="Lieblingsmesser", menge=1)
+
+        neuer_toern = _toern(self.anbieter, titel="Neuer Törn")
+        Teilnahme.objects.create(
+            toern=neuer_toern, user=self.skipper, status="bestaetigt", rolle="skipper"
+        )
+        vorlage = _get_or_create_vorlage(neuer_toern, "personal", user=self.skipper)
+        self.assertEqual(list(vorlage.eintraege.values_list("name", flat=True)), ["Lieblingsmesser"])
+
+    def test_default_standard_greift_nicht_fuer_crew(self):
+        standard = PacklisteStandard.objects.create(
+            user=self.crew, typ="personal", name="Crew-Standard", ist_default=True
+        )
+        PacklisteStandardEintrag.objects.create(standard=standard, name="Crew-Item", menge=1)
+
+        neuer_toern = _toern(self.anbieter, titel="Neuer Törn 2")
+        Teilnahme.objects.create(
+            toern=neuer_toern, user=self.crew, status="bestaetigt", rolle="crew"
+        )
+        vorlage = _get_or_create_vorlage(neuer_toern, "personal", user=self.crew)
+        namen = list(vorlage.eintraege.values_list("name", flat=True))
+        self.assertNotIn("Crew-Item", namen)
+        self.assertIn("Reisepass / Ausweis", namen)
+
+    def test_standard_list_nur_eigene(self):
+        PacklisteStandard.objects.create(user=self.skipper, typ="personal", name="Meins")
+        PacklisteStandard.objects.create(user=self.coskipper, typ="personal", name="Fremd")
+        self.client.force_login(self.skipper)
+        resp = self.client.get(reverse("packl_standard_list"), {"typ": "personal"})
+        namen = [s["name"] for s in resp.json()["standards"]]
+        self.assertEqual(namen, ["Meins"])
 
 
 class AddPackitemTests(PacklisteTestBase):
