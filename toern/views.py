@@ -14,7 +14,7 @@ from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE, SKIPPER_LISTE
-from utils.rezept_skalierung import skaliere_menge
+from utils.rezept_skalierung import skaliere_menge, summiere_mengen
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, PacklisteStandard, PacklisteStandardEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
 from .crew_utils import fehlende_crew_felder
@@ -4091,44 +4091,9 @@ def _detect_kategorie(name):
             return kat
     return 'sonstiges'
 
-def _fmt_einkauf_num(n):
-    return str(int(n)) if n == int(n) else str(round(n, 1)).replace('.', ',')
-
-def _scale_einkauf_menge(menge, factor):
-    import re as _re
-    if not menge or factor == 1:
-        return menge or ''
-    menge = menge.strip()
-    m = _re.match(r'^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)(.*)', menge)
-    if m:
-        lo = float(m.group(1).replace(',', '.')) * factor
-        hi = float(m.group(2).replace(',', '.')) * factor
-        return f"{_fmt_einkauf_num(lo)}–{_fmt_einkauf_num(hi)}{m.group(3)}"
-    m = _re.match(r'^(\d+(?:[.,]\d+)?)(.*)', menge)
-    if m:
-        num = float(m.group(1).replace(',', '.')) * factor
-        return f"{_fmt_einkauf_num(num)}{m.group(2)}"
-    return menge
-
-def _merge_mengen(menge_list):
-    import re as _re
-    totals = {}   # unit -> float
-    leftovers = []
-    for raw in menge_list:
-        if not raw:
-            continue
-        raw = raw.strip()
-        m = _re.match(r'^(\d+(?:[.,]\d+)?)\s*(.*)', raw)
-        if m:
-            num  = float(m.group(1).replace(',', '.'))
-            unit = m.group(2).strip()
-            totals[unit] = totals.get(unit, 0.0) + num
-        else:
-            if raw not in leftovers:
-                leftovers.append(raw)
-    parts = [f"{_fmt_einkauf_num(v)} {k}".strip() for k, v in totals.items()]
-    parts += leftovers
-    return " + ".join(parts) if parts else ""
+# Skalieren + Zusammenfassen: gemeinsame Logik in utils/rezept_skalierung.py
+# (kann auch "ca. 1 kg", "½ Bund", "1/2 TL" — vorher blieben die unskaliert)
+_merge_mengen = summiere_mengen
 
 _STANDARD_ARTIKEL = [
     # (name, menge_template, kategorie)  — {crew} = crew count, {wasser} = crew*5
@@ -4172,7 +4137,7 @@ def einkaufsliste_generieren(request, toern_id, boot_id):
         for z in mz.rezept.zutaten.all():
             key = z.name.lower().strip()
             raw[key]['name'] = raw[key]['name'] or z.name
-            raw[key]['mengen'].append(_scale_einkauf_menge(z.menge, factor))
+            raw[key]['mengen'].append(skaliere_menge(z.menge, factor))
             if mz.rezept.name not in raw[key]['rezepte']:
                 raw[key]['rezepte'].append(mz.rezept.name)
 
