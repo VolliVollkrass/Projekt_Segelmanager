@@ -14,6 +14,7 @@ from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE, SKIPPER_LISTE
+from utils.rezept_skalierung import skaliere_menge
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, PacklisteStandard, PacklisteStandardEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
 from .crew_utils import fehlende_crew_felder
@@ -373,6 +374,7 @@ def crew_overview(request):
     teilnahmen = (
         Teilnahme.objects
         .filter(user=request.user)
+        .exclude(status="abgelehnt")
         .select_related("toern")
         .order_by("toern__startdatum")
     )
@@ -430,8 +432,10 @@ def crew_dashboard(request, toern_id):
         toern=toern
     ).select_related("boot").first()
 
-    if not teilnahme:
-        return render(request, "403.html")
+    # Abgelehnte Teilnehmer haben keinen Zugriff mehr
+    # (render("403.html") war ein latenter 500er — das Template existiert nicht)
+    if not teilnahme or teilnahme.status == "abgelehnt":
+        raise PermissionDenied
 
     if teilnahme.status == "warteliste":
         messages.warning(request, "Du bist aktuell auf der Warteliste.")
@@ -790,7 +794,12 @@ def skipper_dashboard(request, toern_id):
     # =========================
     teilnahmen = Teilnahme.objects.filter(
         toern=toern
-    ).select_related("user", "boot", "kabine")
+    ).exclude(status="abgelehnt").select_related("user", "boot", "kabine")
+
+    # Abgelehnte nur als Info-Notiz für Skipper (nicht in den Hauptlisten)
+    abgelehnte = Teilnahme.objects.filter(
+        toern=toern, status="abgelehnt"
+    ).select_related("user").order_by("user__last_name")
 
     # Fortschritt berechnen
     teilnahme_map = {}
@@ -1007,6 +1016,7 @@ def skipper_dashboard(request, toern_id):
         "kritische_konflikte": kritische_konflikte,
         "teilnahmen": teilnahmen,
         "warteliste": warteliste,
+        "abgelehnte": abgelehnte,
         "teilnahme_map": teilnahme_map,
 
         # Stats
@@ -3844,30 +3854,8 @@ def tagesplan_kochplan_pdf(request, toern_id, boot_id):
         .prefetch_related('rezept__zutaten')
     )
 
-    # Mengen skalieren: versucht führende Zahl zu parsen und mit Faktor zu multiplizieren
-    def _fmt(n):
-        if n != n:  # NaN guard
-            return ""
-        if n == int(n):
-            return str(int(n))
-        return str(round(n, 1)).replace('.', ',')
-
-    def scale_menge(menge, factor):
-        if not menge:
-            return ""
-        menge = menge.strip()
-        # Bereich "2-3" oder "2–3"
-        range_m = re.match(r'^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)(.*)', menge)
-        if range_m:
-            lo = float(range_m.group(1).replace(',', '.')) * factor
-            hi = float(range_m.group(2).replace(',', '.')) * factor
-            return f"{_fmt(lo)}–{_fmt(hi)}{range_m.group(3)}"
-        # Einzelne Zahl am Anfang
-        single_m = re.match(r'^(\d+(?:[.,]\d+)?)(.*)', menge)
-        if single_m:
-            num = float(single_m.group(1).replace(',', '.')) * factor
-            return f"{_fmt(num)}{single_m.group(2)}"
-        return menge  # kein parse-barer Wert → unverändert
+    # Mengen skalieren — gemeinsame Logik mit dem Einzel-Rezept-PDF
+    scale_menge = skaliere_menge
 
     # Tage aufbauen
     tage = []

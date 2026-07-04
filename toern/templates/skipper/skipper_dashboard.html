@@ -115,9 +115,14 @@
                             {% csrf_token %}
                             <button class="btn btn-success btn-sm">Bestätigen</button>
                         </form>
-                        <form method="POST" action="{% url 'warteliste_ablehnen' t.id %}">
+                        <form method="POST" action="{% url 'warteliste_ablehnen' t.id %}"
+                              onsubmit="return confirm('{{ t.user.first_name }} {{ t.user.last_name }} wirklich ablehnen? Die Person verliert den Zugriff auf den Törn und wird per Mail informiert.');">
                             {% csrf_token %}
-                            <button class="btn btn-error btn-outline btn-sm">Ablehnen</button>
+                            <button class="btn btn-ghost btn-sm text-error px-2" title="Ablehnen">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -443,25 +448,35 @@
                     </div>
                     {% endif %}
                     {% if t.status == 'angemeldet' %}
-                    <div class="flex gap-2 mt-3 pt-3 border-t border-base-200">
+                    <div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-200">
                         <form method="POST" action="{% url 'teilnehmer_bestaetigen' t.id %}" class="flex-1">
                             {% csrf_token %}
                             <button class="btn btn-success btn-sm w-full">Bestätigen</button>
                         </form>
-                        <form method="POST" action="{% url 'teilnehmer_ablehnen' t.id %}" class="flex-1">
+                        <form method="POST" action="{% url 'teilnehmer_ablehnen' t.id %}" class="shrink-0"
+                              onsubmit="return confirm('{{ t.user.first_name }} {{ t.user.last_name }} wirklich ablehnen? Die Person verliert den Zugriff auf den Törn und wird per Mail informiert.');">
                             {% csrf_token %}
-                            <button class="btn btn-error btn-outline btn-sm w-full">Ablehnen</button>
+                            <button class="btn btn-ghost btn-sm text-error px-2" title="Ablehnen">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
                         </form>
                     </div>
                     {% elif t.status == 'bestaetigt' and t.rolle == 'crew' %}
-                    <div class="flex gap-2 mt-3 pt-3 border-t border-base-200">
+                    <div class="flex items-center gap-2 mt-3 pt-3 border-t border-base-200">
                         <form method="POST" action="{% url 'teilnehmer_zuruecksetzen' t.id %}" class="flex-1">
                             {% csrf_token %}
                             <button class="btn btn-warning btn-outline btn-sm w-full">Zurücksetzen</button>
                         </form>
-                        <form method="POST" action="{% url 'teilnehmer_ablehnen' t.id %}" class="flex-1">
+                        <form method="POST" action="{% url 'teilnehmer_ablehnen' t.id %}" class="shrink-0"
+                              onsubmit="return confirm('{{ t.user.first_name }} {{ t.user.last_name }} wirklich ablehnen? Die Person verliert den Zugriff auf den Törn und wird per Mail informiert.');">
                             {% csrf_token %}
-                            <button class="btn btn-error btn-outline btn-sm w-full">Ablehnen</button>
+                            <button class="btn btn-ghost btn-sm text-error px-2" title="Ablehnen">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
                         </form>
                     </div>
                     {% endif %}
@@ -537,6 +552,19 @@
             </div>
             {% endif %}
         </div>
+
+        <!-- Abgelehnte (nur als Notiz) -->
+        {% if abgelehnte %}
+        <div>
+            <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-3">Abgelehnt ({{ abgelehnte|length }})</h2>
+            <div class="bg-base-200/50 rounded-xl px-4 py-3">
+                <p class="text-xs text-base-content/50">
+                    {% for t in abgelehnte %}{{ t.user.first_name }} {{ t.user.last_name }}{% if not forloop.last %} · {% endif %}{% endfor %}
+                </p>
+                <p class="text-[11px] text-base-content/30 mt-1">Abgelehnte Personen haben keinen Zugriff mehr auf den Törn und wurden per Mail informiert.</p>
+            </div>
+        </div>
+        {% endif %}
 
     </div>
 

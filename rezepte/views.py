@@ -3,6 +3,8 @@ import json
 import os
 import re
 
+from utils.rezept_skalierung import skaliere_menge
+
 from django.conf import settings as django_settings
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -307,25 +309,8 @@ def rezept_pdf(request, pk):
         personen = 0
     scale_factor = (personen / rezept.portionen) if personen and rezept.portionen else 1
 
-    def _fmt_zahl(n):
-        if n == int(n):
-            return str(int(n))
-        return str(round(n, 1)).replace('.', ',')
-
     def scale_menge(menge):
-        if scale_factor == 1 or not menge:
-            return menge or ""
-        menge = menge.strip()
-        range_m = re.match(r'^(\d+(?:[.,]\d+)?)\s*[-–]\s*(\d+(?:[.,]\d+)?)(.*)', menge)
-        if range_m:
-            lo = float(range_m.group(1).replace(',', '.')) * scale_factor
-            hi = float(range_m.group(2).replace(',', '.')) * scale_factor
-            return f"{_fmt_zahl(lo)}–{_fmt_zahl(hi)}{range_m.group(3)}"
-        single_m = re.match(r'^(\d+(?:[.,]\d+)?)(.*)', menge)
-        if single_m:
-            num = float(single_m.group(1).replace(',', '.')) * scale_factor
-            return f"{_fmt_zahl(num)}{single_m.group(2)}"
-        return menge
+        return skaliere_menge(menge, scale_factor)
 
     buffer = io.BytesIO()
     MAR = 20 * mm
