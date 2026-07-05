@@ -126,9 +126,7 @@
             <div class="divide-y divide-base-200">
                 {% for nachricht in pinnwand_nachrichten %}
                 <div class="px-4 py-3 flex items-start gap-3">
-                    <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-semibold text-primary mt-0.5">
-                        {{ nachricht.autor.first_name|first }}
-                    </div>
+                    {% include "includes/avatar.html" with person=nachricht.autor size="w-7 h-7" extra="mt-0.5" %}
                     <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2 mb-0.5">
                             <span class="text-xs font-semibold">{{ nachricht.autor.first_name }} {{ nachricht.autor.last_name }}</span>
@@ -283,9 +281,7 @@
             <div class="flex flex-col gap-2">
                 {% for t in teilnahmen %}
                 <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-xl p-3">
-                    <div class="w-9 h-9 rounded-full bg-base-200 flex items-center justify-center shrink-0 text-sm font-semibold text-base-content/60">
-                        {{ t.user.first_name|first }}
-                    </div>
+                    {% include "includes/avatar.html" with person=t.user size="w-9 h-9" text="text-sm" farbe="bg-base-200 text-base-content/60" %}
                     <div class="flex-1 min-w-0">
                         <p class="font-medium text-sm truncate">
                             {% if t.user == request.user %}
@@ -655,9 +651,7 @@
                 <div class="border-t border-base-200 divide-y divide-base-200">
                     {% for a in eintrag.anfragen.all %}
                     <div class="px-4 py-2.5 flex items-center gap-3">
-                        <div class="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-xs font-semibold text-primary">
-                            {{ a.anfragender.first_name|first }}
-                        </div>
+                        {% include "includes/avatar.html" with person=a.anfragender size="w-6 h-6" %}
                         <div class="flex-1 min-w-0">
                             <span class="text-xs font-medium">{{ a.anfragender.first_name }} {{ a.anfragender.last_name }}</span>
                             {% if a.status == 'pending' %}

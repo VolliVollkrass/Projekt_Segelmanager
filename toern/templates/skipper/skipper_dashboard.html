@@ -103,9 +103,7 @@
             <div class="flex flex-col gap-2">
                 {% for t in warteliste %}
                 <div class="flex items-center gap-3 bg-warning/5 border border-warning/30 rounded-xl p-4">
-                    <div class="w-9 h-9 rounded-full bg-warning/20 flex items-center justify-center shrink-0 text-sm font-semibold text-warning">
-                        {{ t.user.first_name|first }}
-                    </div>
+                    {% include "includes/avatar.html" with person=t.user size="w-9 h-9" text="text-sm" farbe="bg-warning/20 text-warning" %}
                     <div class="flex-1 min-w-0">
                         <p class="font-semibold text-sm truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
                         <p class="text-xs text-base-content/40 truncate">{{ t.user.email }}</p>
@@ -240,9 +238,7 @@
                     <div class="crew-item flex items-center gap-2 bg-base-100 border border-base-300 rounded-xl px-3 py-2 cursor-pointer hover:border-primary transition-colors"
                          draggable="true"
                          data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
-                        <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-                            {{ item.users.0.first_name|first }}
-                        </div>
+                        {% include "includes/avatar.html" with person=item.users.0 size="w-7 h-7" %}
                         <div class="text-sm">
                             {% for u in item.users %}
                             <span class="font-medium">{{ u.first_name }} {{ u.last_name }}</span>{% if not forloop.last %} &amp; {% endif %}
@@ -298,9 +294,7 @@
                         <div class="crew-item flex items-center gap-2 bg-base-200 border border-base-300 rounded-xl px-3 py-2 cursor-pointer hover:border-primary transition-colors"
                              draggable="true"
                              data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
-                            <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
-                                {{ item.users.0.first_name|first }}
-                            </div>
+                            {% include "includes/avatar.html" with person=item.users.0 size="w-7 h-7" %}
                             <div class="min-w-0">
                                 {% for u in item.users %}
                                 <div class="text-sm font-medium leading-tight">{{ u.first_name }} {{ u.last_name }}</div>
@@ -409,9 +403,7 @@
                 <div class="bg-base-100 border rounded-xl px-4 py-3
                     {% if t.status == 'angemeldet' %}border-warning/40{% elif t.status == 'bestaetigt' %}border-base-300{% else %}border-base-300{% endif %}">
                     <div class="flex items-center gap-3">
-                        <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-semibold text-primary">
-                            {{ t.user.first_name|first }}
-                        </div>
+                        {% include "includes/avatar.html" with person=t.user size="w-9 h-9" text="text-sm" %}
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center justify-between gap-2">
                                 <p class="font-medium text-sm truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
@@ -899,13 +891,7 @@
                         {% for t in eintrag.crew %}
                         <div class="flex items-center gap-3 bg-base-200 rounded-xl px-3 py-2.5">
                             <div class="flex items-center gap-2 flex-1 min-w-0">
-                                {% if t.user.profilbild %}
-                                    <img src="{{ t.user.profilbild.url }}" class="w-7 h-7 rounded-full object-cover shrink-0">
-                                {% else %}
-                                    <div class="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                                        {{ t.user.first_name|first|upper }}
-                                    </div>
-                                {% endif %}
+                                {% include "includes/avatar.html" with person=t.user size="w-7 h-7" %}
                                 <div class="min-w-0">
                                     <p class="text-sm font-medium truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
                                     {% if t.rolle != "crew" %}

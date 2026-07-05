@@ -100,9 +100,7 @@
                     {% for t in k.crew %}
                         {% if t.rolle == "skipper" or t.rolle == "coskipper" %}
                         <div class="flex items-center gap-3 bg-base-100 border border-base-300 rounded-xl p-3">
-                            <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 text-sm font-bold text-primary">
-                                {{ t.user.first_name|first }}{{ t.user.last_name|first }}
-                            </div>
+                            {% include "includes/avatar.html" with person=t.user size="w-10 h-10" text="text-sm" zwei=True %}
                             <div class="flex-1 min-w-0">
                                 <p class="font-semibold text-sm">{{ t.user.first_name }} {{ t.user.last_name }}</p>
                                 {% if t.user.telefonnummer %}
@@ -139,12 +137,13 @@
                     <div class="divide-y divide-base-200">
                         {% for t in k.crew %}
                         <div class="flex items-center gap-3 px-4 py-3">
-                            <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold
-                                {% if t.rolle == 'skipper' %}bg-primary/10 text-primary
-                                {% elif t.rolle == 'coskipper' %}bg-secondary/10 text-secondary
-                                {% else %}bg-base-300 text-base-content/60{% endif %}">
-                                {{ t.user.first_name|first }}{{ t.user.last_name|first }}
-                            </div>
+                            {% if t.rolle == 'skipper' %}
+                                {% include "includes/avatar.html" with person=t.user size="w-8 h-8" zwei=True %}
+                            {% elif t.rolle == 'coskipper' %}
+                                {% include "includes/avatar.html" with person=t.user size="w-8 h-8" farbe="bg-secondary/10 text-secondary" zwei=True %}
+                            {% else %}
+                                {% include "includes/avatar.html" with person=t.user size="w-8 h-8" farbe="bg-base-300 text-base-content/60" zwei=True %}
+                            {% endif %}
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium truncate">{{ t.user.first_name }} {{ t.user.last_name }}</p>
                                 {% if t.user.telefonnummer %}
@@ -682,9 +681,7 @@
                 <div class="divide-y divide-base-200">
                     {% for t in crew_bestaetigt %}
                     <div class="flex items-start gap-3 px-4 py-3">
-                        <div class="w-8 h-8 rounded-full bg-base-300 flex items-center justify-center shrink-0 text-xs font-bold text-base-content/60 mt-0.5">
-                            {{ t.user.first_name|first }}{{ t.user.last_name|first }}
-                        </div>
+                        {% include "includes/avatar.html" with person=t.user size="w-8 h-8" farbe="bg-base-300 text-base-content/60" zwei=True extra="mt-0.5" %}
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium">{{ t.user.first_name }} {{ t.user.last_name }}</p>
                             <div class="flex flex-wrap gap-2 mt-1">
