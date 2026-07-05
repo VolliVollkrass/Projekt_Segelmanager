@@ -186,6 +186,10 @@ class Teilnahme(models.Model):
     wunschpartner = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="wunschpartner_teilnahmen")
     ausschlussliste = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name="ausgeschlossen_teilnahmen")
     individuelle_meilen = models.PositiveIntegerField(null=True, blank=True)
+    boot_fixiert = models.BooleanField(
+        default=False,
+        help_text="Vom Skipper ans Boot gepinnt — die Auto-Zuteilung verschiebt diese Person nicht"
+    )
     seglerische_erfahrung = models.CharField(max_length=30, choices=SEGELERFAHRUNG_CHOICES, default="1")
     notizen = models.TextField(blank=True)  # private Notizen für Skipper/Admin
     teilnahmebedingungen_akzeptiert = models.BooleanField(default=False)
