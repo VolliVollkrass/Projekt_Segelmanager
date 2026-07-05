@@ -1,0 +1,17 @@
+{% comment %}
+Runder Personen-Avatar: Profilbild falls vorhanden, sonst Initialen-Kreis.
+Parameter:
+  person  – User-Objekt (Pflicht)
+  size    – Größenklassen, z.B. "w-7 h-7" (Pflicht)
+  text    – Textgröße der Initialen, Default "text-xs"
+  farbe   – Farbe des Initialen-Kreises, Default "bg-primary/10 text-primary"
+  zwei    – wenn gesetzt: zwei Initialen (Vor- + Nachname), sonst eine
+  extra   – zusätzliche Klassen für beide Varianten, z.B. "mt-0.5"
+{% endcomment %}
+{% if person.profilbild %}
+<img src="{{ person.profilbild.url }}" alt="" class="{{ size }} rounded-full object-cover shrink-0 {{ extra }}">
+{% else %}
+<div class="{{ size }} rounded-full {{ farbe|default:'bg-primary/10 text-primary' }} flex items-center justify-center shrink-0 {{ text|default:'text-xs' }} font-semibold {{ extra }}">
+    {{ person.first_name|first|upper }}{% if zwei %}{{ person.last_name|first|upper }}{% endif %}
+</div>
+{% endif %}
