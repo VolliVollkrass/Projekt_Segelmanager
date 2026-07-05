@@ -4,7 +4,7 @@ from .models import Andacht
 
 @admin.register(Andacht)
 class AndachtAdmin(admin.ModelAdmin):
-    list_display = ('titel', 'user', 'typ', 'zielgruppe', 'dauer_minuten', 'erstellt_am')
-    list_filter = ('typ', 'zielgruppe', 'kirchenjahr')
+    list_display = ('titel', 'user', 'typ', 'zielgruppe', 'dauer_minuten', 'veroeffentlicht', 'erstellt_am')
+    list_filter = ('typ', 'zielgruppe', 'kirchenjahr', 'veroeffentlicht')
     search_fields = ('titel', 'thema', 'user__email')
     readonly_fields = ('erstellt_am',)

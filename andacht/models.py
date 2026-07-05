@@ -71,6 +71,13 @@ class Andacht(models.Model):
 
     erstellt_am = models.DateTimeField(auto_now_add=True)
 
+    # --- Andachtsbuch ---
+    veroeffentlicht = models.BooleanField(
+        default=False,
+        help_text="Im Andachtsbuch für alle eingeloggten Nutzer sichtbar"
+    )
+    veroeffentlicht_am = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ['-erstellt_am']
         verbose_name = 'Andacht'
