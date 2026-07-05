@@ -24,6 +24,7 @@ urlpatterns = [
     path("<int:toern_id>/skipper/", skipper_dashboard, name="skipper_dashboard"),
     path("toern/<int:toern_id>/kabine-update/", kabine_update, name="kabine_update"),
     path("toern/<int:toern_id>/auto-assign/", auto_assign, name="auto_assign"),
+    path("toern/<int:toern_id>/fixieren/<uuid:user_id>/", teilnahme_boot_fixieren, name="teilnahme_boot_fixieren"),
     path("boot/<int:boot_id>/assign-skipper/", boot_skipper_assign, name="boot_skipper_assign"),
     path("toern/<int:toern_id>/reset/", reset_zuteilung, name="reset_zuteilung"),
     path("warteliste/bestaetigen/<int:teilnahme_id>/", warteliste_bestaetigen, name="warteliste_bestaetigen"),

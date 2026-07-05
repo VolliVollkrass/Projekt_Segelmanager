@@ -21,6 +21,7 @@ from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
 from utils.permissions import anbieter_required, is_owner
+from utils.seemeilen import seemeilen_map, erfahrungs_stufe
 from django.core.exceptions import PermissionDenied
 from .forms import TeilnahmeDetailForm, ToernForm, TeilnahmeForm
 from django.contrib import messages
@@ -1289,41 +1290,54 @@ def kabine_update(request, toern_id):
 @require_POST
 def reset_zuteilung(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
-
-    teilnahme = Teilnahme.objects.filter(
-        user=request.user,
-        toern=toern
-    ).first()
-
-    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
-        raise PermissionDenied
+    _hat_skipper_oder_anbieter(request, toern)
 
     # =========================
-    # RESET LOGIK
+    # RESET LOGIK — Skipper/Co-Skipper und fixierte Personen (📌) behalten ihr Boot
     # =========================
     Teilnahme.objects.filter(
         toern=toern
     ).exclude(
         rolle__in=["skipper", "coskipper"]
+    ).exclude(
+        boot_fixiert=True
     ).update(
         boot=None,
         kabine=None
     )
 
-    messages.success(request, "Zuteilung wurde zurückgesetzt")
+    messages.success(request, "Zuteilung wurde zurückgesetzt (fixierte Personen bleiben)")
 
     return redirect("skipper_dashboard", toern_id=toern.id)
     
 @login_required
 @require_POST
 def auto_assign(request, toern_id):
+    """Auto-Zuteilung: verteilt Crew auf Boote & Kabinen.
+
+    - Erfahrung = Seemeilen-Stufe kombiniert mit Selbsteinschätzung (utils/seemeilen.py)
+    - Skipper/Co-Skipper und gepinnte Personen (boot_fixiert) bleiben auf ihrem Boot
+    - Ausschlüsse sind harte Bedingung; Gruppen mit Konflikten werden zuerst platziert
+    - Multi-Start: 20 Durchläufe mit variierter Reihenfolge, beste Lösung gewinnt
+    """
     import json
+    import random
 
     toern = get_object_or_404(Toern, id=toern_id)
-    data = json.loads(request.body or "{}")
+    _hat_skipper_oder_anbieter(request, toern)
 
+    if toern.status in ["ZUTEILUNG_FIXIERT", "ABGESCHLOSSEN"]:
+        return JsonResponse({
+            "status": "error",
+            "message": "Die Zuteilung ist fixiert. Erst zurücksetzen, dann neu verteilen."
+        }, status=400)
+
+    data = json.loads(request.body or "{}")
     avoid_mode = data.get("avoid_mode", "soft")
     balance = data.get("balance", True)
+    age_mode = data.get("age_mode", "ignore")
+    experience_mode = data.get("experience_mode", "ignore")
+    gender_mode = data.get("gender_mode", "ignore")
 
     teilnahmen = list(
         Teilnahme.objects.filter(
@@ -1331,290 +1345,323 @@ def auto_assign(request, toern_id):
             status__in=["angemeldet", "bestaetigt"]
         ).select_related("user", "boot", "kabine")
     )
-
     boote = list(toern.boote.prefetch_related("kabinen"))
+    if not boote or not teilnahmen:
+        return JsonResponse({"status": "error", "message": "Keine Boote oder keine Crew vorhanden."}, status=400)
+
+    teilnahme_map = {t.user.id: t for t in teilnahmen}
+    user_by_id = {t.user.id: t.user for t in teilnahmen}
+    capacity = {b.id: sum(k.betten for k in b.kabinen.all()) for b in boote}
+    warnings = []
 
     # =========================
-    # 1. PARTNER MAP
+    # ERFAHRUNG (Seemeilen + Selbsteinschätzung) & ALTER
     # =========================
-    partner_map = get_partner_map(toern)
-
-    # =========================
-    # 2. GRUPPEN BAUEN (🔥 CORE)
-    # =========================
-    assigned = set()
-    groups = []
-
-    for t in teilnahmen:
-
-        if t.user.id in assigned:
-            continue
-
-        partner = partner_map.get(t.user.id)
-
-        # 👉 Paar
-        if partner and partner.id not in assigned:
-            groups.append({
-                "users": [t.user, partner],
-                "size": 2,
-                "type": "pair"
-            })
-            assigned.add(t.user.id)
-            assigned.add(partner.id)
-
-        # 👉 Single
-        else:
-            groups.append({
-                "users": [t.user],
-                "size": 1,
-                "type": "single"
-            })
-            assigned.add(t.user.id)
-
-    # =========================
-    # 3. KAPAZITÄT
-    # =========================
-    boot_state = {
-        b.id: {
-            "boot": b,
-            "capacity": sum(k.betten for k in b.kabinen.all()),
-            "used": 0,
-            "groups": []
-        }
-        for b in boote
+    meilen = seemeilen_map(teilnahme_map.keys())
+    erfahrung = {
+        uid: erfahrungs_stufe(meilen.get(uid, 0), t.seglerische_erfahrung)
+        for uid, t in teilnahme_map.items()
     }
+    global_mean_exp = sum(erfahrung.values()) / len(erfahrung)
+
+    def _alter(user):
+        if not user.geburtsdatum:
+            return None
+        today = date.today()
+        return (
+            today.year - user.geburtsdatum.year
+            - ((today.month, today.day) < (user.geburtsdatum.month, user.geburtsdatum.day))
+        )
+
+    alter = {uid: _alter(u) for uid, u in user_by_id.items()}
+    alter_vals = [a for a in alter.values() if a is not None]
+    global_mean_age = sum(alter_vals) / len(alter_vals) if alter_vals else None
 
     # =========================
-    # 4. SKIPPER FIXIEREN
+    # PRÄFERENZEN
     # =========================
-    for g in groups:
-
-        # 👉 prüfe nur EINEN user der gruppe
-        u = g["users"][0]
-
-        t = next(x for x in teilnahmen if x.user.id == u.id)
-
-        if t.rolle in ["skipper", "coskipper"] and t.boot:
-
-            state = boot_state[t.boot.id]
-
-            state["groups"].append(g)
-            state["used"] += g["size"]
-
-            g["fixed"] = True
-
-    # =========================
-    # 5. REST GRUPPEN
-    # =========================
-    free_groups = [g for g in groups if not g.get("fixed")]
-
-    # größere Gruppen zuerst
-    free_groups.sort(key=lambda g: -g["size"])
-
-    # =========================
-    # 6. PRÄFERENZEN
-    # =========================
-    praeferenzen = CrewPraeferenz.objects.filter(toern=toern)
-
     exclude = set()
     avoid = set()
-
-    for p in praeferenzen:
-        key = tuple(sorted([p.from_user.id, p.to_user.id]))
+    for p in CrewPraeferenz.objects.filter(toern=toern):
+        key = tuple(sorted([p.from_user_id, p.to_user_id]))
         if p.typ == "exclude":
             exclude.add(key)
         else:
             avoid.add(key)
 
-    teilnahme_map = {
-        t.user.id: t
-        for t in teilnahmen
-    }
+    AVOID_W = 30 if avoid_mode == "strict" else 8
 
-    
+    # =========================
+    # GRUPPEN (Kabinen-Paare) + FIXIERUNGEN
+    # =========================
+    partner_map = get_partner_map(toern)
 
-    def score(group, boot_groups):
-        s = 0
+    raw_groups = []
+    assigned = set()
+    for t in teilnahmen:
+        if t.user.id in assigned:
+            continue
+        partner = partner_map.get(t.user.id)
+        if partner and partner.id not in assigned and partner.id in teilnahme_map:
+            raw_groups.append([t.user, partner])
+            assigned.update({t.user.id, partner.id})
+        else:
+            raw_groups.append([t.user])
+            assigned.add(t.user.id)
 
-        # =========================
-        # 🔧 HELPER
-        # =========================
-        def get_age(user):
-            if user.geburtsdatum:
-                today = date.today()
-                return (
-                    today.year
-                    - user.geburtsdatum.year
-                    - ((today.month, today.day) < (user.geburtsdatum.month, user.geburtsdatum.day))
-                )
-            return None
+    groups = []
+    for users in raw_groups:
+        fixed_boats = {}
+        for u in users:
+            t = teilnahme_map[u.id]
+            if t.boot_id and (t.rolle in ("skipper", "coskipper") or t.boot_fixiert):
+                fixed_boats[u.id] = t.boot_id
+        if len(set(fixed_boats.values())) > 1:
+            namen = " & ".join(f"{u.first_name} {u.last_name}" for u in users)
+            warnings.append(
+                f"Kabinen-Paar {namen} ist auf verschiedene Boote fixiert und wurde getrennt."
+            )
+            for u in users:
+                groups.append({"users": [u], "size": 1, "fixed_boot_id": fixed_boats.get(u.id)})
+        else:
+            groups.append({
+                "users": users, "size": len(users),
+                "fixed_boot_id": next(iter(fixed_boats.values())) if fixed_boats else None,
+            })
 
-        def get_exp(user):
-            t = teilnahme_map.get(user.id)
-            return int(t.seglerische_erfahrung) if t else 1
+    fixed_groups = [g for g in groups if g["fixed_boot_id"]]
+    free_groups = [g for g in groups if not g["fixed_boot_id"]]
 
-        # =========================
-        # 🔁 VERGLEICHE
-        # =========================
-        for other_group in boot_groups:
-            for u1 in group["users"]:
-                for u2 in other_group["users"]:
+    # =========================
+    # STARTZUSTAND (Fixierte vorab platzieren) + WARNUNGEN
+    # =========================
+    base = {b.id: {"members": [], "exp_sum": 0.0, "used": 0} for b in boote}
+    for g in fixed_groups:
+        st = base[g["fixed_boot_id"]]
+        for u in g["users"]:
+            st["members"].append(u.id)
+            st["exp_sum"] += erfahrung[u.id]
+        st["used"] += g["size"]
 
-                    key = tuple(sorted([u1.id, u2.id]))
+    boot_by_id = {b.id: b for b in boote}
+    for bid, st in base.items():
+        if st["used"] > capacity[bid]:
+            warnings.append(
+                f"{boot_by_id[bid].name}: {st['used']} fixierte Personen bei nur "
+                f"{capacity[bid]} Betten — bitte Fixierungen prüfen."
+            )
+        ms = st["members"]
+        for i in range(len(ms)):
+            for j in range(i + 1, len(ms)):
+                if tuple(sorted((ms[i], ms[j]))) in exclude:
+                    u1, u2 = user_by_id[ms[i]], user_by_id[ms[j]]
+                    warnings.append(
+                        f"Fixierungs-Konflikt auf {boot_by_id[bid].name}: "
+                        f"{u1.first_name} {u1.last_name} und {u2.first_name} {u2.last_name} "
+                        f"schließen sich aus."
+                    )
 
-                    # ❌ HARD BLOCK
-                    if key in exclude:
-                        return None
+    # =========================
+    # SCORING
+    # =========================
+    def bewerte(g, st):
+        """Kosten, die Gruppe g auf einem Boot mit Zustand st verursachen würde.
+        None = hartes Verbot (Ausschluss)."""
+        s = 0.0
+        g_ids = [u.id for u in g["users"]]
 
-                    # ⚠️ AVOID
-                    if key in avoid:
-                        s += 20 if avoid_mode == "strict" else 5
+        for uid in g_ids:
+            for vid in st["members"]:
+                key = (uid, vid) if uid < vid else (vid, uid)
+                if key in exclude:
+                    return None
+                if key in avoid:
+                    s += AVOID_W
+                if gender_mode == "same" and user_by_id[uid].geschlecht != user_by_id[vid].geschlecht:
+                    s += 5
+                elif gender_mode == "mixed" and user_by_id[uid].geschlecht == user_by_id[vid].geschlecht:
+                    s += 2
+                if age_mode == "similar":
+                    a1, a2 = alter.get(uid), alter.get(vid)
+                    if a1 is not None and a2 is not None:
+                        s += abs(a1 - a2) * 0.5
+                if experience_mode == "separate":
+                    s += abs(erfahrung[uid] - erfahrung[vid]) * 3
 
-                    # =========================
-                    # 👥 ALTER
-                    # =========================
-                    if data.get("age_mode") != "ignore":
-
-                        a1 = get_age(u1)
-                        a2 = get_age(u2)
-
-                        if a1 is not None and a2 is not None:
-                            diff = abs(a1 - a2)
-
-                            if data.get("age_mode") == "similar":
-                                s += diff * 0.5
-
-                            elif data.get("age_mode") == "mixed":
-                                s -= diff * 0.3
-
-                    # =========================
-                    # ⚓ ERFAHRUNG
-                    # =========================
-                    if data.get("experience_mode") != "ignore":
-
-                        e1 = get_exp(u1)
-                        e2 = get_exp(u2)
-
-                        diff = abs(e1 - e2)
-
-                        if data.get("experience_mode") == "separate":
-                            s += diff * 3
-
-                        elif data.get("experience_mode") == "mixed":
-                            s -= diff * 2
-
-                    # =========================
-                    # 🚻 GESCHLECHT
-                    # =========================
-                    if data.get("gender_mode") != "ignore":
-
-                        gender1 = u1.geschlecht
-                        gender2 = u2.geschlecht
-
-                        if data.get("gender_mode") == "same":
-                            if gender1 != gender2:
-                                s += 5
-
-                        elif data.get("gender_mode") == "mixed":
-                            if gender1 == gender2:
-                                s += 2
+        # „Mischen" = Boots-Durchschnitt soll dem Gesamt-Durchschnitt entsprechen
+        if experience_mode == "mixed":
+            n = len(st["members"]) + len(g_ids)
+            mean_after = (st["exp_sum"] + sum(erfahrung[uid] for uid in g_ids)) / n
+            s += abs(mean_after - global_mean_exp) * 12
+        if age_mode == "mixed" and global_mean_age is not None:
+            ages = [alter[m] for m in st["members"] if alter.get(m) is not None]
+            ages += [alter[uid] for uid in g_ids if alter.get(uid) is not None]
+            if ages:
+                s += abs(sum(ages) / len(ages) - global_mean_age) * 0.5
 
         return s
 
-    # =========================
-    # 7. BOOT ZUWEISUNG
-    # =========================
-    unassigned = []
-
-    for g in free_groups:
-
-        best = None
-        best_score = 9999
-
-        for b_id, state in boot_state.items():
-
-            if state["used"] + g["size"] > state["capacity"]:
+    def platziere(ordnung):
+        state = {
+            bid: {"members": list(st["members"]), "exp_sum": st["exp_sum"], "used": st["used"]}
+            for bid, st in base.items()
+        }
+        zuteilung = {}
+        offen = []
+        for g in ordnung:
+            best_bid, best_s = None, None
+            for b in boote:
+                st = state[b.id]
+                if st["used"] + g["size"] > capacity[b.id]:
+                    continue
+                s = bewerte(g, st)
+                if s is None:
+                    continue
+                if balance:
+                    s += st["used"] * 2
+                if best_s is None or s < best_s:
+                    best_s, best_bid = s, b.id
+            if best_bid is None:
+                offen.append(g)
                 continue
-
-            s = score(g, state["groups"])
-            if s is None:
-                continue
-
-            if balance:
-                s += state["used"] * 0.5
-
-            if s < best_score:
-                best_score = s
-                best = state
-
-        if not best:
-            unassigned.extend(g["users"])
-            continue
-
-        best["groups"].append(g)
-        best["used"] += g["size"]
-
-    # =========================
-    # 8. BOOT SPEICHERN (bulk — 2 Queries statt N)
-    # =========================
-    Teilnahme.objects.filter(toern=toern).update(boot=None)
-
-    teilnahme_map_for_save = {t.user.id: t for t in teilnahmen}
-    for state in boot_state.values():
-        for g in state["groups"]:
+            st = state[best_bid]
             for u in g["users"]:
-                t = teilnahme_map_for_save.get(u.id)
-                if t:
-                    t.boot = state["boot"]
+                st["members"].append(u.id)
+                st["exp_sum"] += erfahrung[u.id]
+            st["used"] += g["size"]
+            zuteilung[id(g)] = best_bid
+        return zuteilung, offen, state
 
-    Teilnahme.objects.bulk_update(list(teilnahme_map_for_save.values()), ["boot"])
+    def loesung_kosten(offen, state):
+        """Globale Güte einer fertigen Lösung — je kleiner, desto besser."""
+        kosten = 10000.0 * sum(g["size"] for g in offen)
+        for bid, st in state.items():
+            ms = st["members"]
+            n = len(ms)
+            for i in range(n):
+                for j in range(i + 1, n):
+                    key = (ms[i], ms[j]) if ms[i] < ms[j] else (ms[j], ms[i])
+                    if key in avoid:
+                        kosten += AVOID_W
+                    if gender_mode == "same" and user_by_id[ms[i]].geschlecht != user_by_id[ms[j]].geschlecht:
+                        kosten += 5
+                    elif gender_mode == "mixed" and user_by_id[ms[i]].geschlecht == user_by_id[ms[j]].geschlecht:
+                        kosten += 2
+                    if age_mode == "similar":
+                        a1, a2 = alter.get(ms[i]), alter.get(ms[j])
+                        if a1 is not None and a2 is not None:
+                            kosten += abs(a1 - a2) * 0.5
+                    if experience_mode == "separate":
+                        kosten += abs(erfahrung[ms[i]] - erfahrung[ms[j]]) * 3
+            if n:
+                if experience_mode == "mixed":
+                    kosten += abs(st["exp_sum"] / n - global_mean_exp) * 12 * n
+                if age_mode == "mixed" and global_mean_age is not None:
+                    ages = [alter[m] for m in ms if alter.get(m) is not None]
+                    if ages:
+                        kosten += abs(sum(ages) / len(ages) - global_mean_age) * 0.5 * n
+        if balance:
+            useds = [st["used"] for st in state.values()]
+            kosten += (max(useds) - min(useds)) * 3
+        return kosten
 
     # =========================
-    # 9. KABINEN ZUWEISUNG (bulk — 2 Queries statt N)
+    # MULTI-START: Konflikt-Gruppen zuerst, 20 Reihenfolgen, beste Lösung
     # =========================
-    Teilnahme.objects.filter(toern=toern).update(kabine=None)
+    for g in free_groups:
+        ids = {u.id for u in g["users"]}
+        g["_konflikte"] = sum(1 for key in exclude if ids & set(key))
 
-    for state in boot_state.values():
+    rnd = random.Random(42)
+    beste = None
+    for lauf in range(20):
+        kandidaten = list(free_groups)
+        if lauf > 0:
+            rnd.shuffle(kandidaten)
+        kandidaten.sort(key=lambda g: (-g["_konflikte"], -g["size"]))
+        zuteilung, offen, state = platziere(kandidaten)
+        k = loesung_kosten(offen, state)
+        if beste is None or k < beste[0]:
+            beste = (k, zuteilung, offen)
+    _, zuteilung, offen = beste
 
-        kabinen = list(state["boot"].kabinen.all())
+    # =========================
+    # SPEICHERN: Boote + Kabinen (First-Fit-Decreasing), bulk
+    # =========================
+    Teilnahme.objects.filter(toern=toern).update(boot=None, kabine=None)
 
-        kabinen_state = [
-            {
-                "kabine": k,
-                "free": k.betten,
-                "users": []
-            }
-            for k in kabinen
-        ]
+    boat_groups = {b.id: [] for b in boote}
+    for g in fixed_groups:
+        boat_groups[g["fixed_boot_id"]].append(g)
+    for g in free_groups:
+        bid = zuteilung.get(id(g))
+        if bid:
+            boat_groups[bid].append(g)
 
-        for g in state["groups"]:
+    unassigned_users = [u for g in offen for u in g["users"]]
 
-            placed = False
+    for b in boote:
+        for g in boat_groups[b.id]:
+            for u in g["users"]:
+                teilnahme_map[u.id].boot = b
 
+        kabinen_state = [{"kabine": k, "free": k.betten, "users": []} for k in b.kabinen.all()]
+        for g in sorted(boat_groups[b.id], key=lambda g: -g["size"]):
             for k in kabinen_state:
-
                 if k["free"] >= g["size"]:
                     k["users"].extend(g["users"])
                     k["free"] -= g["size"]
-                    placed = True
                     break
-
-            if not placed:
-                for u in g["users"]:
-                    unassigned.append(u)
-
+            else:
+                unassigned_users.extend(g["users"])
         for k in kabinen_state:
             for u in k["users"]:
-                t = teilnahme_map_for_save.get(u.id)
-                if t:
-                    t.kabine = k["kabine"]
+                teilnahme_map[u.id].kabine = k["kabine"]
 
-    Teilnahme.objects.bulk_update(list(teilnahme_map_for_save.values()), ["kabine"])
+    Teilnahme.objects.bulk_update(list(teilnahme_map.values()), ["boot", "kabine"])
+
+    # =========================
+    # RÜCKMELDUNG (Flash-Messages erscheinen nach dem Reload)
+    # =========================
+    for w in warnings:
+        messages.warning(request, w)
+    if unassigned_users:
+        namen = ", ".join(f"{u.first_name} {u.last_name}" for u in unassigned_users)
+        messages.warning(request, f"Nicht zugeteilt: {namen}")
+    else:
+        messages.success(request, "Auto-Zuteilung abgeschlossen — alle Personen zugeteilt.")
 
     return JsonResponse({
         "status": "ok",
-        "unassigned": [u.id for u in unassigned]
+        "unassigned": [u.id for u in unassigned_users],
+        "warnings": warnings,
     })
+
+
+@login_required
+@require_POST
+def teilnahme_boot_fixieren(request, toern_id, user_id):
+    """Pin an/aus: fixiert eine Person an ihr aktuelles Boot (Auto-Zuteilung lässt sie dort)."""
+    import json
+
+    toern = get_object_or_404(Toern, id=toern_id)
+    _hat_skipper_oder_anbieter(request, toern)
+    teilnahme = get_object_or_404(Teilnahme, toern=toern, user_id=user_id)
+
+    if not teilnahme.boot_id:
+        return JsonResponse({
+            "status": "error",
+            "message": "Erst einem Boot zuteilen, dann fixieren."
+        }, status=400)
+
+    data = json.loads(request.body or "{}")
+    if "fixiert" in data:
+        teilnahme.boot_fixiert = bool(data["fixiert"])
+    else:
+        teilnahme.boot_fixiert = not teilnahme.boot_fixiert
+    teilnahme.save(update_fields=["boot_fixiert"])
+    return JsonResponse({"status": "ok", "fixiert": teilnahme.boot_fixiert})
+
 
 @login_required
 @require_POST

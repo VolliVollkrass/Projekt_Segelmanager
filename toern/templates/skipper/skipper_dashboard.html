@@ -291,8 +291,11 @@
                     </p>
                     <div class="crew-container flex flex-wrap gap-2 min-h-10">
                         {% for item in k.crew %}
-                        <div class="crew-item flex items-center gap-2 bg-base-200 border border-base-300 rounded-xl px-3 py-2 cursor-pointer hover:border-primary transition-colors"
-                             draggable="true"
+                        {% with pt=teilnahme_map|get_item:item.users.0.id %}
+                        <div class="crew-item flex items-center gap-2 border rounded-xl px-3 py-2 cursor-pointer transition-colors
+                                    {% if pt.boot_fixiert %}bg-secondary/10 border-secondary/50{% else %}bg-base-200 border-base-300 hover:border-primary{% endif %}"
+                             draggable="{% if pt.boot_fixiert %}false{% else %}true{% endif %}"
+                             {% if pt.boot_fixiert %}data-fixiert="1"{% endif %}
                              data-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
                             {% include "includes/avatar.html" with person=item.users.0 size="w-7 h-7" %}
                             <div class="min-w-0">
@@ -308,7 +311,18 @@
                                 </div>
                                 {% endfor %}
                             </div>
+                            {% if pt and pt.rolle == 'crew' %}
+                            <button type="button"
+                                    onclick="togglePin(event, this)"
+                                    data-user-ids="{% for u in item.users %}{{ u.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+                                    data-aktiv="{% if pt.boot_fixiert %}1{% endif %}"
+                                    title="{% if pt.boot_fixiert %}Fixierung lösen — Auto-Zuteilung darf wieder verschieben{% else %}An dieses Boot fixieren — Auto-Zuteilung lässt die Person hier{% endif %}"
+                                    class="btn btn-ghost btn-xs px-1 shrink-0 {% if pt.boot_fixiert %}opacity-100{% else %}opacity-30 hover:opacity-100{% endif %}">
+                                📌
+                            </button>
+                            {% endif %}
                         </div>
+                        {% endwith %}
                         {% endfor %}
                     </div>
                 </div>
@@ -1086,7 +1100,9 @@
     <div class="modal-box w-full max-w-lg">
 
         <h3 class="text-xl font-bold mb-1">Auto-Zuteilung</h3>
-        <p class="text-sm opacity-60 mb-6">Lege fest, wie die Crew auf die Boote verteilt werden soll.</p>
+        <p class="text-sm opacity-60 mb-2">Lege fest, wie die Crew auf die Boote verteilt werden soll.</p>
+        <p class="text-xs opacity-50 mb-6">📌 Fixierte Personen und Skipper bleiben auf ihrem Boot. Die Erfahrung
+        wird aus den erfassten Seemeilen und der Selbsteinschätzung bestimmt.</p>
 
         <form id="autoForm" class="space-y-6">
 
@@ -1359,6 +1375,7 @@ let selectedItem = null;
 
 document.addEventListener("click", e => {
     const item = e.target.closest(".crew-item");
+    if (item && item.dataset.fixiert) return;
     if (item) {
         selectedItem = item;
         document.querySelectorAll(".crew-item").forEach(i => i.classList.remove("ring","ring-primary","ring-2"));
@@ -1382,6 +1399,21 @@ document.querySelectorAll('.dropzone').forEach(zone => {
 
 // Initial Konflikt-Check
 document.querySelectorAll('.boot-zone').forEach(b => checkConflictsForBoot(b));
+
+// ===================== BOOT-FIXIERUNG (PIN) =====================
+function togglePin(e, btn) {
+    e.stopPropagation();
+    e.preventDefault();
+    const ziel = btn.dataset.aktiv ? false : true;
+    const ids = btn.dataset.userIds.split(',').filter(Boolean);
+    Promise.all(ids.map(uid =>
+        fetch(`{% url 'teilnahme_boot_fixieren' toern.id '00000000-0000-0000-0000-000000000000' %}`.replace('00000000-0000-0000-0000-000000000000', uid), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+            body: JSON.stringify({ fixiert: ziel })
+        })
+    )).then(() => location.reload());
+}
 
 // ===================== AUTO ASSIGN =====================
 function submitAutoAssign() {
