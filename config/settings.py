@@ -88,6 +88,11 @@ AXES_RESET_ON_SUCCESS = True
 AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
 AXES_LOCKOUT_TEMPLATE = "accounts/lockout.html"
 
+# Gleitende Session: aktive Nutzer bleiben eingeloggt, wer 30 Tage nichts tut,
+# muss sich neu anmelden (SESSION_SAVE_EVERY_REQUEST verlängert das Fenster bei jedem Request).
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 30  # 30 Tage
+SESSION_SAVE_EVERY_REQUEST = True
+
 X_FRAME_OPTIONS = "DENY"
 
 ROOT_URLCONF = 'config.urls'
