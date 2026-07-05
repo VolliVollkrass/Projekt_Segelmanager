@@ -4,6 +4,8 @@ from .dokumente_pdf import mayday_plakat_pdf, notrollen_plakat_pdf, dokument_che
 from .dokumente_views import (
     dokument_items_get, dokument_item_add, dokument_item_update,
     dokument_item_delete, dokument_reset,
+    dok_standard_list, dok_standard_speichern, dok_standard_laden,
+    dok_standard_loeschen, dok_standard_default,
 )
 
 urlpatterns = [
@@ -54,6 +56,11 @@ urlpatterns = [
     path("<int:toern_id>/dokument/item/<int:item_id>/update/", dokument_item_update, name="dokument_item_update"),
     path("<int:toern_id>/dokument/item/<int:item_id>/delete/", dokument_item_delete, name="dokument_item_delete"),
     path("<int:toern_id>/dokument/reset/", dokument_reset, name="dokument_reset"),
+    path("dokument/standards/", dok_standard_list, name="dok_standard_list"),
+    path("<int:toern_id>/dokument/standard/speichern/", dok_standard_speichern, name="dok_standard_speichern"),
+    path("<int:toern_id>/dokument/standard/laden/", dok_standard_laden, name="dok_standard_laden"),
+    path("dokument/standards/<int:standard_id>/loeschen/", dok_standard_loeschen, name="dok_standard_loeschen"),
+    path("dokument/standards/<int:standard_id>/default/", dok_standard_default, name="dok_standard_default"),
     path("<int:toern_id>/dokument/<str:typ>/", dokument_items_get, name="dokument_items_get"),
     path("<int:toern_id>/teilnehmerliste/pdf/", teilnehmerliste_pdf, name="teilnehmerliste_pdf"),
     path("<int:toern_id>/vorlage/revier/", packl_revier_set, name="packl_revier_set"),

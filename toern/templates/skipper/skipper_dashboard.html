@@ -727,6 +727,23 @@
             <button onclick="resetDokument()" class="btn btn-ghost btn-xs text-error">
                 Auf Standard zurücksetzen
             </button>
+
+            <!-- Meine Standards (Checklisten) -->
+            <div class="bg-base-100 rounded-xl p-4 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Meine Standards</p>
+                        <p class="text-xs text-base-content/50 mt-1">
+                            Deine gespeicherten Checklisten — auf jedem Törn wiederverwendbar.
+                            ★ = wird bei deinen neuen Törns automatisch als Start-Checkliste verwendet.
+                        </p>
+                    </div>
+                    <button onclick="openDokStandardSpeichern()" class="btn btn-xs btn-outline whitespace-nowrap">Checkliste speichern…</button>
+                </div>
+                <div id="dok-standard-liste" class="space-y-2">
+                    <p class="text-sm text-base-content/40">Noch keine Standards für diese Checkliste gespeichert.</p>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -1029,6 +1046,33 @@
         <div class="modal-action mt-4">
             <button class="btn btn-ghost" onclick="standardSpeichernModal.close()">Abbrechen</button>
             <button class="btn btn-primary" onclick="submitStandardSpeichern()">Speichern</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- Checklisten-Standard-Speichern Modal -->
+<dialog id="dokStandardSpeichernModal" class="modal">
+    <div class="modal-box">
+        <h3 class="font-bold text-lg mb-2">Checkliste als Standard speichern</h3>
+        <p class="text-sm opacity-70 mb-4">
+            Die aktuelle Checkliste wird unter deinem Namen gespeichert und steht dir auf allen Törns zur Verfügung.
+            Ein bestehender Standard mit gleichem Namen wird überschrieben.
+        </p>
+        <div class="space-y-3">
+            <input type="text" id="dok-standard-name" maxlength="100" placeholder="Name, z.B. Bavaria-Charter"
+                   class="input input-bordered w-full"/>
+            <label class="flex items-center gap-3 cursor-pointer bg-base-200 p-3 rounded-lg">
+                <input type="checkbox" id="dok-standard-default" class="checkbox checkbox-primary"/>
+                <div>
+                    <p class="font-medium text-sm">Als Standard für neue Törns</p>
+                    <p class="text-xs opacity-60">Wird bei deinen neuen Törns automatisch als Start-Checkliste verwendet</p>
+                </div>
+            </label>
+        </div>
+        <div class="modal-action mt-4">
+            <button class="btn btn-ghost" onclick="dokStandardSpeichernModal.close()">Abbrechen</button>
+            <button class="btn btn-primary" onclick="submitDokStandardSpeichern()">Speichern</button>
         </div>
     </div>
     <form method="dialog" class="modal-backdrop"><button>close</button></form>
@@ -1521,6 +1565,7 @@ function loadDokument() {
     fetch(`{% url 'dokument_items_get' toern.id 'TYP' %}`.replace('TYP', dokTyp))
         .then(r => r.json())
         .then(data => { dokVorlageId = data.vorlage_id; renderDokItems(data.items); });
+    loadDokStandards();
 }
 
 function renderDokItems(items) {
@@ -1690,6 +1735,87 @@ function submitStandardSpeichern() {
     }).then(r => r.json()).then(() => {
         document.getElementById('standardSpeichernModal').close();
         loadStandards();
+    });
+}
+
+// ===================== PERSÖNLICHE CHECKLISTEN-STANDARDS =====================
+let dokStandardsCache = {};
+
+function loadDokStandards() {
+    fetch(`{% url 'dok_standard_list' %}?typ=${dokTyp}`)
+        .then(r => r.json())
+        .then(data => renderDokStandards(data.standards || []));
+}
+
+function renderDokStandards(standards) {
+    dokStandardsCache = {};
+    const box = document.getElementById('dok-standard-liste');
+    box.innerHTML = '';
+    if (standards.length === 0) {
+        box.innerHTML = '<p class="text-sm text-base-content/40">Noch keine Standards für diese Checkliste gespeichert.</p>';
+        return;
+    }
+    standards.forEach(s => {
+        dokStandardsCache[s.id] = s;
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2 bg-base-200/60 rounded-lg px-3 py-2';
+        div.innerHTML = `
+            <button onclick="dokStandardDefault(${s.id})" class="btn btn-xs btn-ghost text-base"
+                title="Für neue Törns automatisch verwenden">${s.ist_default ? '★' : '☆'}</button>
+            <span class="flex-1 text-sm font-medium">${escapeHtml(s.name)}</span>
+            <span class="text-xs text-base-content/40 whitespace-nowrap">${s.anzahl} Einträge</span>
+            <button onclick="dokStandardLaden(${s.id})" class="btn btn-xs btn-outline">Laden</button>
+            <button onclick="dokStandardLoeschen(${s.id})" class="btn btn-xs btn-ghost text-error">🗑</button>`;
+        box.appendChild(div);
+    });
+}
+
+function dokStandardLaden(id) {
+    const s = dokStandardsCache[id];
+    if (!s) return;
+    if (!confirm(`Die aktuelle Törn-Checkliste durch deinen Standard „${s.name}" ersetzen?\nBestehende Einträge der Törn-Checkliste gehen verloren.`)) return;
+    fetch("{% url 'dok_standard_laden' toern.id %}", {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ standard_id: id })
+    }).then(r => r.json()).then(() => loadDokument());
+}
+
+function dokStandardLoeschen(id) {
+    const s = dokStandardsCache[id];
+    if (!s) return;
+    if (!confirm(`Standard „${s.name}" wirklich löschen?`)) return;
+    fetch(`{% url 'dok_standard_loeschen' 9999 %}`.replace('9999', id), {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(() => loadDokStandards());
+}
+
+function dokStandardDefault(id) {
+    fetch(`{% url 'dok_standard_default' 9999 %}`.replace('9999', id), {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(() => loadDokStandards());
+}
+
+function openDokStandardSpeichern() {
+    document.getElementById('dok-standard-name').value = '';
+    document.getElementById('dok-standard-default').checked = false;
+    document.getElementById('dokStandardSpeichernModal').showModal();
+}
+
+function submitDokStandardSpeichern() {
+    const nameEl = document.getElementById('dok-standard-name');
+    const name = nameEl.value.trim();
+    if (!name) { nameEl.classList.add('input-error'); return; }
+    nameEl.classList.remove('input-error');
+    fetch("{% url 'dok_standard_speichern' toern.id %}", {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({
+            typ: dokTyp,
+            name: name,
+            ist_default: document.getElementById('dok-standard-default').checked
+        })
+    }).then(r => r.json()).then(() => {
+        document.getElementById('dokStandardSpeichernModal').close();
+        loadDokStandards();
     });
 }
 </script>

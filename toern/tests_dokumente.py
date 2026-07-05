@@ -11,7 +11,10 @@ import json
 
 from boote.models import Boot
 from utils.dokumente import DOKUMENT_DEFAULTS
-from .models import Toern, Teilnahme, DokumentVorlage, DokumentEintrag
+from .models import (
+    Toern, Teilnahme, DokumentVorlage, DokumentEintrag,
+    DokumentStandard, DokumentStandardEintrag,
+)
 
 User = get_user_model()
 
@@ -184,3 +187,113 @@ class ChecklistenTests(DokumenteTestBase):
         self.client.force_login(self.crew)
         resp = self.client.get(reverse("dokument_checkliste_pdf", args=[self.boot.id, "uebernahme"]))
         self.assertEqual(resp.status_code, 403)
+
+
+class DokumentStandardTests(DokumenteTestBase):
+    """Persönliche benannte Standards für die Boots-Checklisten (PR E)."""
+
+    def _speichern(self, user, typ="uebernahme", name="Meine Übernahme", ist_default=False):
+        self.client.force_login(user)
+        return self.client.post(
+            reverse("dok_standard_speichern", args=[self.toern.id]),
+            data=json.dumps({"typ": typ, "name": name, "ist_default": ist_default}),
+            content_type="application/json",
+        )
+
+    def test_speichern_erstellt_standard_mit_eintraegen(self):
+        resp = self._speichern(self.skipper)
+        self.assertEqual(resp.status_code, 200)
+        standard = DokumentStandard.objects.get(user=self.skipper, typ="uebernahme", name="Meine Übernahme")
+        vorlage = DokumentVorlage.objects.get(toern=self.toern, typ="uebernahme")
+        self.assertEqual(standard.eintraege.count(), vorlage.eintraege.count())
+        self.assertGreater(standard.eintraege.count(), 0)
+
+    def test_speichern_ueberschreibt_gleichen_namen(self):
+        self._speichern(self.skipper)
+        vorlage = DokumentVorlage.objects.get(toern=self.toern, typ="uebernahme")
+        vorlage.eintraege.all().delete()
+        DokumentEintrag.objects.create(vorlage=vorlage, sektion="Test", text="Nur ein Punkt")
+        self._speichern(self.skipper)
+        standard = DokumentStandard.objects.get(user=self.skipper, typ="uebernahme", name="Meine Übernahme")
+        self.assertEqual(standard.eintraege.count(), 1)
+        self.assertEqual(DokumentStandard.objects.filter(user=self.skipper).count(), 1)
+
+    def test_default_ist_exklusiv_pro_typ(self):
+        self._speichern(self.skipper, name="A", ist_default=True)
+        self._speichern(self.skipper, name="B", ist_default=True)
+        defaults = DokumentStandard.objects.filter(user=self.skipper, typ="uebernahme", ist_default=True)
+        self.assertEqual(defaults.count(), 1)
+        self.assertEqual(defaults.first().name, "B")
+
+    def test_laden_ersetzt_toern_checkliste(self):
+        self._speichern(self.skipper)
+        standard = DokumentStandard.objects.get(user=self.skipper)
+        standard.eintraege.all().delete()
+        DokumentStandardEintrag.objects.create(standard=standard, sektion="Eigene", text="Mein Punkt", reihenfolge=0)
+
+        resp = self.client.post(
+            reverse("dok_standard_laden", args=[self.toern.id]),
+            data=json.dumps({"standard_id": standard.id}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        vorlage = DokumentVorlage.objects.get(toern=self.toern, typ="uebernahme")
+        self.assertEqual(vorlage.eintraege.count(), 1)
+        self.assertEqual(vorlage.eintraege.first().text, "Mein Punkt")
+
+    def test_list_liefert_nur_eigene_standards_des_typs(self):
+        self._speichern(self.skipper, typ="uebernahme", name="Übernahme-Std")
+        self._speichern(self.skipper, typ="rueckgabe", name="Rückgabe-Std")
+        self._speichern(self.anbieter, typ="uebernahme", name="Anbieter-Std")
+
+        self.client.force_login(self.skipper)
+        resp = self.client.get(reverse("dok_standard_list") + "?typ=uebernahme")
+        namen = [s["name"] for s in resp.json()["standards"]]
+        self.assertEqual(namen, ["Übernahme-Std"])
+
+    def test_fremder_standard_loeschen_gibt_404(self):
+        self._speichern(self.anbieter)
+        standard = DokumentStandard.objects.get(user=self.anbieter)
+        self.client.force_login(self.skipper)
+        resp = self.client.post(reverse("dok_standard_loeschen", args=[standard.id]))
+        self.assertEqual(resp.status_code, 404)
+        self.assertTrue(DokumentStandard.objects.filter(id=standard.id).exists())
+
+    def test_crew_darf_nicht_speichern(self):
+        resp = self._speichern(self.crew)
+        self.assertEqual(resp.status_code, 403)
+
+    def test_default_standard_wird_bei_neuem_toern_vererbt(self):
+        self._speichern(self.skipper, ist_default=True)
+        standard = DokumentStandard.objects.get(user=self.skipper)
+        standard.eintraege.all().delete()
+        DokumentStandardEintrag.objects.create(standard=standard, sektion="Eigene", text="Vererbt", reihenfolge=0)
+
+        start = timezone.now() + timedelta(days=90)
+        toern2 = Toern.objects.create(
+            titel="Zweiter Törn", anbieter=self.anbieter,
+            startdatum=start, enddatum=start + timedelta(days=7),
+            revier="Ostsee", preis_pro_person=500, status="ZUTEILUNG_FIXIERT",
+        )
+        Teilnahme.objects.create(toern=toern2, user=self.skipper, status="bestaetigt", rolle="skipper")
+
+        resp = self.client.get(reverse("dokument_items_get", args=[toern2.id, "uebernahme"]))
+        self.assertEqual(resp.status_code, 200)
+        texte = [i["text"] for i in resp.json()["items"]]
+        self.assertEqual(texte, ["Vererbt"])
+
+    def test_ohne_default_kommen_statische_inhalte(self):
+        self.client.force_login(self.skipper)
+        resp = self.client.get(reverse("dokument_items_get", args=[self.toern.id, "ablegen"]))
+        erwartet = sum(len(items) for _, items in DOKUMENT_DEFAULTS["ablegen"])
+        self.assertEqual(len(resp.json()["items"]), erwartet)
+
+    def test_reset_nutzt_statische_defaults_trotz_default_standard(self):
+        self._speichern(self.skipper, ist_default=True)
+        resp = self.client.post(
+            reverse("dokument_reset", args=[self.toern.id]),
+            data=json.dumps({"typ": "uebernahme"}),
+            content_type="application/json",
+        )
+        erwartet = sum(len(items) for _, items in DOKUMENT_DEFAULTS["uebernahme"])
+        self.assertEqual(len(resp.json()["items"]), erwartet)
