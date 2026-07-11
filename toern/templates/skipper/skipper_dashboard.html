@@ -1310,6 +1310,8 @@ function checkConflictsForBoot(bootZone) {
     items.forEach(i => {
         statusMap.set(i, "none");
         i.classList.remove("border-error","bg-error/20","border-warning","bg-warning/20");
+        // Pin-Optik wiederherstellen (wurde bei Konflikt entfernt)
+        if (i.dataset.fixiert) i.classList.add("bg-secondary/10","border-secondary/50");
     });
     for (let i = 0; i < items.length; i++) {
         for (let j = i + 1; j < items.length; j++) {
@@ -1329,8 +1331,14 @@ function checkConflictsForBoot(bootZone) {
         }
     }
     statusMap.forEach((status, item) => {
-        if (status === "exclude") item.classList.add("border-error","bg-error/20");
-        else if (status === "avoid") item.classList.add("border-warning","bg-warning/20");
+        if (status === "exclude") {
+            // Pin-Optik entfernen, sonst überdeckt border-secondary/bg-secondary das Rot (CSS-Reihenfolge)
+            item.classList.remove("bg-secondary/10","border-secondary/50");
+            item.classList.add("border-error","bg-error/20");
+        } else if (status === "avoid") {
+            item.classList.remove("bg-secondary/10","border-secondary/50");
+            item.classList.add("border-warning","bg-warning/20");
+        }
     });
 }
 
