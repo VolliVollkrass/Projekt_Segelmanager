@@ -149,6 +149,9 @@ class EinkaufslistenEintrag(models.Model):
     quelle       = models.CharField(max_length=20, default='manuell')   # rezept | standard | manuell
     rezept_info  = models.CharField(max_length=500, blank=True)          # "Pasta Napoli, Tomaten-Suppe"
     erledigt     = models.BooleanField(default=False)
+    # Kaufhistorie: beim Neu-Generieren wandern erledigte Einträge ins Archiv
+    # (statt gelöscht zu werden) und werden nicht ungefragt erneut angelegt
+    archiviert   = models.BooleanField(default=False)
     erledigt_von = models.ForeignKey(
         settings.AUTH_USER_MODEL, null=True, blank=True,
         on_delete=models.SET_NULL, related_name='+'
@@ -165,6 +168,53 @@ class EinkaufslistenEintrag(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.menge})" if self.menge else self.name
+
+
+# Grundeinkauf: bearbeitbare Vorlage pro Törn (ersetzt die Hardcode-Konstante)
+class EinkaufsVorlage(models.Model):
+    toern = models.OneToOneField(Toern, on_delete=models.CASCADE, related_name='einkaufs_vorlage')
+
+    def __str__(self):
+        return f"Grundeinkauf – {self.toern}"
+
+
+class EinkaufsVorlageEintrag(models.Model):
+    vorlage = models.ForeignKey(EinkaufsVorlage, on_delete=models.CASCADE, related_name='eintraege')
+    name = models.CharField(max_length=200)
+    # Mengen-Template mit Platzhaltern: {crew} = Crew-Anzahl, {wasser} = crew*5
+    menge_template = models.CharField(max_length=100, blank=True)
+    kategorie = models.CharField(
+        max_length=20, choices=EinkaufslistenEintrag.KATEGORIE_CHOICES, default='sonstiges'
+    )
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f"{self.name} ({self.menge_template})"
+
+
+# Grundeinkauf: persönlicher Standard eines Skippers — Default für neue Törns
+class EinkaufsStandard(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='einkaufs_standard'
+    )
+    aktualisiert_am = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Grundeinkauf-Standard – {self.user}"
+
+
+class EinkaufsStandardEintrag(models.Model):
+    standard = models.ForeignKey(EinkaufsStandard, on_delete=models.CASCADE, related_name='eintraege')
+    name = models.CharField(max_length=200)
+    menge_template = models.CharField(max_length=100, blank=True)
+    kategorie = models.CharField(
+        max_length=20, choices=EinkaufslistenEintrag.KATEGORIE_CHOICES, default='sonstiges'
+    )
+
+    class Meta:
+        ordering = ['id']
 
 
 # Persönliche Packliste

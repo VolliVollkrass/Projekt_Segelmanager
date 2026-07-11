@@ -9,7 +9,7 @@ from boote.models import Boot, Kabine
 from config import settings
 from finance.models import Ausgabe, TopfAusgabe
 from finance.utils import berechne_salden, berechne_ausgleich
-from logistik.models import Einkaufspunkt, EinkaufslistenEintrag, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
+from logistik.models import Einkaufspunkt, EinkaufslistenEintrag, EinkaufsStandard, EinkaufsStandardEintrag, EinkaufsVorlage, EinkaufsVorlageEintrag, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
@@ -2093,10 +2093,15 @@ def boot_dashboard(request, toern_id):
         or request.user == toern.anbieter
     )
 
-    # Einkaufsliste (neu)
+    # Einkaufsliste (neu) — Archivierte laufen separat als Kaufhistorie
     einkaufs_qs = EinkaufslistenEintrag.objects.filter(
-        boot=boot, toern=toern
+        boot=boot, toern=toern, archiviert=False
     ).select_related('einkaufer__user', 'erledigt_von')
+    einkauf_archiv = list(
+        EinkaufslistenEintrag.objects.filter(boot=boot, toern=toern, archiviert=True)
+        .select_related('erledigt_von')
+        .order_by('-erledigt_am', '-id')
+    )
     einkaufs_by_kat = {k: [] for k in EINKAUF_KATEGORIE_ORDER}
     for e in einkaufs_qs:
         einkaufs_by_kat.setdefault(e.kategorie, []).append(e)
@@ -2154,6 +2159,8 @@ def boot_dashboard(request, toern_id):
         "einkauf_gruppen": einkauf_gruppen,
         "einkauf_gesamt": einkauf_gesamt,
         "einkauf_erledigt": einkauf_erledigt,
+        "einkauf_archiv": einkauf_archiv,
+        "darf_grundeinkauf": kasse_darf_verwalten,
         # Bootskasse
         "kasse_ausgaben": kasse_ausgaben,
         "kasse_salden": kasse_salden,
@@ -4144,6 +4151,7 @@ _merge_mengen = summiere_mengen
 
 _STANDARD_ARTIKEL = [
     # (name, menge_template, kategorie)  — {crew} = crew count, {wasser} = crew*5
+    # Nur noch DEFAULT-Inhalt für neue Grundeinkauf-Vorlagen (EinkaufsVorlage)
     ('Klopapier',      '{crew} Rolle(n)',   'haushalt'),
     ('Küchenrolle',    '1 Packung',          'haushalt'),
     ('Spüllappen',     '1 Packung',          'haushalt'),
@@ -4154,6 +4162,33 @@ _STANDARD_ARTIKEL = [
     ('Müllbeutel 5L',  '1 Rolle',            'haushalt'),
     ('Müllbeutel 20L', '1 Rolle',            'haushalt'),
 ]
+
+
+def _get_or_create_einkaufsvorlage(toern, user=None):
+    """Grundeinkauf-Vorlage des Törns holen oder anlegen. Quelle beim Anlegen:
+    persönlicher Grundeinkauf-Standard des Users (falls Skipper/Anbieter),
+    sonst _STANDARD_ARTIKEL."""
+    vorlage, created = EinkaufsVorlage.objects.get_or_create(toern=toern)
+    if created:
+        source = None
+        if user is not None and _ist_skipper_oder_anbieter(user, toern):
+            standard = EinkaufsStandard.objects.filter(user=user).first()
+            if standard and standard.eintraege.exists():
+                source = list(standard.eintraege.values_list('name', 'menge_template', 'kategorie'))
+        if source is None:
+            source = _STANDARD_ARTIKEL
+        EinkaufsVorlageEintrag.objects.bulk_create([
+            EinkaufsVorlageEintrag(vorlage=vorlage, name=n, menge_template=t, kategorie=k)
+            for n, t, k in source
+        ])
+    return vorlage
+
+
+def _menge_aus_template(template, crew_anzahl):
+    try:
+        return template.format(crew=crew_anzahl, wasser=crew_anzahl * 5)
+    except (KeyError, IndexError, ValueError):
+        return template
 
 
 # ─── Einkaufsliste — Views ────────────────────────────────────────────────────
@@ -4172,8 +4207,23 @@ def einkaufsliste_generieren(request, toern_id, boot_id):
         toern=toern, boot=boot, status='bestaetigt'
     ).count() or 1
 
-    # Löscht alle nicht-manuellen Einträge
-    EinkaufslistenEintrag.objects.filter(boot=boot, toern=toern).exclude(quelle='manuell').delete()
+    # Erledigtes wandert ins Einkaufsarchiv (Kaufhistorie) statt gelöscht zu werden
+    EinkaufslistenEintrag.objects.filter(
+        boot=boot, toern=toern, erledigt=True, archiviert=False
+    ).update(archiviert=True)
+
+    # Offene automatische Einträge werden neu aufgebaut
+    EinkaufslistenEintrag.objects.filter(
+        boot=boot, toern=toern, archiviert=False
+    ).exclude(quelle='manuell').delete()
+
+    # Bereits Gekauftes (Archiv) nicht ungefragt erneut auf die Liste setzen
+    archiv_namen = {
+        n.lower().strip()
+        for n in EinkaufslistenEintrag.objects.filter(
+            boot=boot, toern=toern, archiviert=True
+        ).values_list('name', flat=True)
+    }
 
     # Zutaten aus Rezepten sammeln + skalieren
     raw = defaultdict(lambda: {'mengen': [], 'rezepte': [], 'name': ''})
@@ -4188,30 +4238,37 @@ def einkaufsliste_generieren(request, toern_id, boot_id):
             if mz.rezept.name not in raw[key]['rezepte']:
                 raw[key]['rezepte'].append(mz.rezept.name)
 
-    to_create = [
-        EinkaufslistenEintrag(
+    uebersprungen = 0
+    to_create = []
+    for key, data in raw.items():
+        if key in archiv_namen:
+            uebersprungen += 1
+            continue
+        to_create.append(EinkaufslistenEintrag(
             boot=boot, toern=toern,
             name=data['name'],
             menge=_merge_mengen(data['mengen']),
             kategorie=_detect_kategorie(data['name']),
             quelle='rezept',
             rezept_info=', '.join(data['rezepte']),
-        )
-        for data in raw.values()
-    ]
+        ))
 
-    # Standard-Artikel
-    for name, tpl, kat in _STANDARD_ARTIKEL:
+    # Grundeinkauf aus der bearbeitbaren Törn-Vorlage
+    vorlage = _get_or_create_einkaufsvorlage(toern, user=request.user)
+    for e in vorlage.eintraege.all():
+        if e.name.lower().strip() in archiv_namen:
+            uebersprungen += 1
+            continue
         to_create.append(EinkaufslistenEintrag(
             boot=boot, toern=toern,
-            name=name,
-            menge=tpl.format(crew=crew_anzahl, wasser=crew_anzahl * 5),
-            kategorie=kat,
+            name=e.name,
+            menge=_menge_aus_template(e.menge_template, crew_anzahl),
+            kategorie=e.kategorie,
             quelle='standard',
         ))
 
     EinkaufslistenEintrag.objects.bulk_create(to_create)
-    return JsonResponse({'ok': True, 'count': len(to_create)})
+    return JsonResponse({'ok': True, 'count': len(to_create), 'uebersprungen': uebersprungen})
 
 
 @login_required
@@ -4295,7 +4352,7 @@ def einkaufsliste_aufteilen(request, toern_id, boot_id):
         return JsonResponse({'error': 'Keine gültigen Personen'}, status=400)
     n = len(shoppers)
 
-    items = list(EinkaufslistenEintrag.objects.filter(boot=boot, toern=toern, erledigt=False))
+    items = list(EinkaufslistenEintrag.objects.filter(boot=boot, toern=toern, erledigt=False, archiviert=False))
 
     # Kategorien in Supermarkt-Reihenfolge, dann per round-robin auf Einkäufer verteilen
     by_cat = defaultdict(list)
@@ -4325,7 +4382,7 @@ def einkaufsliste_status(request, toern_id, boot_id):
     if not Teilnahme.objects.filter(user=request.user, toern=toern).exists() \
             and request.user != toern.anbieter:
         raise PermissionDenied
-    qs = EinkaufslistenEintrag.objects.filter(boot=boot, toern=toern).select_related('erledigt_von', 'einkaufer__user')
+    qs = EinkaufslistenEintrag.objects.filter(boot=boot, toern=toern, archiviert=False).select_related('erledigt_von', 'einkaufer__user')
     items = []
     for e in qs:
         von = ''
@@ -4339,3 +4396,103 @@ def einkaufsliste_status(request, toern_id, boot_id):
         items.append({'id': e.id, 'erledigt': e.erledigt, 'erledigt_von': von,
                       'shopper': shopper, 'shopper_id': shopper_id})
     return JsonResponse({'items': items})
+
+
+@login_required
+@require_POST
+def einkaufsliste_reaktivieren(request, eintrag_id):
+    """Archivierten Eintrag bewusst erneut kaufen — als neue aktive Zeile,
+    die Kaufhistorie im Archiv bleibt erhalten."""
+    eintrag = get_object_or_404(EinkaufslistenEintrag, id=eintrag_id, archiviert=True)
+    if not Teilnahme.objects.filter(user=request.user, toern=eintrag.toern).exists() \
+            and request.user != eintrag.toern.anbieter:
+        raise PermissionDenied
+    neu = EinkaufslistenEintrag.objects.create(
+        boot=eintrag.boot, toern=eintrag.toern,
+        name=eintrag.name, menge=eintrag.menge,
+        kategorie=eintrag.kategorie,
+        quelle='manuell',  # überlebt das nächste Generieren
+        rezept_info=eintrag.rezept_info,
+    )
+    return JsonResponse({'ok': True, 'id': neu.id})
+
+
+# ─── Grundeinkauf-Vorlage (bearbeitbar) ──────────────────────────────────────
+
+@login_required
+def einkaufsvorlage_get(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    _hat_skipper_oder_anbieter(request, toern)
+    vorlage = _get_or_create_einkaufsvorlage(toern, user=request.user)
+    items = list(vorlage.eintraege.values('id', 'name', 'menge_template', 'kategorie'))
+    return JsonResponse({
+        'items': items,
+        'kategorien': EinkaufslistenEintrag.KATEGORIE_CHOICES,
+        'hat_standard': EinkaufsStandard.objects.filter(user=request.user).exists(),
+    })
+
+
+@login_required
+@require_POST
+def einkaufsvorlage_add(request, toern_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    _hat_skipper_oder_anbieter(request, toern)
+    data = json.loads(request.body)
+    name = (data.get('name') or '').strip()
+    if not name:
+        return JsonResponse({'error': 'Name fehlt'}, status=400)
+    kategorie = data.get('kategorie') or _detect_kategorie(name)
+    if kategorie not in dict(EinkaufslistenEintrag.KATEGORIE_CHOICES):
+        kategorie = 'sonstiges'
+    vorlage = _get_or_create_einkaufsvorlage(toern, user=request.user)
+    e = EinkaufsVorlageEintrag.objects.create(
+        vorlage=vorlage, name=name,
+        menge_template=(data.get('menge_template') or '').strip(),
+        kategorie=kategorie,
+    )
+    return JsonResponse({'ok': True, 'id': e.id})
+
+
+@login_required
+@require_POST
+def einkaufsvorlage_update(request, toern_id, item_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    _hat_skipper_oder_anbieter(request, toern)
+    e = get_object_or_404(EinkaufsVorlageEintrag, id=item_id, vorlage__toern=toern)
+    data = json.loads(request.body)
+    e.name = (data.get('name') or e.name).strip()
+    e.menge_template = (data.get('menge_template') if data.get('menge_template') is not None else e.menge_template).strip()
+    kategorie = data.get('kategorie')
+    if kategorie in dict(EinkaufslistenEintrag.KATEGORIE_CHOICES):
+        e.kategorie = kategorie
+    e.save()
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def einkaufsvorlage_delete(request, toern_id, item_id):
+    toern = get_object_or_404(Toern, id=toern_id)
+    _hat_skipper_oder_anbieter(request, toern)
+    e = get_object_or_404(EinkaufsVorlageEintrag, id=item_id, vorlage__toern=toern)
+    e.delete()
+    return JsonResponse({'ok': True})
+
+
+@login_required
+@require_POST
+def einkaufsvorlage_als_standard(request, toern_id):
+    """Kopiert die Törn-Grundeinkauf-Vorlage in den persönlichen Standard des Users
+    — wird bei neuen Törns als Ausgangsliste verwendet."""
+    toern = get_object_or_404(Toern, id=toern_id)
+    _hat_skipper_oder_anbieter(request, toern)
+    vorlage = _get_or_create_einkaufsvorlage(toern, user=request.user)
+    standard, _ = EinkaufsStandard.objects.get_or_create(user=request.user)
+    standard.eintraege.all().delete()
+    EinkaufsStandardEintrag.objects.bulk_create([
+        EinkaufsStandardEintrag(standard=standard, name=e.name,
+                                menge_template=e.menge_template, kategorie=e.kategorie)
+        for e in vorlage.eintraege.all()
+    ])
+    standard.save()  # aktualisiert_am
+    return JsonResponse({'ok': True, 'count': standard.eintraege.count()})
