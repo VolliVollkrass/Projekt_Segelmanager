@@ -5,6 +5,16 @@
 {% block content %}
 <div class="max-w-2xl mx-auto px-4 py-6">
 
+  {% if next %}
+  <!-- Rücksprung zum Tagesplan -->
+  <a href="{{ next }}" class="flex items-center gap-1 text-sm text-base-content/50 hover:text-base-content transition-colors mb-4">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Zurück zum Tagesplan
+  </a>
+  {% endif %}
+
   <!-- Header -->
   <div class="flex items-center justify-between mb-5">
     <div>
@@ -12,7 +22,7 @@
       <p class="text-sm text-base-content/50 mt-0.5">Rezepte für die Bordküche</p>
     </div>
     {% if user.is_authenticated %}
-    <a href="{% url 'rezept_erstellen' %}" class="btn btn-primary btn-sm gap-1.5">
+    <a href="{% url 'rezept_erstellen' %}{% if next %}?next={{ next|urlencode }}{% endif %}" class="btn btn-primary btn-sm gap-1.5">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
       </svg>
@@ -23,6 +33,7 @@
 
   <!-- Suche & Filter -->
   <form method="get" class="mb-6 space-y-2">
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
     <div class="flex gap-2">
       <div class="relative flex-1">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -34,16 +45,16 @@
       <button type="submit" class="btn btn-sm btn-primary">Suchen</button>
     </div>
     <div class="flex gap-2 flex-wrap">
-      <a href="?{% if q %}q={{ q }}&{% endif %}sort={{ sort }}"
+      <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}sort={{ sort }}"
          class="badge {% if not kategorie %}badge-primary{% else %}badge-outline{% endif %} cursor-pointer">Alle</a>
       {% for k_val, k_label in kategorien %}
-      <a href="?{% if q %}q={{ q }}&{% endif %}kategorie={{ k_val }}&sort={{ sort }}"
+      <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}kategorie={{ k_val }}&sort={{ sort }}"
          class="badge {% if kategorie == k_val %}badge-primary{% else %}badge-outline{% endif %} cursor-pointer">{{ k_label }}</a>
       {% endfor %}
       <div class="ml-auto flex gap-1">
-        <a href="?{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort=neu"
+        <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort=neu"
            class="badge {% if sort != 'beliebt' %}badge-secondary{% else %}badge-outline{% endif %} cursor-pointer">Neueste</a>
-        <a href="?{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort=beliebt"
+        <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort=beliebt"
            class="badge {% if sort == 'beliebt' %}badge-secondary{% else %}badge-outline{% endif %} cursor-pointer">Beliebteste</a>
       </div>
     </div>
@@ -53,7 +64,7 @@
   {% if page_obj.object_list %}
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     {% for rezept in page_obj %}
-    <a href="{% url 'rezept_detail' rezept.pk %}" class="group card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-md transition-all overflow-hidden">
+    <a href="{% url 'rezept_detail' rezept.pk %}{% if next %}?next={{ next|urlencode }}{% endif %}" class="group card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-md transition-all overflow-hidden">
       {% if rezept.bild %}
       <figure class="h-40 overflow-hidden">
         <img src="{{ rezept.bild.url }}" alt="{{ rezept.name }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
@@ -92,12 +103,12 @@
   {% if page_obj.has_other_pages %}
   <div class="flex justify-center gap-2 mt-6">
     {% if page_obj.has_previous %}
-    <a href="?{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort={{ sort }}&page={{ page_obj.previous_page_number }}"
+    <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort={{ sort }}&page={{ page_obj.previous_page_number }}"
        class="btn btn-sm btn-ghost">← Zurück</a>
     {% endif %}
     <span class="btn btn-sm btn-disabled">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
     {% if page_obj.has_next %}
-    <a href="?{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort={{ sort }}&page={{ page_obj.next_page_number }}"
+    <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}sort={{ sort }}&page={{ page_obj.next_page_number }}"
        class="btn btn-sm btn-ghost">Weiter →</a>
     {% endif %}
   </div>
