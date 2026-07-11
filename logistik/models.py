@@ -76,7 +76,7 @@ class Tagesaufgabe(models.Model):
         ('navigation', 'Navigation'),
         ('abfahrtsprotokoll', 'Abfahrtsprotokoll'),
         ('einkauf', 'Einkauf / Proviant'),
-        ('hafenwache', 'Hafenwache'),
+        ('backschaft', 'Backschaft'),
         ('reinigung', 'Reinigung / Aufräumen'),
         ('sonstiges', 'Sonstiges'),
     ]

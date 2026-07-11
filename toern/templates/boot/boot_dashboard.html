@@ -529,7 +529,7 @@
                                 </div>
                             </div>
                         </div>
-                        <button onclick="addMahlzeitTag('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2" id="mz-btn-{{ tag.datum|date:'Ymd' }}">+ Mahlzeit</button>
+                        <button onclick="addMahlzeitTag('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2" id="mz-btn-{{ tag.datum|date:'Ymd' }}">Mahlzeit hinzufügen</button>
                     </div>
                     {% endif %}
                 </div>
@@ -577,7 +577,7 @@
                             <input type="text" id="auf-beschreibung-{{ tag.datum|date:'Ymd' }}" placeholder="Beschreibung…"
                                 class="input input-xs input-bordered col-span-2 hidden">
                         </div>
-                        <button onclick="addAufgabe('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">+ Aufgabe</button>
+                        <button onclick="addAufgabe('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">Aufgabe hinzufügen</button>
                     </div>
                     {% endif %}
                 </div>
@@ -623,7 +623,7 @@
                             <input type="text" id="imp-thema-{{ tag.datum|date:'Ymd' }}" placeholder="Impuls (optional)…"
                                 class="input input-xs input-bordered col-span-2">
                         </div>
-                        <button onclick="addImpuls('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">+ Impuls</button>
+                        <button onclick="addImpuls('{{ tag.datum|date:'Y-m-d' }}')" class="btn btn-xs btn-ghost mt-2">Impuls hinzufügen</button>
                     </div>
                     {% endif %}
                 </div>
