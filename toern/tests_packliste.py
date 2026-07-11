@@ -61,14 +61,14 @@ class PacklisteTestBase(TestCase):
 
 class SkipperVorlageTests(PacklisteTestBase):
     def test_skipper_vorlage_wird_mit_standardliste_erstellt(self):
-        vorlage = _get_or_create_vorlage(self.toern, "skipper")
+        vorlage = _get_or_create_vorlage(self.toern, "skipper", user=self.skipper)
         namen = set(vorlage.eintraege.values_list("name", flat=True))
         self.assertEqual(namen, {name for name, _ in SKIPPER_LISTE})
         self.assertIn("Chartervertrag", namen)
         self.assertIn("Rettungsweste", namen)
 
     def test_revier_wechsel_reset_laesst_skipper_vorlage_unangetastet(self):
-        vorlage = _get_or_create_vorlage(self.toern, "skipper")
+        vorlage = _get_or_create_vorlage(self.toern, "skipper", user=self.skipper)
         vorlage.eintraege.create(name="Eigenes Skipper-Item", menge=1)
         self.client.force_login(self.skipper)
         resp = self.client.post(
@@ -78,7 +78,7 @@ class SkipperVorlageTests(PacklisteTestBase):
         )
         self.assertEqual(resp.status_code, 200)
         self.assertTrue(
-            PacklisteVorlage.objects.get(toern=self.toern, typ="skipper")
+            PacklisteVorlage.objects.get(toern=self.toern, typ="skipper", user=self.skipper)
             .eintraege.filter(name="Eigenes Skipper-Item").exists()
         )
 
@@ -88,6 +88,55 @@ class SkipperVorlageTests(PacklisteTestBase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(len(data["items"]), len(SKIPPER_LISTE))
+
+    def test_skipper_vorlagen_sind_pro_person(self):
+        """Skipper und Co-Skipper haben getrennte, unabhängig editierbare Vorlagen."""
+        v_skipper = _get_or_create_vorlage(self.toern, "skipper", user=self.skipper)
+        v_coskipper = _get_or_create_vorlage(self.toern, "skipper", user=self.coskipper)
+        self.assertNotEqual(v_skipper.id, v_coskipper.id)
+
+        v_skipper.eintraege.create(name="Nur meins", menge=1)
+        self.assertFalse(v_coskipper.eintraege.filter(name="Nur meins").exists())
+
+        # items_get liefert jedem die eigene Liste
+        self.client.force_login(self.coskipper)
+        resp = self.client.get(reverse("vorlage_items_get", args=[self.toern.id, "skipper"]))
+        namen = [i["name"] for i in resp.json()["items"]]
+        self.assertNotIn("Nur meins", namen)
+
+    def test_skipper_vorlage_seedet_aus_eigenem_default_standard(self):
+        standard = PacklisteStandard.objects.create(
+            user=self.coskipper, typ="skipper", name="Mein Set", ist_default=True
+        )
+        PacklisteStandardEintrag.objects.create(standard=standard, name="Sextant", menge=1)
+        vorlage = _get_or_create_vorlage(self.toern, "skipper", user=self.coskipper)
+        self.assertEqual(list(vorlage.eintraege.values_list("name", flat=True)), ["Sextant"])
+        # Der andere Skipper bekommt weiterhin die Default-SKIPPER_LISTE
+        v2 = _get_or_create_vorlage(self.toern, "skipper", user=self.skipper)
+        self.assertIn("Chartervertrag", set(v2.eintraege.values_list("name", flat=True)))
+
+    def test_fremde_skipper_vorlage_nicht_editierbar(self):
+        v_coskipper = _get_or_create_vorlage(self.toern, "skipper", user=self.coskipper)
+        eintrag = v_coskipper.eintraege.first()
+        self.client.force_login(self.skipper)
+
+        resp = self.client.post(
+            reverse("vorlage_item_add", args=[self.toern.id]),
+            data=json.dumps({"vorlage_id": v_coskipper.id, "name": "Hack", "menge": 1}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+        resp = self.client.post(
+            reverse("vorlage_item_update", args=[self.toern.id, eintrag.id]),
+            data=json.dumps({"name": "Gehackt"}),
+            content_type="application/json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+        resp = self.client.post(reverse("vorlage_item_delete", args=[self.toern.id, eintrag.id]))
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(v_coskipper.eintraege.filter(id=eintrag.id).exists())
 
 
 class VorlageAnwendenTests(PacklisteTestBase):
@@ -114,6 +163,20 @@ class VorlageAnwendenTests(PacklisteTestBase):
         self.assertEqual(resp.json()["added"]["skipper"], 0)
         self.assertEqual(
             self.t_skipper.persoenliche_packliste.count(), len(SKIPPER_LISTE)
+        )
+
+    def test_anwenden_nutzt_die_eigene_vorlage_jedes_skippers(self):
+        """Skipper A hat ein Extra-Item in SEINER Vorlage — nur A bekommt es."""
+        v_skipper = _get_or_create_vorlage(self.toern, "skipper", user=self.skipper)
+        v_skipper.eintraege.create(name="Persönliches Fernglas", menge=1)
+        _get_or_create_vorlage(self.toern, "skipper", user=self.coskipper)
+
+        self._anwenden(apply_personal=False, apply_boot=False, apply_skipper=True)
+        self.assertTrue(
+            self.t_skipper.persoenliche_packliste.filter(name="Persönliches Fernglas").exists()
+        )
+        self.assertFalse(
+            self.t_coskipper.persoenliche_packliste.filter(name="Persönliches Fernglas").exists()
         )
 
 
@@ -155,7 +218,7 @@ class PacklisteStandardTests(PacklisteTestBase):
         )
 
     def test_speichern_kopiert_toern_vorlage(self):
-        vorlage = _get_or_create_vorlage(self.toern, "skipper")
+        vorlage = _get_or_create_vorlage(self.toern, "skipper", user=self.skipper)
         vorlage.eintraege.create(name="Extra-Item", menge=3)
         resp = self._speichern(self.skipper, typ="skipper", name="Mein Charter-Set")
         self.assertEqual(resp.status_code, 200)

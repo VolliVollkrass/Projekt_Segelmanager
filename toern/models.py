@@ -294,9 +294,28 @@ class PacklisteVorlage(models.Model):
         related_name='packliste_vorlagen'
     )
     typ = models.CharField(max_length=10, choices=[('personal', 'Persönlich'), ('boot', 'Boot'), ('skipper', 'Skipper')])
+    # Nur für typ='skipper': jede/r Skipper/Co-Skipper hat die eigene, persönliche
+    # Vorlage im Törn. personal/boot bleiben törn-geteilt (user=None).
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.CASCADE,
+        related_name='packliste_vorlagen'
+    )
 
     class Meta:
-        unique_together = [('toern', 'typ')]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['toern', 'typ'],
+                condition=models.Q(user__isnull=True),
+                name='uniq_packlvorlage_toern_typ_shared',
+            ),
+            models.UniqueConstraint(
+                fields=['toern', 'typ', 'user'],
+                condition=models.Q(user__isnull=False),
+                name='uniq_packlvorlage_toern_typ_user',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.get_typ_display()} – {self.toern}"

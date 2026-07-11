@@ -1057,6 +1057,9 @@ function switchToTab(tab) {
     // Content panels
     document.querySelectorAll("[id^='tab-']").forEach(t => t.classList.add("hidden"));
     document.getElementById(`tab-${tab}`)?.classList.remove("hidden");
+    // Tab in der URL halten — location.reload() (z.B. Packliste hinzufügen/löschen)
+    // landet sonst wieder auf der Übersicht
+    history.replaceState(null, "", "?tab=" + tab);
 }
 
 document.querySelectorAll(".tab-btn").forEach(btn => {
