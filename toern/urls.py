@@ -107,4 +107,10 @@ urlpatterns = [
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/status/",     einkaufsliste_status,     name="einkaufsliste_status"),
     path("einkaufsliste/<int:eintrag_id>/toggle/",                       einkaufsliste_toggle,     name="einkaufsliste_toggle"),
     path("einkaufsliste/<int:eintrag_id>/delete/",                       einkaufsliste_delete,     name="einkaufsliste_delete"),
+    path("einkaufsliste/<int:eintrag_id>/reaktivieren/",                 einkaufsliste_reaktivieren, name="einkaufsliste_reaktivieren"),
+    path("<int:toern_id>/einkaufsvorlage/",                              einkaufsvorlage_get,      name="einkaufsvorlage_get"),
+    path("<int:toern_id>/einkaufsvorlage/add/",                          einkaufsvorlage_add,      name="einkaufsvorlage_add"),
+    path("<int:toern_id>/einkaufsvorlage/<int:item_id>/update/",         einkaufsvorlage_update,   name="einkaufsvorlage_update"),
+    path("<int:toern_id>/einkaufsvorlage/<int:item_id>/delete/",         einkaufsvorlage_delete,   name="einkaufsvorlage_delete"),
+    path("<int:toern_id>/einkaufsvorlage/als-standard/",                 einkaufsvorlage_als_standard, name="einkaufsvorlage_als_standard"),
 ]

@@ -716,6 +716,14 @@
                     {% endif %}
                 </div>
                 <div class="flex gap-2">
+                    {% if darf_grundeinkauf %}
+                    <button onclick="oeffneGrundeinkauf()" class="btn btn-xs btn-ghost gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                        </svg>
+                        Grundeinkauf
+                    </button>
+                    {% endif %}
                     <button onclick="generiereEinkaufsliste()" id="btn-generieren"
                             class="btn btn-xs btn-outline gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -820,9 +828,72 @@
                     <button onclick="addEinkauf()" class="btn btn-sm btn-primary px-3">+</button>
                 </div>
             </div>
+
+            <!-- ═══ EINKAUFSARCHIV (bereits gekauft) ═══ -->
+            {% if einkauf_archiv %}
+            <div class="mt-6 pt-4 border-t border-base-200">
+                <div class="flex items-center gap-2 mb-3">
+                    <h2 class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Einkaufsarchiv</h2>
+                    <span class="badge badge-xs badge-outline">{{ einkauf_archiv|length }}</span>
+                </div>
+                <p class="text-xs text-base-content/40 mb-3">
+                    Bereits gekauft — kommt beim Generieren nicht erneut auf die Liste.
+                    „↻" setzt einen Posten bewusst wieder auf die aktive Liste.
+                </p>
+                <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+                    <div class="divide-y divide-base-200">
+                        {% for item in einkauf_archiv %}
+                        <div class="flex items-center gap-3 px-4 py-2 opacity-60">
+                            <div class="flex-1 min-w-0">
+                                <span class="text-sm line-through">{{ item.name }}</span>
+                                {% if item.menge %}
+                                <span class="text-xs text-base-content/40 ml-1.5">{{ item.menge }}</span>
+                                {% endif %}
+                            </div>
+                            {% if item.erledigt_von %}
+                            <span class="text-[10px] text-success shrink-0">
+                                {{ item.erledigt_von.first_name }}{% if item.erledigt_am %} · {{ item.erledigt_am|date:"d.m." }}{% endif %}
+                            </span>
+                            {% endif %}
+                            <button onclick="reaktiviereEinkauf({{ item.id }})"
+                                    title="Wieder auf die Liste setzen"
+                                    class="btn btn-ghost btn-xs text-secondary px-1 shrink-0">↻</button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
 
     </div>
+
+    <!-- ═══ MODAL: Grundeinkauf bearbeiten ═══ -->
+    {% if darf_grundeinkauf %}
+    <dialog id="grundeinkaufModal" class="modal">
+        <div class="modal-box max-w-lg">
+            <h3 class="font-bold text-lg mb-1">Grundeinkauf bearbeiten</h3>
+            <p class="text-xs text-base-content/50 mb-4">
+                Diese Artikel landen bei „Generieren" immer auf der Einkaufsliste.
+                In der Menge kannst du <code>{crew}</code> (Crew-Anzahl) und
+                <code>{wasser}</code> (Crew × 5) als Platzhalter verwenden.
+            </p>
+            <div id="ge-liste" class="space-y-2 max-h-80 overflow-y-auto mb-3"></div>
+            <div class="flex gap-2 pt-3 border-t border-base-200">
+                <input type="text" id="ge-new-name" placeholder="Artikel" class="input input-sm input-bordered flex-1">
+                <input type="text" id="ge-new-menge" placeholder="Menge" class="input input-sm input-bordered w-24">
+                <button onclick="addGrundeinkauf()" class="btn btn-sm btn-primary px-3">+</button>
+            </div>
+            <div class="modal-action justify-between">
+                <button onclick="grundeinkaufAlsStandard()" id="ge-standard-btn" class="btn btn-sm btn-ghost">
+                    Als meinen Standard speichern
+                </button>
+                <button class="btn btn-sm" onclick="grundeinkaufModal.close()">Fertig</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>close</button></form>
+    </dialog>
+    {% endif %}
 
     <!-- ========================= TAB: BOOTSKASSE ========================= -->
     <div id="tab-kasse" class="space-y-5 hidden">
@@ -1641,6 +1712,92 @@ async function loescheEinkauf(id) {
     await fetch(`/toern/einkaufsliste/${id}/delete/`, {
         method: 'POST', headers: {'X-CSRFToken': CSRF},
     });
+}
+
+async function reaktiviereEinkauf(id) {
+    // Archivierten Posten bewusst erneut kaufen — neue aktive Zeile, Archiv bleibt
+    await fetch(`/toern/einkaufsliste/${id}/reaktivieren/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+    location.href = "?tab=bordkueche";
+}
+
+// ─── Grundeinkauf-Vorlage ───
+const GE_KATEGORIEN = [];
+
+async function oeffneGrundeinkauf() {
+    document.getElementById('grundeinkaufModal').showModal();
+    await ladeGrundeinkauf();
+}
+
+async function ladeGrundeinkauf() {
+    const r = await fetch(`/toern/${TOERN_ID}/einkaufsvorlage/`);
+    const d = await r.json();
+    GE_KATEGORIEN.length = 0;
+    d.kategorien.forEach(k => GE_KATEGORIEN.push(k));
+    const liste = document.getElementById('ge-liste');
+    liste.innerHTML = '';
+    if (!d.items.length) {
+        liste.innerHTML = '<p class="text-sm opacity-50 text-center py-4">Keine Artikel.</p>';
+        return;
+    }
+    d.items.forEach(item => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2';
+        const opts = GE_KATEGORIEN.map(([v, l]) =>
+            `<option value="${v}" ${v === item.kategorie ? 'selected' : ''}>${l}</option>`).join('');
+        row.innerHTML = `
+            <input type="text" value="${escAttr(item.name)}" class="input input-xs input-bordered flex-1"
+                   onchange="updateGrundeinkauf(${item.id}, this.parentElement)">
+            <input type="text" value="${escAttr(item.menge_template)}" class="input input-xs input-bordered w-24"
+                   onchange="updateGrundeinkauf(${item.id}, this.parentElement)">
+            <select class="select select-xs select-bordered w-28"
+                    onchange="updateGrundeinkauf(${item.id}, this.parentElement)">${opts}</select>
+            <button onclick="loescheGrundeinkauf(${item.id})" class="btn btn-ghost btn-xs text-error px-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>`;
+        liste.appendChild(row);
+    });
+}
+
+async function updateGrundeinkauf(id, row) {
+    const inputs = row.querySelectorAll('input');
+    const select = row.querySelector('select');
+    await fetch(`/toern/${TOERN_ID}/einkaufsvorlage/${id}/update/`, {
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+        body: JSON.stringify({ name: inputs[0].value, menge_template: inputs[1].value, kategorie: select.value }),
+    });
+}
+
+async function loescheGrundeinkauf(id) {
+    await fetch(`/toern/${TOERN_ID}/einkaufsvorlage/${id}/delete/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+    await ladeGrundeinkauf();
+}
+
+async function addGrundeinkauf() {
+    const nameEl = document.getElementById('ge-new-name');
+    const mengeEl = document.getElementById('ge-new-menge');
+    if (!nameEl.value.trim()) return;
+    await fetch(`/toern/${TOERN_ID}/einkaufsvorlage/add/`, {
+        method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+        body: JSON.stringify({ name: nameEl.value, menge_template: mengeEl.value }),
+    });
+    nameEl.value = ''; mengeEl.value = '';
+    await ladeGrundeinkauf();
+}
+
+async function grundeinkaufAlsStandard() {
+    const btn = document.getElementById('ge-standard-btn');
+    const r = await fetch(`/toern/${TOERN_ID}/einkaufsvorlage/als-standard/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+    const d = await r.json();
+    if (d.ok) {
+        btn.textContent = `✓ Gespeichert (${d.count} Artikel)`;
+        setTimeout(() => { btn.textContent = 'Als meinen Standard speichern'; }, 2500);
+    }
 }
 
 async function addEinkauf() {
