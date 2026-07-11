@@ -474,7 +474,7 @@
                             <span class="text-xs text-base-content/40">{{ m.kochverantwortlich.user.first_name }}</span>
                             {% endif %}
                             {% if m.rezept %}
-                            <a href="{% url 'rezept_detail' m.rezept.pk %}" target="_blank"
+                            <a href="{% url 'rezept_detail' m.rezept.pk %}?next={{ request.path|add:"?tab=tagesplan"|urlencode }}" target="_blank"
                                class="btn btn-ghost btn-xs text-secondary px-1" title="Rezept: {{ m.rezept.name }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
@@ -1311,6 +1311,8 @@ function toggleBeschr(datumStr) {
 const MEAL_ICONS = { fruehstueck:'☀️', mittag:'🌤️', abend:'🌙', essen_gehen:'🍽️', snack:'🍎' };
 
 // ── Rezept-Suche Autocomplete ──
+// Rücksprung-Ziel für Kochbuch-Links: zurück zum Tagesplan-Tab
+const KOCHBUCH_NEXT = encodeURIComponent(location.pathname + '?tab=tagesplan');
 let _suchTimer = {};
 function rezeptSuche(d, q) {
     // Reset bei Freitext — Rezept-Bindung aufheben
@@ -1333,7 +1335,7 @@ function zeigeDropdown(d, q, results) {
     if (!results.length) {
         dd.innerHTML = `
             <div class="px-3 py-2 text-xs text-base-content/40">Kein Rezept gefunden</div>
-            <a href="/kochbuch/neu/" target="_blank"
+            <a href="/kochbuch/neu/?next=${KOCHBUCH_NEXT}" target="_blank"
                class="flex items-center gap-2 px-3 py-2 text-xs text-secondary hover:bg-base-200 border-t border-base-200">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
@@ -1357,7 +1359,7 @@ function zeigeDropdown(d, q, results) {
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
             </svg>
         </button>`).join('') +
-        `<a href="/kochbuch/neu/" target="_blank"
+        `<a href="/kochbuch/neu/?next=${KOCHBUCH_NEXT}" target="_blank"
             class="flex items-center gap-1.5 px-3 py-2 text-[10px] text-base-content/40 hover:bg-base-200 border-t border-base-200">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
@@ -1417,7 +1419,7 @@ function addMahlzeitTag(datum) {
         const isEssen = data.typ === 'essen_gehen';
         const personHtml = data.person ? `<span class="text-xs text-base-content/40">${data.person.split(' ')[0]}</span>` : '';
         const rezeptHtml = data.rezept_id
-            ? `<a href="/kochbuch/${data.rezept_id}/" target="_blank" class="btn btn-ghost btn-xs text-secondary px-1" title="Rezept ansehen">
+            ? `<a href="/kochbuch/${data.rezept_id}/?next=${KOCHBUCH_NEXT}" target="_blank" class="btn btn-ghost btn-xs text-secondary px-1" title="Rezept ansehen">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
                 </svg></a>` : '';

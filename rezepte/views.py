@@ -11,9 +11,22 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from .models import Rezept, RezeptSchritt, RezeptStern, RezeptZutat
+
+
+def _safe_next(request):
+    """Rücksprung-URL (z.B. Tagesplan im Boot-Dashboard) aus ?next= / POST holen.
+    Nur relative URLs auf demselben Host zulassen."""
+    from django.utils.http import url_has_allowed_host_and_scheme
+    nxt = request.POST.get("next") or request.GET.get("next") or ""
+    if nxt and url_has_allowed_host_and_scheme(
+        nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return nxt
+    return ""
 
 
 def kochbuch_liste(request):
@@ -48,6 +61,7 @@ def kochbuch_liste(request):
         "sort": sort,
         "kategorien": Rezept.KATEGORIE_CHOICES,
         "meine_sterne": meine_sterne,
+        "next": _safe_next(request),
     })
 
 
@@ -63,6 +77,7 @@ def rezept_detail(request, pk):
     return render(request, "rezepte/detail.html", {
         "rezept": rezept,
         "hat_stern": hat_stern,
+        "next": _safe_next(request),
     })
 
 
@@ -73,6 +88,7 @@ def rezept_erstellen(request):
     return render(request, "rezepte/form.html", {
         "kategorien": Rezept.KATEGORIE_CHOICES,
         "action": "erstellen",
+        "next": _safe_next(request),
     })
 
 
@@ -95,6 +111,7 @@ def rezept_bearbeiten(request, pk):
             for z in rezept.zutaten.all()
         ]),
         "schritte_json": json.dumps([s.text for s in rezept.schritte.all()]),
+        "next": _safe_next(request),
     })
 
 
@@ -146,6 +163,11 @@ def _rezept_speichern(request, rezept):
         for i, s in enumerate(schritte_data) if s.strip()
     ])
 
+    nxt = _safe_next(request)
+    if nxt:
+        # Rücksprung-Kontext (Tagesplan) am Detail erhalten
+        from urllib.parse import quote
+        return redirect(f"{reverse('rezept_detail', args=[rezept.pk])}?next={quote(nxt)}")
     return redirect("rezept_detail", pk=rezept.pk)
 
 
