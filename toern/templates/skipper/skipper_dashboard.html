@@ -18,11 +18,6 @@
                 <h1 class="text-2xl font-bold leading-tight">{{ toern.titel }}</h1>
                 <p class="text-base-content/50 text-sm mt-0.5">Skipper-Dashboard</p>
             </div>
-            {% if toern.status != "ABGESCHLOSSEN" %}
-            <a href="{% url 'skipper_dashboard' toern.id %}#tab-abschluss" class="btn btn-sm btn-outline shrink-0" onclick="setTimeout(()=>document.querySelector('[data-tab=abschluss]')?.click(),100)">
-                Abschließen
-            </a>
-            {% endif %}
         </div>
     </div>
 
@@ -606,7 +601,8 @@
 
         <!-- Hinweis Skipper-Liste -->
         <p id="skipper-typ-hinweis" class="text-xs text-base-content/50 hidden">
-            Diese Liste geht nur an Skipper &amp; Co-Skipper und ist unabhängig vom Segelgebiet
+            Deine persönliche Skipperliste — jede/r Skipper &amp; Co-Skipper hat eine eigene.
+            Änderungen gelten nur für dich; unabhängig vom Segelgebiet
             (ein Revier-Wechsel setzt sie nicht zurück).
         </p>
 
@@ -1275,7 +1271,10 @@ const avoidMap = {
 
     const params = new URLSearchParams(location.search);
     const initial = params.get('tab') || location.hash.replace('#', '') || 'uebersicht';
-    activate(initial);
+    // Aufschieben: activate('packliste'/'dokumente') ruft loadVorlage/loadDokument,
+    // die auf let-Variablen weiter unten im Script zugreifen — synchron wäre das
+    // ein TDZ-ReferenceError, der den restlichen Script-Block abbricht.
+    queueMicrotask(() => activate(initial));
 })();
 
 // ===================== CSRF =====================
@@ -1529,7 +1528,7 @@ function cancelVorlageEdit(id) {
 }
 function saveVorlageRow(id) {
     const row = document.getElementById('vorlage-row-' + id);
-    const inputs = row.querySelectorAll('.edit-mode input');
+    const inputs = row.querySelectorAll('input.edit-mode');
     const name = inputs[0].value.trim();
     const menge = parseInt(inputs[1].value) || 1;
     if (!name) return;

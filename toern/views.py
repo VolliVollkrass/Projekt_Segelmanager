@@ -2815,9 +2815,13 @@ def teilnehmerliste_pdf(request, toern_id):
 def _get_or_create_vorlage(toern, typ, user=None):
     """Törn-Vorlage holen oder anlegen. Quelle beim Anlegen (in dieser Reihenfolge):
     Default-Standard des Users (falls Skipper/Co-Skipper/Anbieter des Törns),
-    sonst die statische Standard-Liste des Reviers."""
+    sonst die statische Standard-Liste des Reviers.
+
+    typ='skipper' ist PERSÖNLICH: eine eigene Vorlage pro Skipper/Co-Skipper
+    (user-gebunden); personal/boot bleiben törn-geteilt (user=None)."""
     revier_typ = toern.packliste_revier_typ
-    vorlage, created = PacklisteVorlage.objects.get_or_create(toern=toern, typ=typ)
+    vorlage_user = user if typ == 'skipper' else None
+    vorlage, created = PacklisteVorlage.objects.get_or_create(toern=toern, typ=typ, user=vorlage_user)
     if created:
         source = None
         if user is not None and _ist_skipper_oder_anbieter(user, toern):
@@ -2902,6 +2906,8 @@ def vorlage_item_add(request, toern_id):
         return JsonResponse({'error': 'Name fehlt'}, status=400)
 
     vorlage = get_object_or_404(PacklisteVorlage, id=vorlage_id, toern=toern)
+    if vorlage.user_id and vorlage.user_id != request.user.id:
+        raise PermissionDenied  # persönliche Skipperliste eines anderen
     eintrag = PacklisteVorlageEintrag.objects.create(vorlage=vorlage, name=name, menge=menge)
     return JsonResponse({'status': 'ok', 'id': eintrag.id, 'name': eintrag.name, 'menge': eintrag.menge})
 
@@ -2913,6 +2919,8 @@ def vorlage_item_update(request, toern_id, item_id):
     _hat_skipper_oder_anbieter(request, toern)
 
     eintrag = get_object_or_404(PacklisteVorlageEintrag, id=item_id, vorlage__toern=toern)
+    if eintrag.vorlage.user_id and eintrag.vorlage.user_id != request.user.id:
+        raise PermissionDenied
     data = json.loads(request.body)
     eintrag.name = data.get('name', eintrag.name).strip()
     eintrag.menge = max(1, int(data.get('menge', eintrag.menge)))
@@ -2927,6 +2935,8 @@ def vorlage_item_delete(request, toern_id, item_id):
     _hat_skipper_oder_anbieter(request, toern)
 
     eintrag = get_object_or_404(PacklisteVorlageEintrag, id=item_id, vorlage__toern=toern)
+    if eintrag.vorlage.user_id and eintrag.vorlage.user_id != request.user.id:
+        raise PermissionDenied
     eintrag.delete()
     return JsonResponse({'status': 'ok'})
 
@@ -2958,9 +2968,10 @@ def vorlage_anwenden(request, toern_id):
             added['personal'] += len(to_create)
 
     if apply_skipper:
-        vorlage = _get_or_create_vorlage(toern, 'skipper', user=request.user)
-        template_items = list(vorlage.eintraege.values_list('name', 'menge'))
+        # Skipperliste ist persönlich — jede/r Skipper bekommt die EIGENE Vorlage
         for t in toern.teilnahmen.filter(status='bestaetigt', rolle__in=['skipper', 'coskipper']):
+            vorlage = _get_or_create_vorlage(toern, 'skipper', user=t.user)
+            template_items = list(vorlage.eintraege.values_list('name', 'menge'))
             existing = set(t.persoenliche_packliste.values_list('name', flat=True))
             to_create = [
                 PersönlicherGegenstand(participation=t, name=name, menge=menge, ist_skipper=True)
@@ -3041,7 +3052,10 @@ def packl_standard_laden(request, toern_id):
     data = json.loads(request.body)
     standard = get_object_or_404(PacklisteStandard, id=data.get('standard_id'), user=request.user)
 
-    vorlage, _ = PacklisteVorlage.objects.get_or_create(toern=toern, typ=standard.typ)
+    vorlage, _ = PacklisteVorlage.objects.get_or_create(
+        toern=toern, typ=standard.typ,
+        user=request.user if standard.typ == 'skipper' else None,
+    )
     vorlage.eintraege.all().delete()
     PacklisteVorlageEintrag.objects.bulk_create([
         PacklisteVorlageEintrag(vorlage=vorlage, name=n, menge=m)
