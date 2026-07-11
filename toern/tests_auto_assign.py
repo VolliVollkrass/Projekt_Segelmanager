@@ -259,6 +259,30 @@ class BootFixierungTests(AutoAssignBase):
         self.assertEqual(self._boot_von(b), self.boote[2])
         self.assertTrue(any("getrennt" in w for w in resp.json()["warnings"]))
 
+    def test_nicht_zuteilbare_person_verliert_altes_boot(self):
+        """Regression: X war vorher auf Boot 1 zugeteilt. Ausschließer werden auf
+        alle Boote gepinnt → X ist nicht zuteilbar. X darf dann NICHT still sein
+        altes Boot behalten (dort sitzt ein Ausschließer!), sondern muss ohne
+        Boot/Kabine enden."""
+        self._setup()
+        # X hat noch eine alte Zuteilung auf Boot 1 (nicht fixiert)
+        tx = Teilnahme.objects.get(toern=self.toern, user=self.x)
+        tx.boot = self.boote[0]
+        tx.kabine = self.boote[0].kabinen.first()
+        tx.save()
+        # Drei Ausschließer, einer pro Boot, gepinnt
+        for i in range(3):
+            self._pin(self.ausschliesser[i], self.boote[i])
+
+        resp = self._run()
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn(str(self.x.id), resp.json()["unassigned"])
+
+        tx.refresh_from_db()
+        self.assertIsNone(tx.boot, "X wurde als 'nicht zugeteilt' gemeldet, hängt aber noch am alten Boot")
+        self.assertIsNone(tx.kabine)
+        self._keine_ausschluss_verletzung()
+
     def test_fixierungs_konflikt_warnung(self):
         """Zwei gegeneinander Ausgeschlossene bewusst aufs selbe Boot gepinnt → Warnung, bleiben."""
         self._setup()

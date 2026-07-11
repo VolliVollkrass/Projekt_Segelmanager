@@ -1589,6 +1589,11 @@ def auto_assign(request, toern_id):
     # SPEICHERN: Boote + Kabinen (First-Fit-Decreasing), bulk
     # =========================
     Teilnahme.objects.filter(toern=toern).update(boot=None, kabine=None)
+    # Auch die geladenen Objekte leeren — sonst schreibt bulk_update für
+    # nicht zuteilbare Personen ihr altes Boot/Kabine zurück
+    for t in teilnahme_map.values():
+        t.boot = None
+        t.kabine = None
 
     boat_groups = {b.id: [] for b in boote}
     for g in fixed_groups:
@@ -1613,7 +1618,14 @@ def auto_assign(request, toern_id):
                     k["free"] -= g["size"]
                     break
             else:
-                unassigned_users.extend(g["users"])
+                if g["fixed_boot_id"]:
+                    # Fixierte bleiben auf ihrem Boot, nur ohne Kabine
+                    namen = " & ".join(f"{u.first_name} {u.last_name}" for u in g["users"])
+                    warnings.append(f"{b.name}: keine freie Kabine für {namen} — bitte manuell prüfen.")
+                else:
+                    for u in g["users"]:
+                        teilnahme_map[u.id].boot = None
+                    unassigned_users.extend(g["users"])
         for k in kabinen_state:
             for u in k["users"]:
                 teilnahme_map[u.id].kabine = k["kabine"]
