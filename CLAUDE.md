@@ -35,7 +35,11 @@ cd ~/docker/segelmanager
 git pull
 docker compose build segelmanager
 docker compose up -d
-docker compose exec segelmanager python manage.py migrate
+
+# KEIN manueller migrate — entrypoint.sh migriert beim Container-Start selbst!
+# Ein paralleler manueller Aufruf crasht mit DuplicateColumn.
+# Stattdessen nach ~20s kontrollieren:
+docker compose exec segelmanager python manage.py showmigrations toern | tail -3
 ```
 
 ## Projektstruktur
@@ -58,10 +62,12 @@ config/      settings.py, urls.py
 | Anonym | Startseite, Törn-Details |
 | Crew | Crew-Dashboard, Profil |
 | Skipper / Co-Skipper | + Skipper-Dashboard (Übersicht / Zuteilung / Crew / Packliste) |
-| Anbieter (`is_anbieter=True`) | + Anbieter-Dashboard, Törn erstellen/bearbeiten |
+| Anbieter (Gruppe "Anbieter") | + Anbieter-Dashboard, Törn erstellen/bearbeiten |
 | Staff (`is_staff=True`) | + Django Admin |
 
 Decorators: `@login_required`, `@anbieter_required` (utils/permissions.py), `@require_POST`
+
+**Achtung**: `User.is_anbieter` ist eine **Methode** (prüft Mitgliedschaft in Gruppe "Anbieter"), kein Feld. In Tests: `user.groups.add(Group.objects.get_or_create(name="Anbieter")[0])` + `email_verified=True` (sonst 302 durch EmailVerificationMiddleware).
 
 ## Frontend-Konventionen
 
@@ -81,6 +87,8 @@ Decorators: `@login_required`, `@anbieter_required` (utils/permissions.py), `@re
 - **schema_viewer**: Nur wenn `DEBUG=True` aktiv
 - **Kabinenpartner-Logik**: Gegenseitig — accepted löscht alle anderen Anfragen beider User
 - **E-Mail**: HETZNER BLOCKIERT SMTP-PORTS (587/465/2525) → Brevo REST API via anymail verwenden, nie SMTP
+- **ToernForm nutzt `Meta.exclude`**: Jedes neue `Toern`-Feld landet automatisch im Formular. Felder ohne `blank=True`, die nicht in `toern_form.html` gerendert werden, blockieren das Speichern lautlos → entweder rendern oder in `exclude` aufnehmen
+- **Unique-Feld mit callable Default (z.B. UUID)**: Nie direkt per `AddField` — der Default wird einmal berechnet, alle Bestandszeilen bekommen denselben Wert → UNIQUE-Fehler. Dreistufig: AddField ohne Default (null=True) → RunPython-Backfill → AlterField unique. Migration gegen Kopie von db.sqlite3 testen
 
 ## Wichtige Dateien
 
