@@ -22,40 +22,34 @@
         </div>
     </div>
 
-    <!-- TAB-NAVIGATION Mobile Icon-Menu -->
-    <div class="lg:hidden flex justify-center mb-4">
-        <ul class="menu menu-horizontal bg-base-200 rounded-box gap-0.5">
-            <li>
-                <a class="tab-icon-btn tooltip tooltip-bottom active" data-tab="uebersicht" data-tip="Crew &amp; Boot" onclick="switchToTab('uebersicht'); return false;">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
-                </a>
-            </li>
-            <li>
-                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="packliste" data-tip="Meine Packliste" onclick="switchToTab('packliste'); return false;">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
-                </a>
-            </li>
-            <li>
-                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="bootspackliste" data-tip="Mitbringen" onclick="switchToTab('bootspackliste'); return false;">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                </a>
-            </li>
-            <li>
-                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="kasse" data-tip="Bootskasse" onclick="switchToTab('kasse'); return false;">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                </a>
-            </li>
-            <li>
-                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="tagesplan" data-tip="Tagesplan" onclick="switchToTab('tagesplan'); return false;">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                </a>
-            </li>
-            <li>
-                <a class="tab-icon-btn tooltip tooltip-bottom" data-tab="bordkueche" data-tip="Einkaufsliste" onclick="switchToTab('bordkueche'); return false;">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
-                </a>
-            </li>
-        </ul>
+    <!-- TAB-NAVIGATION Mobile (Icon + Label) -->
+    <div class="lg:hidden -mx-4 px-4 mb-5 overflow-x-auto">
+        <div class="flex gap-1 min-w-max">
+            <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] bg-primary/10 text-primary transition-colors" data-tab="uebersicht">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span class="text-[10px] font-medium leading-tight">Crew &amp; Boot</span>
+            </button>
+            <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="packliste">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                <span class="text-[10px] font-medium leading-tight">Packliste</span>
+            </button>
+            <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="bootspackliste">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                <span class="text-[10px] font-medium leading-tight">Mitbringen</span>
+            </button>
+            <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="kasse">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span class="text-[10px] font-medium leading-tight">Bootskasse</span>
+            </button>
+            <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="tagesplan">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span class="text-[10px] font-medium leading-tight">Tagesplan</span>
+            </button>
+            <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="bordkueche">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span class="text-[10px] font-medium leading-tight">Einkauf</span>
+            </button>
+        </div>
     </div>
 
     <!-- TAB-NAVIGATION Desktop -->
@@ -1121,9 +1115,12 @@ function switchToTab(tab) {
         b.classList.toggle("border-transparent", !active);
         b.classList.toggle("text-base-content/50", !active);
     });
-    // Mobile icon menu
-    document.querySelectorAll(".tab-icon-btn").forEach(b => {
-        b.classList.toggle("active", b.dataset.tab === tab);
+    // Mobile icon+label row
+    document.querySelectorAll(".mtab-btn").forEach(b => {
+        const active = b.dataset.tab === tab;
+        b.classList.toggle("bg-primary/10", active);
+        b.classList.toggle("text-primary", active);
+        b.classList.toggle("text-base-content/50", !active);
     });
     // Content panels
     document.querySelectorAll("[id^='tab-']").forEach(t => t.classList.add("hidden"));
@@ -1133,7 +1130,7 @@ function switchToTab(tab) {
     history.replaceState(null, "", "?tab=" + tab);
 }
 
-document.querySelectorAll(".tab-btn").forEach(btn => {
+document.querySelectorAll(".tab-btn, .mtab-btn").forEach(btn => {
     btn.addEventListener("click", () => switchToTab(btn.dataset.tab));
 });
 
