@@ -86,6 +86,17 @@ class BootForm(forms.ModelForm):
             "bild_boot": forms.ClearableFileInput(attrs={
                 "class": "file-input file-input-bordered w-full"
             }),
+
+            "charterbasis_name": forms.TextInput(attrs={
+                "class": "input input-bordered w-full",
+                "placeholder": "z.B. Pitter Yachting"
+            }),
+
+            "charterbasis_email": forms.EmailInput(attrs={
+                "class": "input input-bordered w-full",
+                "placeholder": "z.B. charter@basis.de",
+                "inputmode": "email",
+            }),
         }
 
     def __init__(self, *args, **kwargs):

@@ -74,10 +74,17 @@
 
                         {{ form.funkrufzeichen.label_tag }} {{ form.funkrufzeichen }}
                         {{ form.mmsi.label_tag }} {{ form.mmsi }}
+
+                        {{ form.charterbasis_name.label_tag }} {{ form.charterbasis_name }}
+                        {{ form.charterbasis_email.label_tag }} {{ form.charterbasis_email }}
                     </div>
                     <p class="text-xs text-base-content/50 mt-2">
                         Funkrufzeichen und MMSI stehen in den Schiffspapieren / im Chartervertrag —
                         sie werden für das Mayday-Plakat am Funkgerät benötigt.
+                    </p>
+                    <p class="text-xs text-base-content/50 mt-1">
+                        Die E-Mail der Charterbasis wird beim Versenden des Schadensprotokolls
+                        als Empfänger vorbelegt.
                     </p>
 
                     <div class="mt-4">

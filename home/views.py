@@ -81,4 +81,7 @@ def pdf_viewer(request):
         "src": src,
         "titel": titel,
         "dateiname": dateiname,
+        # Optionaler Empfänger für den mailto-Fallback (z.B. Charterbasis)
+        "mailto": request.GET.get("mailto", "").strip(),
+        "betreff": request.GET.get("betreff", "").strip(),
     })
