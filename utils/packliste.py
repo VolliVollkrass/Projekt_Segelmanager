@@ -113,4 +113,13 @@ SKIPPER_LISTE = [
     ("Bändsel", 1),
     ("Rettungsweste", 1),
     ("Multifunktionstool", 1),
+    ("Schäkel", 2),
+    ("Karabiner", 2),
+    ("WD-40", 1),
+    ("Revierführer", 1),
+    ("Panzertape", 1),
+    ("Hanfunkgerät", 1),
+    ("Ankerboje", 1),
+    ("Segelwhere", 1),
+    ("Spezialflaggen", 1),
 ]

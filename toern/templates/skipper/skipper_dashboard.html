@@ -593,10 +593,10 @@
         </div>
 
         <!-- Typ-Tabs -->
-        <div role="tablist" class="tabs tabs-boxed">
-            <button role="tab" id="tab-personal" class="tab tab-active" onclick="setTyp('personal')">Persönlich</button>
-            <button role="tab" id="tab-boot" class="tab" onclick="setTyp('boot')">Boot</button>
-            <button role="tab" id="tab-skipper" class="tab" onclick="setTyp('skipper')">Skipper</button>
+        <div role="tablist" class="tabs tabs-box">
+            <button role="tab" id="subtab-personal" class="tab tab-active" onclick="setTyp('personal')">Persönlich</button>
+            <button role="tab" id="subtab-boot" class="tab" onclick="setTyp('boot')">Boot</button>
+            <button role="tab" id="subtab-skipper" class="tab" onclick="setTyp('skipper')">Skipper</button>
         </div>
 
         <!-- Hinweis Skipper-Liste -->
@@ -705,7 +705,7 @@
                 </p>
             </div>
 
-            <div role="tablist" class="tabs tabs-boxed">
+            <div role="tablist" class="tabs tabs-box">
                 <button role="tab" id="dok-tab-uebernahme" class="tab tab-active" onclick="setDokTyp('uebernahme')">Übernahme</button>
                 <button role="tab" id="dok-tab-ablegen" class="tab" onclick="setDokTyp('ablegen')">Ablegen</button>
                 <button role="tab" id="dok-tab-anlegen" class="tab" onclick="setDokTyp('anlegen')">Anlegen</button>
@@ -1475,7 +1475,7 @@ function bestaetigeRevierWechsel() {
 
 function setTyp(typ) {
     vorlageTyp = typ;
-    ['personal','boot','skipper'].forEach(t => { document.getElementById('tab-' + t).classList.toggle('tab-active', t === typ); });
+    ['personal','boot','skipper'].forEach(t => { document.getElementById('subtab-' + t).classList.toggle('tab-active', t === typ); });
     document.getElementById('skipper-typ-hinweis').classList.toggle('hidden', typ !== 'skipper');
     loadVorlage();
 }
