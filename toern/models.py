@@ -540,3 +540,92 @@ class ErinnerungsMailLog(models.Model):
 
     def __str__(self):
         return f"{self.empfaenger} — {self.toern} ({self.gesendet_am:%d.%m.%Y %H:%M})"
+
+class Schadensmeldung(models.Model):
+    """Ein Schadenseintrag im Schadensprotokoll eines Boots.
+
+    Die ganze Boots-Crew darf lesen, anlegen und bearbeiten (jeder jeden Eintrag).
+    Löschen darf nur der Autor oder Skipper/Co-Skipper des Boots.
+    """
+    STATUS_CHOICES = [
+        ("offen", "Offen"),
+        ("behoben", "Behoben"),
+        ("gemeldet", "An Basis gemeldet"),
+    ]
+
+    SCHWEREGRAD_CHOICES = [
+        (1, "1 – Kosmetisch / unwesentlich"),
+        (2, "2 – Gering"),
+        (3, "3 – Spürbar"),
+        (4, "4 – Erheblich"),
+        (5, "5 – Sicherheitskritisch / nicht fahrtüchtig"),
+    ]
+
+    boot = models.ForeignKey(Boot, on_delete=models.CASCADE, related_name="schaeden")
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="schaeden")
+    titel = models.CharField(max_length=200, verbose_name="Was ist kaputt")
+    ort = models.CharField(max_length=200, verbose_name="Wo am Boot")
+    schweregrad = models.PositiveSmallIntegerField(choices=SCHWEREGRAD_CHOICES, default=3)
+    beschreibung = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="offen")
+
+    erstellt_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name="erstellte_schaeden",
+    )
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+    geaendert_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="geaenderte_schaeden",
+    )
+    geaendert_am = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-erstellt_am"]
+
+    def __str__(self):
+        return f"{self.titel} ({self.boot.name})"
+
+    @property
+    def schweregrad_farbe(self):
+        """DaisyUI-Badge-Klasse passend zum Schweregrad (grün → rot)."""
+        return {
+            1: "badge-success",
+            2: "badge-success",
+            3: "badge-warning",
+            4: "badge-error",
+            5: "badge-error",
+        }.get(self.schweregrad, "badge-ghost")
+
+    @property
+    def status_farbe(self):
+        return {
+            "offen": "badge-error",
+            "behoben": "badge-success",
+            "gemeldet": "badge-info",
+        }.get(self.status, "badge-ghost")
+
+
+class Schadensbild(models.Model):
+    """Foto zu einem Schadenseintrag (max. 5 pro Meldung, serverseitig geprüft)."""
+    meldung = models.ForeignKey(Schadensmeldung, on_delete=models.CASCADE, related_name="bilder")
+    bild = models.ImageField(upload_to="schaeden/%Y/%m/")
+    hochgeladen_am = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["hochgeladen_am"]
+
+    def save(self, *args, **kwargs):
+        # Beim ersten Speichern durch den Bild-Optimizer jagen (HEIC → JPEG, EXIF, max 1200px, q85)
+        if self.bild and not self.pk:
+            optimized = optimize_image(self.bild)
+            basis = os.path.splitext(os.path.basename(self.bild.name))[0]
+            self.bild.save(f"{basis}.jpg", optimized, save=False)
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        delete_file(self.bild)
+        super().delete(*args, **kwargs)
+
+    def __str__(self):
+        return f"Bild zu {self.meldung_id}"

@@ -317,3 +317,32 @@ class TeilnahmeDetailForm(forms.ModelForm):
 
             "tshirt_groesse": forms.Select(attrs={"class": "select select-bordered w-full"}),
         }
+
+class SchadensmeldungForm(forms.ModelForm):
+    class Meta:
+        from .models import Schadensmeldung
+        model = Schadensmeldung
+        fields = ["titel", "ort", "schweregrad", "beschreibung", "status"]
+        widgets = {
+            "titel": forms.TextInput(attrs={
+                "class": "input input-bordered w-full",
+                "placeholder": "z.B. Winsch blockiert",
+                "maxlength": "200",
+            }),
+            "ort": forms.TextInput(attrs={
+                "class": "input input-bordered w-full",
+                "placeholder": "z.B. Steuerbord-Winsch im Cockpit",
+                "maxlength": "200",
+            }),
+            "schweregrad": forms.Select(attrs={
+                "class": "select select-bordered w-full",
+            }),
+            "beschreibung": forms.Textarea(attrs={
+                "class": "textarea textarea-bordered w-full",
+                "rows": "4",
+                "placeholder": "Was genau ist passiert? Seit wann? Auswirkungen?",
+            }),
+            "status": forms.Select(attrs={
+                "class": "select select-bordered w-full",
+            }),
+        }

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}{% if meldung %}Schaden bearbeiten{% else %}Schaden melden{% endif %} – {{ boot.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
+
+    <a href="{% url 'boot_dashboard' toern.id %}?tab=schaden"
+       class="flex items-center gap-1 text-sm text-base-content/50 hover:text-base-content transition-colors mb-4">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Zurück zum Schadensprotokoll
+    </a>
+
+    <h1 class="text-2xl font-bold leading-tight mb-1">
+        {% if meldung %}Schaden bearbeiten{% else %}Schaden melden{% endif %}
+    </h1>
+    <p class="text-base-content/50 text-sm mb-5">⛵ {{ boot.name }} · {{ toern.titel }}</p>
+
+    {% if form.errors %}
+    <div class="alert alert-error mb-4">
+        <ul class="list-disc list-inside text-sm">
+            {% for field in form %}{% for error in field.errors %}
+                <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+            {% endfor %}{% endfor %}
+            {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" enctype="multipart/form-data" class="space-y-4">
+        {% csrf_token %}
+
+        <div class="form-control">
+            <label class="label py-1" for="{{ form.titel.id_for_label }}">
+                <span class="label-text font-medium">Was ist kaputt? <span class="text-error">*</span></span>
+            </label>
+            {{ form.titel }}
+        </div>
+
+        <div class="form-control">
+            <label class="label py-1" for="{{ form.ort.id_for_label }}">
+                <span class="label-text font-medium">Wo am Boot? <span class="text-error">*</span></span>
+            </label>
+            {{ form.ort }}
+        </div>
+
+        <div class="form-control">
+            <label class="label py-1" for="{{ form.schweregrad.id_for_label }}">
+                <span class="label-text font-medium">Beeinträchtigung <span class="text-error">*</span></span>
+            </label>
+            {{ form.schweregrad }}
+            <p class="text-xs text-base-content/50 mt-1">
+                1 = kosmetisch · 2 = gering · 3 = spürbar · 4 = erheblich · 5 = sicherheitskritisch / nicht fahrtüchtig
+            </p>
+        </div>
+
+        <div class="form-control">
+            <label class="label py-1" for="{{ form.beschreibung.id_for_label }}">
+                <span class="label-text font-medium">Beschreibung</span>
+            </label>
+            {{ form.beschreibung }}
+        </div>
+
+        <div class="form-control">
+            <label class="label py-1" for="{{ form.status.id_for_label }}">
+                <span class="label-text font-medium">Status</span>
+            </label>
+            {{ form.status }}
+        </div>
+
+        {# Bestehende Fotos (Bearbeiten) #}
+        {% if meldung and meldung.bilder.all %}
+        <div class="form-control">
+            <span class="label-text font-medium mb-1">Vorhandene Fotos</span>
+            <div id="bestehende-bilder" class="grid grid-cols-3 gap-2">
+                {% for b in meldung.bilder.all %}
+                <div class="relative group" id="bild-{{ b.id }}">
+                    <button type="button" onclick="openSchadenBild('{{ b.bild.url }}')" class="block w-full">
+                        <img src="{{ b.bild.url }}" alt="Schadensfoto" class="w-full h-24 object-cover rounded-lg border border-base-300">
+                    </button>
+                    <button type="button" onclick="deleteSchadenBild({{ b.id }})"
+                            class="btn btn-circle btn-xs btn-error absolute -top-2 -right-2">✕</button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="form-control">
+            <label class="label py-1" for="bilder-input">
+                <span class="label-text font-medium">Fotos hinzufügen</span>
+                <span class="label-text-alt text-base-content/50">max. {{ max_bilder }} pro Schaden</span>
+            </label>
+            <input type="file" name="bilder" id="bilder-input" accept="image/*,.heic,.heif" multiple
+                   class="file-input file-input-bordered w-full">
+            <p class="text-xs text-base-content/50 mt-1">Vom Handy (iOS/Android). Bilder werden automatisch verkleinert.</p>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+            <a href="{% url 'boot_dashboard' toern.id %}?tab=schaden" class="btn btn-ghost flex-1">Abbrechen</a>
+            <button type="submit" class="btn btn-primary flex-1">
+                {% if meldung %}Speichern{% else %}Schaden melden{% endif %}
+            </button>
+        </div>
+    </form>
+
+    {% if meldung and darf_loeschen %}
+    <form method="post" action="{% url 'schaden_loeschen' meldung.id %}" class="mt-6"
+          onsubmit="return confirm('Diesen Schaden wirklich löschen? Alle Fotos werden entfernt.');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline btn-error btn-sm w-full">Schaden löschen</button>
+    </form>
+    {% endif %}
+</div>
+
+<!-- Foto-Lightbox -->
+<dialog id="schadenBildModal" class="modal">
+    <div class="modal-box max-w-3xl p-2 relative">
+        <button onclick="schadenBildModal.close()" class="btn btn-circle btn-sm absolute right-3 top-3 z-10">✕</button>
+        <img id="schadenBildImg" src="" alt="Schadensfoto" class="w-full rounded-lg">
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<script>
+function getCSRFToken() {
+    return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1];
+}
+function openSchadenBild(url) {
+    document.getElementById('schadenBildImg').src = url;
+    document.getElementById('schadenBildModal').showModal();
+}
+function deleteSchadenBild(id) {
+    if (!confirm('Dieses Foto löschen?')) return;
+    fetch(`/toern/schaden/bild/${id}/loeschen/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(res => {
+        if (res.ok) document.getElementById(`bild-${id}`)?.remove();
+    });
+}
+</script>
+{% endblock %}

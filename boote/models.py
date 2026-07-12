@@ -37,6 +37,8 @@ class Boot(models.Model):
     bild_boot = models.ImageField(upload_to='boote/bilder/', blank=True, null=True)
     skipper_meilen = models.PositiveIntegerField(default=0)
     logbuch_pdf = models.FileField(upload_to='boote/logbuch/', blank=True, null=True)
+    charterbasis_name = models.CharField(max_length=150, blank=True, verbose_name="Charterbasis (Name)")
+    charterbasis_email = models.EmailField(blank=True, verbose_name="Charterbasis E-Mail (für Schadensprotokoll)")
 
     def save(self, *args, **kwargs):
 

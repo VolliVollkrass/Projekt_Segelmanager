@@ -76,8 +76,12 @@
             e.preventDefault();
             e.stopPropagation();
             const titel = (a.title || a.textContent || 'Dokument').trim().slice(0, 80);
-            location.href = '/pdf-viewer/?src=' + encodeURIComponent(pfad + url.search)
+            let ziel = '/pdf-viewer/?src=' + encodeURIComponent(pfad + url.search)
                 + '&titel=' + encodeURIComponent(titel);
+            // Optional: Empfänger für den mailto-Fallback (z.B. Charterbasis) vorbelegen
+            if (a.dataset.mailto) ziel += '&mailto=' + encodeURIComponent(a.dataset.mailto);
+            if (a.dataset.betreff) ziel += '&betreff=' + encodeURIComponent(a.dataset.betreff);
+            location.href = ziel;
         }, true);
     })();
     </script>

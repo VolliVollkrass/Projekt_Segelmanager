@@ -61,6 +61,15 @@
 const PDF_SRC = "{{ src|escapejs }}";
 const PDF_DATEINAME = "{{ dateiname|escapejs }}";
 const PDF_TITEL = "{{ titel|escapejs }}";
+const PDF_MAILTO = "{{ mailto|escapejs }}";
+const PDF_BETREFF = "{{ betreff|escapejs }}";
+
+function mailtoOeffnen() {
+    const betreff = PDF_BETREFF || PDF_TITEL;
+    location.href = 'mailto:' + encodeURIComponent(PDF_MAILTO)
+        + '?subject=' + encodeURIComponent(betreff)
+        + '&body=' + encodeURIComponent('Das Schadensprotokoll hängt an bzw. wird separat geteilt.');
+}
 
 function zurueck() {
     if (history.length > 1) { history.back(); }
@@ -80,7 +89,12 @@ async function teilen() {
     } catch (e) {
         if (e.name === 'AbortError') return; // Nutzer hat das Teilen-Menü geschlossen
     }
-    // Fallback: Download anstoßen (Desktop-Browser ohne Web-Share)
+    // Fallback: ist ein Empfänger vorbelegt (Charterbasis), Mail-Programm öffnen …
+    if (PDF_MAILTO) {
+        mailtoOeffnen();
+        return;
+    }
+    // … sonst Download anstoßen (Desktop-Browser ohne Web-Share)
     const a = document.createElement('a');
     a.href = PDF_SRC;
     a.download = PDF_DATEINAME;

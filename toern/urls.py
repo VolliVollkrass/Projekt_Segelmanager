@@ -8,6 +8,11 @@ from .dokumente_views import (
     dok_standard_loeschen, dok_standard_default,
     boot_dokument_get, boot_dokument_toggle,
 )
+from .schaden_views import (
+    schaden_neu, schaden_bearbeiten, schaden_loeschen,
+    schaden_status, schaden_bild_loeschen,
+)
+from .schaden_pdf import schaden_gesamt_pdf, schaden_einzel_pdf
 
 urlpatterns = [
     path('detail/<int:pk>/', toern_detail, name='toern_detail'),  # Detailseite
@@ -54,6 +59,14 @@ urlpatterns = [
     path("boot/<int:boot_id>/mayday/pdf/", mayday_plakat_pdf, name="mayday_plakat_pdf"),
     path("boot/<int:boot_id>/notrollen/pdf/", notrollen_plakat_pdf, name="notrollen_plakat_pdf"),
     path("boot/<int:boot_id>/checkliste/<str:typ>/pdf/", dokument_checkliste_pdf, name="dokument_checkliste_pdf"),
+    # Schadensprotokoll
+    path("boot/<int:boot_id>/schaden/neu/", schaden_neu, name="schaden_neu"),
+    path("boot/<int:boot_id>/schaden/pdf/", schaden_gesamt_pdf, name="schaden_gesamt_pdf"),
+    path("schaden/<int:meldung_id>/bearbeiten/", schaden_bearbeiten, name="schaden_bearbeiten"),
+    path("schaden/<int:meldung_id>/loeschen/", schaden_loeschen, name="schaden_loeschen"),
+    path("schaden/<int:meldung_id>/status/", schaden_status, name="schaden_status"),
+    path("schaden/<int:meldung_id>/pdf/", schaden_einzel_pdf, name="schaden_einzel_pdf"),
+    path("schaden/bild/<int:bild_id>/loeschen/", schaden_bild_loeschen, name="schaden_bild_loeschen"),
     path("boot/<int:boot_id>/checkliste/<str:typ>/abhaken/", boot_dokument_get, name="boot_dokument_get"),
     path("boot/<int:boot_id>/checkliste/item/<int:eintrag_id>/toggle/", boot_dokument_toggle, name="boot_dokument_toggle"),
     path("<int:toern_id>/dokument/item/add/", dokument_item_add, name="dokument_item_add"),

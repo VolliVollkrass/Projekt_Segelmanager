@@ -15,7 +15,7 @@ from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE, SKIPPER_LISTE
 from utils.rezept_skalierung import skaliere_menge, summiere_mengen
-from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, PacklisteStandard, PacklisteStandardEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage
+from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, PacklisteStandard, PacklisteStandardEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage, Schadensmeldung
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
 from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
@@ -2148,6 +2148,17 @@ def boot_dashboard(request, toern_id):
         or request.user == toern.anbieter
     )
 
+    # 🛠️ Schadensprotokoll — die ganze Boots-Crew liest/erstellt/bearbeitet.
+    # Löschen darf nur Autor oder Skipper/Co (Flag pro Eintrag am Template gesetzt).
+    schaeden = list(
+        Schadensmeldung.objects.filter(boot=boot, toern=toern)
+        .select_related("erstellt_von")
+        .prefetch_related("bilder")
+    )
+    ist_skipper_co = teilnahme.rolle in ("skipper", "coskipper")
+    for s in schaeden:
+        s.darf_loeschen = (s.erstellt_von_id == request.user.id) or ist_skipper_co
+
     context = {
         "toern": toern,
         "boot": boot,
@@ -2183,6 +2194,9 @@ def boot_dashboard(request, toern_id):
         "kasse_darf_verwalten": kasse_darf_verwalten,
         # Dokumente digital abhaken — nur Skipper/Co dieses Boots
         "darf_dokumente": teilnahme.rolle in ("skipper", "coskipper"),
+        # Schadensprotokoll
+        "schaeden": schaeden,
+        "schaden_status_choices": Schadensmeldung.STATUS_CHOICES,
     }
 
     return render(request, "boot/boot_dashboard.html", context)
