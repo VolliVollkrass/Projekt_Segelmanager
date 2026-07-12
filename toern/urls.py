@@ -6,6 +6,7 @@ from .dokumente_views import (
     dokument_item_delete, dokument_reset,
     dok_standard_list, dok_standard_speichern, dok_standard_laden,
     dok_standard_loeschen, dok_standard_default,
+    boot_dokument_get, boot_dokument_toggle,
 )
 
 urlpatterns = [
@@ -53,6 +54,8 @@ urlpatterns = [
     path("boot/<int:boot_id>/mayday/pdf/", mayday_plakat_pdf, name="mayday_plakat_pdf"),
     path("boot/<int:boot_id>/notrollen/pdf/", notrollen_plakat_pdf, name="notrollen_plakat_pdf"),
     path("boot/<int:boot_id>/checkliste/<str:typ>/pdf/", dokument_checkliste_pdf, name="dokument_checkliste_pdf"),
+    path("boot/<int:boot_id>/checkliste/<str:typ>/abhaken/", boot_dokument_get, name="boot_dokument_get"),
+    path("boot/<int:boot_id>/checkliste/item/<int:eintrag_id>/toggle/", boot_dokument_toggle, name="boot_dokument_toggle"),
     path("<int:toern_id>/dokument/item/add/", dokument_item_add, name="dokument_item_add"),
     path("<int:toern_id>/dokument/item/<int:item_id>/update/", dokument_item_update, name="dokument_item_update"),
     path("<int:toern_id>/dokument/item/<int:item_id>/delete/", dokument_item_delete, name="dokument_item_delete"),

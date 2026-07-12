@@ -2181,6 +2181,8 @@ def boot_dashboard(request, toern_id):
         "kasse_pro_person": kasse_pro_person,
         "mein_kasse_saldo": mein_kasse_saldo,
         "kasse_darf_verwalten": kasse_darf_verwalten,
+        # Dokumente digital abhaken — nur Skipper/Co dieses Boots
+        "darf_dokumente": teilnahme.rolle in ("skipper", "coskipper"),
     }
 
     return render(request, "boot/boot_dashboard.html", context)

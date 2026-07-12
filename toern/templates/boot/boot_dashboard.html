@@ -49,6 +49,12 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                 <span class="text-[10px] font-medium leading-tight">Einkauf</span>
             </button>
+            {% if darf_dokumente %}
+            <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="dokumente">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span class="text-[10px] font-medium leading-tight">Dokumente</span>
+            </button>
+            {% endif %}
         </div>
     </div>
 
@@ -80,6 +86,11 @@
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="bordkueche">
                 Einkaufsliste
             </button>
+            {% if darf_dokumente %}
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="dokumente">
+                Dokumente
+            </button>
+            {% endif %}
         </div>
     </div>
 
@@ -1041,6 +1052,34 @@
 
     </div>
 
+    <!-- ========================= TAB: DOKUMENTE (nur Skipper/Co) ========================= -->
+    {% if darf_dokumente %}
+    <div id="tab-dokumente" class="space-y-4 hidden">
+        <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-3">
+            <div>
+                <p class="text-sm font-semibold">Checklisten abhaken</p>
+                <p class="text-xs text-base-content/50 mt-1">
+                    Nur ihr als Skipper/Co-Skipper seht diesen Bereich. Die Häkchen gelten für <strong>{{ boot.name }}</strong>.
+                </p>
+            </div>
+
+            <div role="tablist" class="tabs tabs-box">
+                <button role="tab" id="bdok-tab-uebernahme" class="tab tab-active" onclick="setBootDokTyp('uebernahme')">Übernahme</button>
+                <button role="tab" id="bdok-tab-ablegen" class="tab" onclick="setBootDokTyp('ablegen')">Ablegen</button>
+                <button role="tab" id="bdok-tab-anlegen" class="tab" onclick="setBootDokTyp('anlegen')">Anlegen</button>
+                <button role="tab" id="bdok-tab-rueckgabe" class="tab" onclick="setBootDokTyp('rueckgabe')">Rückgabe</button>
+            </div>
+
+            <div id="bdok-progress" class="hidden text-xs font-medium text-base-content/50"></div>
+
+            <div id="bdok-loading" class="flex justify-center py-6">
+                <span class="loading loading-spinner loading-md"></span>
+            </div>
+            <div id="bdok-list" class="hidden space-y-4"></div>
+        </div>
+    </div>
+    {% endif %}
+
 </div>
 
 <!-- Ausgabe-Bearbeiten Modal -->
@@ -1951,5 +1990,116 @@ async function pollEinkaufStatus() {
     } catch(e) { /* ignorieren */ }
 }
 </script>
+
+{% if darf_dokumente %}
+<!-- Dokumente digital abhaken (nur Skipper/Co) -->
+<script>
+(function () {
+    const bootId = {{ boot.id }};
+    let bdokTyp = 'uebernahme';
+    let bdokLoaded = false;
+    const listEl     = document.getElementById('bdok-list');
+    const loadingEl  = document.getElementById('bdok-loading');
+    const progressEl = document.getElementById('bdok-progress');
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+    function metaText(it) {
+        return it.erledigt && it.erledigt_von ? '✓ ' + esc(it.erledigt_von) + ' · ' + esc(it.erledigt_am) : '';
+    }
+
+    function rowHtml(it) {
+        return `
+        <label class="bdok-row flex items-start gap-3 border rounded-xl px-3 py-2.5 cursor-pointer transition-colors ${it.erledigt ? 'border-success/30 bg-success/5' : 'border-base-300 bg-base-100'}" data-eintrag="${it.id}">
+            <input type="checkbox" class="checkbox checkbox-success checkbox-sm mt-0.5 shrink-0" ${it.erledigt ? 'checked' : ''} onchange="toggleBootDok(${it.id}, this)">
+            <span class="flex-1 min-w-0">
+                <span class="bdok-text text-sm ${it.erledigt ? 'line-through text-base-content/50' : ''}">${esc(it.text)}</span>
+                <span class="bdok-meta block text-[11px] text-base-content/40 ${it.erledigt ? '' : 'hidden'}">${metaText(it)}</span>
+            </span>
+        </label>`;
+    }
+
+    function render(items) {
+        const groups = [];
+        const idx = {};
+        items.forEach(it => {
+            if (!(it.sektion in idx)) { idx[it.sektion] = groups.length; groups.push({ sektion: it.sektion, items: [] }); }
+            groups[idx[it.sektion]].items.push(it);
+        });
+        listEl.innerHTML = groups.map(g => `
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40 mb-2">${esc(g.sektion)}</p>
+                <div class="space-y-1.5">${g.items.map(rowHtml).join('')}</div>
+            </div>`).join('')
+            || '<p class="text-sm text-base-content/40">Diese Checkliste ist leer. Der Skipper kann Punkte im Skipper-Dashboard ergänzen.</p>';
+        updateProgress(items.filter(i => i.erledigt).length, items.length);
+        loadingEl.classList.add('hidden');
+        listEl.classList.remove('hidden');
+        progressEl.classList.remove('hidden');
+        bdokLoaded = true;
+    }
+
+    function updateProgress(done, total) {
+        progressEl.textContent = total ? `${done} von ${total} erledigt` : '';
+    }
+
+    function load() {
+        loadingEl.classList.remove('hidden');
+        listEl.classList.add('hidden');
+        progressEl.classList.add('hidden');
+        fetch(`/toern/boot/${bootId}/checkliste/${bdokTyp}/abhaken/`)
+            .then(r => r.json())
+            .then(data => render(data.items || []))
+            .catch(() => { loadingEl.innerHTML = '<p class="text-sm text-error">Konnte Checkliste nicht laden.</p>'; });
+    }
+
+    window.setBootDokTyp = function (typ) {
+        bdokTyp = typ;
+        document.querySelectorAll('[id^="bdok-tab-"]').forEach(b => b.classList.toggle('tab-active', b.id === 'bdok-tab-' + typ));
+        load();
+    };
+
+    window.toggleBootDok = function (eintragId, cb) {
+        cb.disabled = true;
+        fetch(`/toern/boot/${bootId}/checkliste/item/${eintragId}/toggle/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCSRFToken() }
+        })
+            .then(r => r.json())
+            .then(data => {
+                cb.disabled = false;
+                if (data.status !== 'ok') { cb.checked = !cb.checked; return; }
+                const row  = cb.closest('.bdok-row');
+                const txt  = row.querySelector('.bdok-text');
+                const meta = row.querySelector('.bdok-meta');
+                row.classList.toggle('border-success/30', data.erledigt);
+                row.classList.toggle('bg-success/5', data.erledigt);
+                row.classList.toggle('border-base-300', !data.erledigt);
+                row.classList.toggle('bg-base-100', !data.erledigt);
+                txt.classList.toggle('line-through', data.erledigt);
+                txt.classList.toggle('text-base-content/50', data.erledigt);
+                if (data.erledigt) {
+                    meta.innerHTML = data.erledigt_von ? '✓ ' + esc(data.erledigt_von) + ' · ' + esc(data.erledigt_am) : '';
+                    meta.classList.remove('hidden');
+                } else {
+                    meta.classList.add('hidden');
+                }
+                const boxes = listEl.querySelectorAll('input[type=checkbox]');
+                updateProgress([...boxes].filter(b => b.checked).length, boxes.length);
+            })
+            .catch(() => { cb.disabled = false; cb.checked = !cb.checked; });
+    };
+
+    // Lazy-Load beim ersten Öffnen des Tabs
+    document.querySelectorAll('[data-tab="dokumente"]').forEach(btn => {
+        btn.addEventListener('click', () => { if (!bdokLoaded) load(); });
+    });
+    // Falls direkt via ?tab=dokumente geladen
+    if (!document.getElementById('tab-dokumente')?.classList.contains('hidden')) {
+        load();
+    }
+})();
+</script>
+{% endif %}
 
 {% endblock %}

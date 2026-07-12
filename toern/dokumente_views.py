@@ -2,15 +2,18 @@
 import json
 
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db.models import Max
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
+from boote.models import Boot
 from utils.dokumente import DOKUMENT_DEFAULTS
 from .models import (
-    Toern, DokumentVorlage, DokumentEintrag,
-    DokumentStandard, DokumentStandardEintrag,
+    Toern, Teilnahme, DokumentVorlage, DokumentEintrag,
+    DokumentAbhakstatus, DokumentStandard, DokumentStandardEintrag,
 )
 
 DOKUMENT_TYPEN_KEYS = tuple(DOKUMENT_DEFAULTS.keys())
@@ -127,6 +130,72 @@ def dokument_reset(request, toern_id):
     DokumentVorlage.objects.filter(toern=toern, typ=typ).delete()
     vorlage = get_or_create_dokument_vorlage(toern, typ)
     return JsonResponse({'status': 'ok', 'items': _items_json(vorlage), 'vorlage_id': vorlage.id})
+
+
+# =========================
+# DIGITALES ABHAKEN PRO BOOT (Boot-Dashboard)
+# =========================
+
+def _boot_dokument_recht(request, boot):
+    """Nur Skipper/Co-Skipper dieses Boots dürfen die Checkliste abhaken."""
+    t = Teilnahme.objects.filter(user=request.user, boot=boot).first()
+    if not (t and t.rolle in ('skipper', 'coskipper')):
+        raise PermissionDenied
+    return t
+
+
+def _abhak_json(status):
+    """Serialisiert den Abhak-Stand für die JSON-Antwort."""
+    if status and status.erledigt:
+        return {
+            'erledigt': True,
+            'erledigt_von': status.erledigt_von.first_name if status.erledigt_von else '',
+            'erledigt_am': status.erledigt_am.strftime('%d.%m.%Y %H:%M') if status.erledigt_am else '',
+        }
+    return {'erledigt': False, 'erledigt_von': '', 'erledigt_am': ''}
+
+
+@login_required
+def boot_dokument_get(request, boot_id, typ):
+    """Checkliste eines Typs inkl. Abhak-Stand dieses Boots (nur Skipper/Co)."""
+    boot = get_object_or_404(Boot, id=boot_id)
+    _boot_dokument_recht(request, boot)
+
+    if typ not in DOKUMENT_TYPEN_KEYS:
+        return JsonResponse({'error': 'Ungültiger Typ'}, status=400)
+
+    vorlage = get_or_create_dokument_vorlage(boot.toern, typ, user=request.user)
+    status_map = {
+        s.eintrag_id: s
+        for s in DokumentAbhakstatus.objects
+        .filter(boot=boot, eintrag__vorlage=vorlage)
+        .select_related('erledigt_von')
+    }
+    items = [
+        {'id': e.id, 'sektion': e.sektion, 'text': e.text, **_abhak_json(status_map.get(e.id))}
+        for e in vorlage.eintraege.all()
+    ]
+    return JsonResponse({'items': items})
+
+
+@login_required
+@require_POST
+def boot_dokument_toggle(request, boot_id, eintrag_id):
+    """Häkchen eines Eintrags für dieses Boot umschalten (nur Skipper/Co)."""
+    boot = get_object_or_404(Boot, id=boot_id)
+    _boot_dokument_recht(request, boot)
+
+    eintrag = get_object_or_404(DokumentEintrag, id=eintrag_id, vorlage__toern=boot.toern)
+    status, _ = DokumentAbhakstatus.objects.get_or_create(boot=boot, eintrag=eintrag)
+    status.erledigt = not status.erledigt
+    if status.erledigt:
+        status.erledigt_von = request.user
+        status.erledigt_am = timezone.now()
+    else:
+        status.erledigt_von = None
+        status.erledigt_am = None
+    status.save()
+    return JsonResponse({'status': 'ok', **_abhak_json(status)})
 
 
 # =========================

@@ -392,6 +392,30 @@ class DokumentEintrag(models.Model):
         return f"[{self.sektion}] {self.text}"
 
 
+class DokumentAbhakstatus(models.Model):
+    """Digitaler Abhak-Stand eines Checklisten-Eintrags — pro Boot eigenständig.
+
+    Die DokumentVorlage/DokumentEintrag ist pro Törn geteilt; jedes Boot hakt
+    seine Übernahme-/Rückgabe-Checkliste unabhängig ab. Nur Skipper/Co-Skipper
+    des Boots setzen die Häkchen. Wird ein Vorlagen-Eintrag gelöscht, verschwindet
+    der Status mit (CASCADE); eine Textkorrektur lässt den Haken bestehen.
+    """
+    boot = models.ForeignKey(Boot, on_delete=models.CASCADE, related_name='dokument_abhakstatus')
+    eintrag = models.ForeignKey(DokumentEintrag, on_delete=models.CASCADE, related_name='abhakstatus')
+    erledigt = models.BooleanField(default=False)
+    erledigt_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='+',
+    )
+    erledigt_am = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = [('boot', 'eintrag')]
+
+    def __str__(self):
+        return f"{self.boot} · {self.eintrag} · {'✓' if self.erledigt else '–'}"
+
+
 class DokumentStandard(models.Model):
     """Persönliche, benannte Checklisten-Standards eines Skippers — törnunabhängig wiederverwendbar."""
     user = models.ForeignKey(
