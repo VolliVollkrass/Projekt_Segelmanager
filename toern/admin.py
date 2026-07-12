@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Toern, Teilnahme, KabinenWunsch, CrewPraeferenz
+from .models import Toern, Teilnahme, KabinenWunsch, CrewPraeferenz, Schadensmeldung, Schadensbild
 from boote.models import Boot
 
 
@@ -85,3 +85,18 @@ class KabinenWunschAdmin(admin.ModelAdmin):
 class CrewPraeferenzAdmin(admin.ModelAdmin):
     list_display = ("from_user", "to_user", "typ", "toern")
     list_filter = ("typ", "toern")
+
+
+class SchadensbildInline(admin.TabularInline):
+    model = Schadensbild
+    extra = 0
+    readonly_fields = ("hochgeladen_am",)
+
+
+@admin.register(Schadensmeldung)
+class SchadensmeldungAdmin(admin.ModelAdmin):
+    list_display = ("titel", "boot", "toern", "schweregrad", "status", "erstellt_von", "erstellt_am")
+    list_filter = ("status", "schweregrad", "toern")
+    search_fields = ("titel", "ort", "beschreibung")
+    readonly_fields = ("erstellt_am", "geaendert_am")
+    inlines = [SchadensbildInline]
