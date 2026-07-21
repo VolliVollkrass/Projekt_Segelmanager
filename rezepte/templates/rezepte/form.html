@@ -154,8 +154,12 @@
 
 <script>
 // ─── State ───────────────────────────────────────────────────────────────────
-let zutaten = {{ zutaten_json|default:'[]' }};
-let schritte = {{ schritte_json|default:'[]' }};
+// Aus den Hidden-Inputs lesen: dort ist das JSON korrekt attribut-escaped und
+// wird vom Browser wieder dekodiert. (Direktes Einsetzen der Template-Variable
+// ins Script würde durch HTML-Escaping der Anführungszeichen JS-Syntaxfehler
+// erzeugen → im Bearbeiten-Modus blieben Zutaten & Schritte leer.)
+let zutaten = JSON.parse(document.getElementById('zutaten-json').value || '[]');
+let schritte = JSON.parse(document.getElementById('schritte-json').value || '[]');
 
 // ─── Render helpers ──────────────────────────────────────────────────────────
 function renderZutaten() {
