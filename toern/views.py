@@ -1000,7 +1000,11 @@ def skipper_dashboard(request, toern_id):
     # =========================
     # 9. Skipper-Topf
     # =========================
-    topf_ausgaben = TopfAusgabe.objects.filter(toern=toern).select_related("erstellt_von")
+    topf_ausgaben = (
+        TopfAusgabe.objects.filter(toern=toern)
+        .select_related("erstellt_von")
+        .prefetch_related("belege")
+    )
     topf_summe = sum((a.betrag for a in topf_ausgaben), Decimal("0"))
     topf_rest = toern.skipper_budget - topf_summe
 
@@ -1039,6 +1043,7 @@ def skipper_dashboard(request, toern_id):
         "topf_ausgaben": topf_ausgaben,
         "topf_summe": topf_summe,
         "topf_rest": topf_rest,
+        "topf_kategorien": TopfAusgabe.KATEGORIE_CHOICES,
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)
