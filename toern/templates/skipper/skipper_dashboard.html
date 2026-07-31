@@ -843,17 +843,48 @@
             </p>
         </div>
 
+        <!-- Export -->
+        {% if topf_ausgaben %}
+        <div class="flex flex-wrap gap-2">
+            <a href="{% url 'topf_belege_pdf' toern.id %}" target="_blank" rel="noopener"
+               class="btn btn-sm btn-outline gap-1.5">📄 Belege-PDF</a>
+            <a href="{% url 'topf_abrechnung_xlsx' toern.id %}"
+               class="btn btn-sm btn-outline gap-1.5">📊 Excel-Abrechnung</a>
+        </div>
+        {% endif %}
+
         <!-- Neue Topf-Ausgabe -->
         <div class="bg-base-100 border border-base-300 rounded-xl p-5">
             <h3 class="font-semibold text-sm mb-3">➕ Ausgabe aus dem Topf erfassen</h3>
-            <form method="post" action="{% url 'topf_ausgabe_erstellen' toern.id %}" class="flex flex-col md:flex-row gap-2">
+            <form method="post" action="{% url 'topf_ausgabe_erstellen' toern.id %}"
+                  enctype="multipart/form-data" class="space-y-2">
                 {% csrf_token %}
-                <input type="text" name="beschreibung" required maxlength="200"
-                       placeholder="z.B. Crewshirts, Tankfüllung, Crew-Essen …"
-                       class="input input-bordered input-sm flex-1">
-                <input type="text" name="betrag" required inputmode="decimal"
-                       placeholder="Betrag, z.B. 120,00"
-                       class="input input-bordered input-sm w-full md:w-40">
+                <div class="flex flex-col md:flex-row gap-2">
+                    <input type="text" name="beschreibung" required maxlength="200"
+                           placeholder="z.B. Crewshirts, Tankfüllung, Crew-Essen …"
+                           class="input input-bordered input-sm flex-1">
+                    <input type="text" name="betrag" required inputmode="decimal"
+                           placeholder="Betrag, z.B. 120,00"
+                           class="input input-bordered input-sm w-full md:w-40">
+                </div>
+                <div class="flex flex-col md:flex-row gap-2">
+                    <select name="kategorie" class="select select-bordered select-sm flex-1">
+                        <option value="">Kategorie automatisch erkennen</option>
+                        {% for k_val, k_label in topf_kategorien %}
+                        <option value="{{ k_val }}">{{ k_label }}</option>
+                        {% endfor %}
+                    </select>
+                    <label class="btn btn-sm btn-outline gap-1.5 md:w-56 cursor-pointer normal-case">
+                        📷 Belege / Quittungen
+                        <input type="file" name="belege" accept="image/*" multiple class="hidden" id="create-belege"
+                               onchange="document.getElementById('create-belege-count').textContent = this.files.length ? this.files.length + ' Foto(s)' : '';">
+                    </label>
+                    <span id="create-belege-count" class="text-xs text-base-content/50 self-center"></span>
+                </div>
+                <p class="text-xs text-base-content/40">
+                    Kategorie leer lassen = automatischer Vorschlag aus der Beschreibung (später jederzeit änderbar).
+                    Lange Kassenzettel: einfach mehrere Fotos auf einmal auswählen.
+                </p>
                 <button class="btn btn-primary btn-sm">Speichern</button>
             </form>
         </div>
@@ -862,24 +893,83 @@
         <div class="bg-base-100 border border-base-300 rounded-xl p-5">
             <h3 class="font-semibold text-sm mb-3">Ausgaben</h3>
             {% if topf_ausgaben %}
-                <div class="space-y-2">
+                <div class="space-y-3">
                     {% for a in topf_ausgaben %}
-                        <div class="flex items-start justify-between gap-3 bg-base-200/40 rounded-lg px-3 py-2">
-                            <div class="min-w-0">
-                                <p class="text-sm font-medium">{{ a.beschreibung }}</p>
-                                <p class="text-xs text-base-content/50 mt-0.5">
-                                    {{ a.erstellt_von.first_name }} {{ a.erstellt_von.last_name }}
-                                    · {{ a.created_at|date:"d.m.Y" }}
-                                </p>
+                        <div class="bg-base-200/40 rounded-lg px-3 py-2.5">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <p class="text-sm font-medium">{{ a.beschreibung }}</p>
+                                        <span class="badge badge-sm badge-ghost">{{ a.get_kategorie_display }}</span>
+                                        {% if not a.belege.all %}
+                                        <span class="badge badge-sm badge-warning gap-1" title="Für diese Ausgabe fehlt noch ein Beleg">⚠ ohne Beleg</span>
+                                        {% endif %}
+                                    </div>
+                                    <p class="text-xs text-base-content/50 mt-0.5">
+                                        {{ a.erstellt_von.first_name }} {{ a.erstellt_von.last_name }}
+                                        · {{ a.created_at|date:"d.m.Y" }}
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span class="font-bold text-sm whitespace-nowrap">{{ a.betrag|floatformat:2 }} €</span>
+                                    <form method="post" action="{% url 'topf_ausgabe_loeschen' a.id %}"
+                                          onsubmit="return confirm('Topf-Ausgabe „{{ a.beschreibung|escapejs }}“ wirklich löschen?');">
+                                        {% csrf_token %}
+                                        <button class="btn btn-ghost btn-xs text-error" title="Löschen">✕</button>
+                                    </form>
+                                </div>
                             </div>
-                            <div class="flex items-center gap-2 shrink-0">
-                                <span class="font-bold text-sm whitespace-nowrap">{{ a.betrag|floatformat:2 }} €</span>
-                                <form method="post" action="{% url 'topf_ausgabe_loeschen' a.id %}"
-                                      onsubmit="return confirm('Topf-Ausgabe „{{ a.beschreibung|escapejs }}“ wirklich löschen?');">
-                                    {% csrf_token %}
-                                    <button class="btn btn-ghost btn-xs text-error" title="Löschen">✕</button>
-                                </form>
+
+                            {% if a.belege.all %}
+                            <div class="flex flex-wrap gap-2 mt-2">
+                                {% for b in a.belege.all %}
+                                <div class="relative">
+                                    <a href="{{ b.bild.url }}" target="_blank" rel="noopener">
+                                        <img src="{{ b.bild.url }}" loading="lazy"
+                                             class="h-16 w-16 object-cover rounded border border-base-300">
+                                    </a>
+                                    <form method="post" action="{% url 'topf_beleg_loeschen' b.id %}"
+                                          onsubmit="return confirm('Diesen Beleg löschen?');"
+                                          class="absolute -top-1.5 -right-1.5">
+                                        {% csrf_token %}
+                                        <button class="btn btn-circle btn-xs btn-error" title="Beleg löschen">✕</button>
+                                    </form>
+                                </div>
+                                {% endfor %}
                             </div>
+                            {% endif %}
+
+                            <details class="mt-2">
+                                <summary class="text-xs text-base-content/50 cursor-pointer hover:text-base-content">Bearbeiten / Beleg hinzufügen</summary>
+                                <div class="mt-2 space-y-3 border-t border-base-300 pt-3">
+                                    <form method="post" action="{% url 'topf_ausgabe_bearbeiten' a.id %}" class="space-y-2">
+                                        {% csrf_token %}
+                                        <div class="flex flex-col md:flex-row gap-2">
+                                            <input type="text" name="beschreibung" required maxlength="200"
+                                                   value="{{ a.beschreibung }}"
+                                                   class="input input-bordered input-xs flex-1">
+                                            <input type="text" name="betrag" required inputmode="decimal"
+                                                   value="{{ a.betrag|floatformat:2 }}"
+                                                   class="input input-bordered input-xs w-full md:w-32">
+                                        </div>
+                                        <div class="flex flex-col md:flex-row gap-2">
+                                            <select name="kategorie" class="select select-bordered select-xs flex-1">
+                                                {% for k_val, k_label in topf_kategorien %}
+                                                <option value="{{ k_val }}" {% if a.kategorie == k_val %}selected{% endif %}>{{ k_label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                            <button class="btn btn-xs btn-primary">Speichern</button>
+                                        </div>
+                                    </form>
+                                    <form method="post" action="{% url 'topf_beleg_add' a.id %}"
+                                          enctype="multipart/form-data" class="flex flex-col md:flex-row gap-2 items-start">
+                                        {% csrf_token %}
+                                        <input type="file" name="belege" accept="image/*" multiple required
+                                               class="file-input file-input-xs file-input-bordered flex-1">
+                                        <button class="btn btn-xs btn-outline">Beleg hochladen</button>
+                                    </form>
+                                </div>
+                            </details>
                         </div>
                     {% endfor %}
                 </div>

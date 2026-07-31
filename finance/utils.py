@@ -3,6 +3,48 @@ from decimal import Decimal, ROUND_HALF_UP
 CENT = Decimal("0.01")
 
 
+# Stichwort → Kategorie-Schlüssel (siehe TopfAusgabe.KATEGORIE_CHOICES).
+# Reihenfolge egal; der erste Treffer im Text gewinnt nach Prioritätsliste unten.
+_KATEGORIE_STICHWORTE = [
+    ("versicherung", ["versicherung", "haftpflicht", "unfall", "kaution", "police"]),
+    ("treibstoff", ["diesel", "bootstank", "tanken schiff", "schiffsdiesel", "bordtank"]),
+    ("anreise", [
+        "vignette", "maut", "autobahn", "fähre", "faehre", "parken", "parkplatz",
+        "hotel", "übernachtung", "uebernachtung", "unterkunft", "benzin", "sprit auto",
+        "flug", "bahn", "zug", "transfer", "auto",
+    ]),
+    ("hafen", [
+        "hafen", "marina", "liegeplatz", "liege", "steg", "strom", "wasser", "müll",
+        "muell", "kurtaxe", "touristensteuer", "nationalpark", "kornati", "krka",
+        "einklarier", "leuchtturm", "abgabe", "gebühr", "gebuehr",
+    ]),
+    ("charter", [
+        "endreinigung", "reinigung", "gasflasche", "gas", "bettwäsche", "bettwaesche",
+        "handtuch", "selbstbehalt", "schaden", "charter", "außenborder", "aussenborder",
+        "dinghy",
+    ]),
+    ("verpflegung", [
+        "restaurant", "essen", "konoba", "trinkgeld", "supermarkt", "lebensmittel",
+        "getränk", "getraenk", "einkauf", "kaffee", "eis", "bäcker", "baecker", "markt",
+    ]),
+    ("crew", ["shirt", "t-shirt", "tshirt", "fahne", "flagge", "gimmick", "crew-shirt"]),
+    ("ausruestung", [
+        "reparatur", "ersatzteil", "material", "ausrüstung", "ausruestung", "apotheke",
+        "medikament", "seekarte", "revierführer", "revierfuehrer", "karte", "werkzeug",
+    ]),
+]
+
+
+def rate_kategorie(beschreibung):
+    """Schlägt anhand von Stichwörtern in der Beschreibung eine Kategorie vor.
+    Kein Treffer → 'sonstiges'."""
+    text = (beschreibung or "").lower()
+    for schluessel, woerter in _KATEGORIE_STICHWORTE:
+        if any(w in text for w in woerter):
+            return schluessel
+    return "sonstiges"
+
+
 def berechne_salden(ausgaben, teilnahmen):
     """Netto-Saldo pro Teilnahme über alle Ausgaben.
 
