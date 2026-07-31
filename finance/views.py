@@ -472,6 +472,7 @@ def topf_abrechnung_xlsx(request, toern_id):
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from openpyxl.chart import PieChart, Reference
     from openpyxl.chart.label import DataLabelList
+    from openpyxl.worksheet.properties import PageSetupProperties
 
     toern = get_object_or_404(Toern, id=toern_id)
     if not _darf_topf_verwalten(request.user, toern):
@@ -587,7 +588,19 @@ def topf_abrechnung_xlsx(request, toern_id):
     breiten = {"A": 3, "B": 12, "C": 28, "D": 40, "E": 14, "F": 22, "G": 26}
     for spalte, w in breiten.items():
         ws.column_dimensions[spalte].width = w
-    ws.freeze_panes = ws.cell(row=header_row + 1, column=2)  # Kopf + Rand fixieren
+
+    # Druck: A4 hochkant, Tabelle (Spalten A–G) auf Seitenbreite skaliert.
+    # Diagramm liegt in Spalte I und damit außerhalb des Druckbereichs.
+    letzte_zeile = ws.max_row
+    ws.print_area = f"A1:G{letzte_zeile}"
+    ws.page_setup.orientation = "portrait"
+    ws.page_setup.paperSize = 9  # A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0  # Breite fix auf 1 Seite, Höhe nach Bedarf
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.print_options.horizontalCentered = True
+    ws.page_margins.left = ws.page_margins.right = 0.4
+    ws.page_margins.top = ws.page_margins.bottom = 0.5
 
     buffer = io.BytesIO()
     wb.save(buffer)
