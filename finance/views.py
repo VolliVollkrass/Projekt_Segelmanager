@@ -470,6 +470,9 @@ def topf_belege_pdf(request, toern_id):
 def topf_abrechnung_xlsx(request, toern_id):
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.chart import PieChart, Reference
+    from openpyxl.chart.label import DataLabelList
+    from openpyxl.worksheet.properties import PageSetupProperties
 
     toern = get_object_or_404(Toern, id=toern_id)
     if not _darf_topf_verwalten(request.user, toern):
@@ -480,6 +483,7 @@ def topf_abrechnung_xlsx(request, toern_id):
     wb = Workbook()
     ws = wb.active
     ws.title = "Abrechnung"
+    ws.sheet_view.showGridLines = False  # Gitternetz aus → weißes Blatt
 
     PRIMARY = "1E3A5F"
     TEAL = "0D9488"
@@ -493,17 +497,22 @@ def topf_abrechnung_xlsx(request, toern_id):
     border = Border(bottom=thin)
     euro = '#,##0.00\\ €'
 
-    # Titel
-    ws.append([f"Abrechnung Skipper-Topf – {toern.titel}"])
-    ws["A1"].font = Font(bold=True, size=14, color=PRIMARY)
-    ws.append([f"Stand {timezone.localdate().strftime('%d.%m.%Y')}"])
-    ws["A2"].font = Font(italic=True, color="64748B")
-    ws.append([])
+    # Spalte A bleibt als Rand frei; Inhalt beginnt in Spalte B (col_index 2).
+    # Zeile 1 bleibt leer (Rand oben), Titel in Zeile 2.
+    ws.append([])  # Zeile 1: leer
+    ws.append([None, f"Abrechnung Skipper-Topf – {toern.titel}"])  # Zeile 2: Titel
+    ws["B2"].font = Font(bold=True, size=14, color=PRIMARY)
+    ws.append([None, f"Stand {timezone.localdate().strftime('%d.%m.%Y')}"])  # Zeile 3: Stand
+    ws["B3"].font = Font(italic=True, color="64748B")
+    ws.append([])  # Zeile 4: leer
+    ws.append([])  # Zeile 5: leer  (2 Leerzeilen unter dem Stand)
 
+    # Datenspalten: B=Datum C=Kategorie D=Beschreibung E=Betrag F=Erfasst G=Belege
+    COL_KAT, COL_BESCHR, COL_BETRAG = 3, 4, 5
     spalten = ["Datum", "Kategorie", "Beschreibung", "Betrag", "Erfasst von", "Belege (siehe PDF)"]
     header_row = ws.max_row + 1
-    ws.append(spalten)
-    for col in range(1, len(spalten) + 1):
+    ws.append([None] + spalten)
+    for col in range(2, 2 + len(spalten)):
         c = ws.cell(row=header_row, column=col)
         c.font = header_font
         c.fill = header_fill
@@ -512,12 +521,12 @@ def topf_abrechnung_xlsx(request, toern_id):
     for g in gruppen:
         # Kategorie-Zeile
         r = ws.max_row + 1
-        ws.append([g["label"], "", "", g["summe"], "", ""])
-        for col in range(1, 7):
+        ws.append([None, g["label"], "", "", g["summe"], "", ""])
+        for col in range(2, 8):
             ws.cell(row=r, column=col).fill = cat_fill
             ws.cell(row=r, column=col).font = cat_font
-        ws.cell(row=r, column=4).number_format = euro
-        ws.cell(row=r, column=4).alignment = Alignment(horizontal="right")
+        ws.cell(row=r, column=COL_BETRAG).number_format = euro
+        ws.cell(row=r, column=COL_BETRAG).alignment = Alignment(horizontal="right")
 
         for eintrag in g["eintraege"]:
             a = eintrag["ausgabe"]
@@ -525,6 +534,7 @@ def topf_abrechnung_xlsx(request, toern_id):
             belege_ref = ", ".join(bl["nummer"] for bl in eintrag["belege"]) or "— kein Beleg —"
             rr = ws.max_row + 1
             ws.append([
+                None,
                 a.created_at.strftime("%d.%m.%Y"),
                 g["label"],
                 a.beschreibung,
@@ -532,36 +542,65 @@ def topf_abrechnung_xlsx(request, toern_id):
                 erfasser,
                 belege_ref,
             ])
-            ws.cell(row=rr, column=4).number_format = euro
-            ws.cell(row=rr, column=4).alignment = Alignment(horizontal="right")
-            for col in range(1, 7):
+            ws.cell(row=rr, column=COL_BETRAG).number_format = euro
+            ws.cell(row=rr, column=COL_BETRAG).alignment = Alignment(horizontal="right")
+            for col in range(2, 8):
                 ws.cell(row=rr, column=col).border = border
 
     # Summenblock
     ws.append([])
     def summenzeile(label, wert, fett=True):
         r = ws.max_row + 1
-        ws.append(["", "", label, float(wert), "", ""])
-        ws.cell(row=r, column=3).font = bold if fett else Font()
-        c = ws.cell(row=r, column=4)
+        ws.append([None, "", "", label, float(wert), "", ""])
+        ws.cell(row=r, column=COL_BESCHR).font = bold if fett else Font()
+        c = ws.cell(row=r, column=COL_BETRAG)
         c.number_format = euro
         c.font = bold if fett else Font()
         c.alignment = Alignment(horizontal="right")
         return r
 
+    kat_summen_start = ws.max_row + 1
     for g in gruppen:
         summenzeile(g["label"], g["summe"], fett=False)
+    kat_summen_ende = ws.max_row
     ws.append([])
     summenzeile("Gesamt ausgegeben", gesamt)
     summenzeile("Budget", toern.skipper_budget)
     rest_row = summenzeile("Verbleibend", toern.skipper_budget - gesamt)
     if toern.skipper_budget - gesamt < 0:
-        ws.cell(row=rest_row, column=4).font = Font(bold=True, color="DC2626")
+        ws.cell(row=rest_row, column=COL_BETRAG).font = Font(bold=True, color="DC2626")
 
-    breiten = [12, 30, 40, 14, 22, 24]
-    for i, w in enumerate(breiten, start=1):
-        ws.column_dimensions[chr(64 + i)].width = w
-    ws.freeze_panes = ws.cell(row=header_row + 1, column=1)
+    # Diagramm rechts: Aufteilung der Kosten nach Kategorie (aus dem Summenblock)
+    if gruppen:
+        chart = PieChart()
+        chart.title = "Kostenaufteilung"
+        chart.height = 8
+        chart.width = 12
+        labels = Reference(ws, min_col=COL_BESCHR, min_row=kat_summen_start, max_row=kat_summen_ende)
+        data = Reference(ws, min_col=COL_BETRAG, min_row=kat_summen_start, max_row=kat_summen_ende)
+        chart.add_data(data, titles_from_data=False)
+        chart.set_categories(labels)
+        chart.dataLabels = DataLabelList()
+        chart.dataLabels.showPercent = True
+        ws.add_chart(chart, "I2")
+
+    # Spaltenbreiten: A schmaler Rand, dann B..G
+    breiten = {"A": 3, "B": 12, "C": 28, "D": 40, "E": 14, "F": 22, "G": 26}
+    for spalte, w in breiten.items():
+        ws.column_dimensions[spalte].width = w
+
+    # Druck: A4 hochkant, Tabelle (Spalten A–G) auf Seitenbreite skaliert.
+    # Diagramm liegt in Spalte I und damit außerhalb des Druckbereichs.
+    letzte_zeile = ws.max_row
+    ws.print_area = f"A1:G{letzte_zeile}"
+    ws.page_setup.orientation = "portrait"
+    ws.page_setup.paperSize = 9  # A4
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0  # Breite fix auf 1 Seite, Höhe nach Bedarf
+    ws.sheet_properties.pageSetUpPr = PageSetupProperties(fitToPage=True)
+    ws.print_options.horizontalCentered = True
+    ws.page_margins.left = ws.page_margins.right = 0.4
+    ws.page_margins.top = ws.page_margins.bottom = 0.5
 
     buffer = io.BytesIO()
     wb.save(buffer)
