@@ -254,8 +254,6 @@ def toern_create(request):
     })
 
 @login_required
-@login_required
-@login_required
 @require_POST
 def toern_status_abschliessen(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
@@ -1115,8 +1113,6 @@ def praeferenz_modus_setzen(request, toern_id):
 
 @login_required
 @require_POST
-@login_required
-@require_POST
 def toern_tagesimpulse_toggle(request, pk):
     """Tagesthema & Impulse für einen Törn ein-/ausschalten."""
     toern = get_object_or_404(Toern, pk=pk)
@@ -1131,6 +1127,8 @@ def toern_tagesimpulse_toggle(request, pk):
     return JsonResponse({'aktiv': toern.tagesimpulse_aktiv})
 
 
+@login_required
+@require_POST
 def toern_foto_links_update(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
     is_anbieter = toern.anbieter == request.user

@@ -73,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "config.security_headers.SecurityHeadersMiddleware",
     "axes.middleware.AxesMiddleware",
     "accounts.middleware.EmailVerificationMiddleware",
 ]
@@ -172,7 +173,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 # Große Datei-Uploads (Logbuch-PDFs bis ~50 MB)
 # DATA_UPLOAD_MAX_MEMORY_SIZE: Limit für nicht-Datei-Felder (Formularfelder) – None = unbegrenzt
 # FILE_UPLOAD_MAX_MEMORY_SIZE: Ab dieser Größe → Temp-Datei statt RAM (kein absolutes Limit)
-DATA_UPLOAD_MAX_MEMORY_SIZE = None
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760   # 10 MB Limit für Nicht-Datei-Felder (DoS-Schutz)
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10485760   # 10 MB Schwelle für RAM → Disk
 
 # WhiteNoise: komprimierte Static Files mit Cache-Busting

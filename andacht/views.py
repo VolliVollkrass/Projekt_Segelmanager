@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.http import JsonResponse, HttpResponse, Http404
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from django_ratelimit.decorators import ratelimit
 
 from utils.permissions import andacht_required
 from .models import Andacht
@@ -23,6 +24,7 @@ def dashboard(request):
 
 @login_required
 @andacht_required
+@ratelimit(key='user', rate='20/h', method='POST', block=True)
 def erstellen(request):
     if request.method == 'POST':
         dauer_raw = request.POST.get('dauer_minuten', '15')
