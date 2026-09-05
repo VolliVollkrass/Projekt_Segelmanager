@@ -14,6 +14,11 @@ urlpatterns = [
     path('segelwissen/', include('segelwissen.urls')),
     path('andacht/', include('andacht.urls')),
     path('finance/', include('finance.urls')),
-    path('schema-viewer/', include('schema_viewer.urls')),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
 ]
+
+# schema_viewer zeigt die komplette DB-Struktur und hat KEINE Auth — nur lokal.
+# Die App ist ohnehin nur bei DEBUG in INSTALLED_APPS; die Route muss ebenso
+# hinter DEBUG liegen, sonst ist /schema-viewer/schema/ in Production offen.
+if settings.DEBUG:
+    urlpatterns += [path('schema-viewer/', include('schema_viewer.urls'))]

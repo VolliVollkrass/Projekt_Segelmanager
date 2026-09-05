@@ -1131,6 +1131,8 @@ def toern_tagesimpulse_toggle(request, pk):
     return JsonResponse({'aktiv': toern.tagesimpulse_aktiv})
 
 
+@login_required
+@require_POST
 def toern_foto_links_update(request, pk):
     toern = get_object_or_404(Toern, pk=pk)
     is_anbieter = toern.anbieter == request.user
