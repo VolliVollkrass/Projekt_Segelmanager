@@ -81,6 +81,15 @@ class BelegMediaZugriffTests(TestCase):
         self.assertEqual(self.client.get(self.url).status_code, 200)
 
 
+class SecurityHeaderTests(TestCase):
+    def test_csp_und_permissions_policy_gesetzt(self):
+        resp = self.client.get("/")
+        self.assertIn("Content-Security-Policy", resp)
+        self.assertIn("frame-ancestors 'none'", resp["Content-Security-Policy"])
+        self.assertIn("object-src 'none'", resp["Content-Security-Policy"])
+        self.assertIn("Permissions-Policy", resp)
+
+
 class UrlGuardTests(TestCase):
     """SSRF-Schutz: interne/nicht-http-Ziele werden abgelehnt."""
 

@@ -1,0 +1,7 @@
+# Lokale Entwicklung: enthält alles aus requirements.txt plus Dev-Tools.
+# Installation:  pip install -r requirements-dev.txt
+-r requirements.txt
+
+# DB-Schema-Viewer — NUR lokal (bei DEBUG=True). Hat keine Auth und darf
+# deshalb nicht ins Produktions-Image (siehe config/urls.py + INSTALLED_APPS).
+django-schema-viewer==0.5.3
