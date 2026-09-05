@@ -8,6 +8,8 @@ ALLOWED_PATHS = (
     "/admin/",
     "/media/",
     "/static/",
+    "/impressum/",
+    "/datenschutz/",
 )
 
 

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Datenschutzerklärung · Meer erleben{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8 space-y-6 leading-relaxed">
+  <h1 class="text-2xl font-bold">Datenschutzerklärung</h1>
+
+  <div role="note" class="alert alert-warning alert-soft text-xs">
+    <span>Hinweis für den Betreiber: <code>[PLATZHALTER]</code> ersetzen und den Text vor
+    Veröffentlichung rechtlich prüfen lassen. Die genannten Auftragsverarbeiter (Hetzner, Brevo,
+    Anthropic) entsprechen dem aktuellen technischen Stand dieser App.</span>
+  </div>
+
+  <section class="space-y-2">
+    <h2 class="text-lg font-semibold">1. Verantwortlicher</h2>
+    <p>
+      Verantwortlich für die Datenverarbeitung auf dieser Website ist:<br>
+      [NAME / BETREIBER]<br>
+      [STRASSE UND HAUSNUMMER], [PLZ ORT], [LAND]<br>
+      E-Mail: [KONTAKT-E-MAIL]
+    </p>
+    <p class="text-sm">Weitere Angaben findest du im <a href="{% url 'impressum' %}" class="link">Impressum</a>.</p>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-lg font-semibold">2. Hosting</h2>
+    <p>
+      Diese Website wird bei der <strong>Hetzner Online GmbH</strong>, Industriestr. 25,
+      91710 Gunzenhausen, Deutschland, gehostet. Die Server stehen in Deutschland. Beim Aufruf
+      der Seiten verarbeitet der Server automatisch technisch notwendige Zugriffsdaten
+      (Server-Logfiles) wie IP-Adresse, Datum und Uhrzeit, aufgerufene URL und User-Agent.
+      Rechtsgrundlage ist unser berechtigtes Interesse an einem sicheren, stabilen Betrieb
+      (Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;f&nbsp;DSGVO). Mit Hetzner besteht ein Vertrag zur
+      Auftragsverarbeitung (Art.&nbsp;28&nbsp;DSGVO).
+    </p>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-lg font-semibold">3. Konto und Registrierung</h2>
+    <p>
+      Für die Nutzung als Crew, Skipper oder Anbieter legst du ein Konto an. Dabei verarbeiten
+      wir die von dir angegebenen Daten (u.&nbsp;a. E-Mail-Adresse, Name sowie freiwillige
+      Profil- und Crewlisten-Angaben). Die Verarbeitung erfolgt zur Erfüllung des
+      Nutzungsvertrags (Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;b&nbsp;DSGVO). Deine Daten werden
+      gelöscht, sobald das Konto gelöscht wird und keine gesetzlichen Aufbewahrungspflichten
+      entgegenstehen.
+    </p>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-lg font-semibold">4. E-Mail-Versand (Brevo)</h2>
+    <p>
+      Für den Versand von System- und Benachrichtigungs-E-Mails (z.&nbsp;B.
+      Verifikation, Passwort-Reset, Törn-Benachrichtigungen) nutzen wir
+      <strong>Brevo</strong> (Sendinblue GmbH, Köpenicker Str. 126, 10179 Berlin). Dabei
+      werden deine E-Mail-Adresse und der Nachrichteninhalt an Brevo übermittelt.
+      Rechtsgrundlage ist die Vertragserfüllung bzw. unser berechtigtes Interesse an
+      zuverlässiger Zustellung (Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;b und f&nbsp;DSGVO). Es
+      besteht ein Auftragsverarbeitungsvertrag.
+    </p>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-lg font-semibold">5. KI-gestützte Funktionen (Anthropic)</h2>
+    <p>
+      An einigen Stellen kannst du Inhalte durch eine künstliche Intelligenz erzeugen lassen
+      (z.&nbsp;B. Törn-Beschreibungen, Andachten, Rezept-Schritte). Hierfür nutzen wir die API
+      von <strong>Anthropic</strong> (Anthropic PBC, USA). Die von dir eingegebenen Stichpunkte
+      bzw. der von dir bereitgestellte Text werden zur Generierung an Anthropic übermittelt.
+      Vor der ersten Nutzung wirst du auf den KI-Einsatz hingewiesen (Art.&nbsp;50 KI-Verordnung).
+    </p>
+    <p>
+      Rechtsgrundlage ist dein Wunsch nach Nutzung der Funktion bzw. unser berechtigtes
+      Interesse (Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;b und f&nbsp;DSGVO). Bei der Übermittlung in
+      die USA stützen wir uns auf die Standardvertragsklauseln der EU-Kommission. Bitte gib in
+      den KI-Feldern keine besonderen Kategorien personenbezogener Daten ein. KI-generierte
+      Inhalte können fehlerhaft sein und sind vor Verwendung zu prüfen.
+    </p>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-lg font-semibold">6. Cookies und lokale Speicherung</h2>
+    <p>
+      Diese Website verwendet ausschließlich <strong>technisch notwendige</strong> Cookies bzw.
+      lokale Speicher: ein Sitzungs-Cookie für die Anmeldung, ein CSRF-Cookie zum Schutz vor
+      Formularmissbrauch sowie Einträge im lokalen Browser-Speicher (z.&nbsp;B. für die
+      Bestätigung des KI-Hinweises und das Ausblenden des Cookie-Hinweises). Diese sind für den
+      Betrieb erforderlich; es findet kein Tracking und keine Weitergabe zu Werbezwecken statt.
+      Es werden keine externen Skripte oder Schriftarten von Drittanbietern geladen —
+      alle Ressourcen werden von unserem eigenen Server ausgeliefert.
+    </p>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-lg font-semibold">7. Hochgeladene Dateien und Bilder</h2>
+    <p>
+      Lädst du Bilder oder Dokumente hoch (z.&nbsp;B. Profilbild, Lizenzen, Belege), werden diese
+      auf unserem Server gespeichert und – soweit sensibel – nur berechtigten Personen zugänglich
+      gemacht. Rechtsgrundlage ist die Vertragserfüllung (Art.&nbsp;6 Abs.&nbsp;1 lit.&nbsp;b&nbsp;DSGVO).
+    </p>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-lg font-semibold">8. Deine Rechte</h2>
+    <p>
+      Du hast das Recht auf Auskunft (Art.&nbsp;15), Berichtigung (Art.&nbsp;16), Löschung
+      (Art.&nbsp;17), Einschränkung der Verarbeitung (Art.&nbsp;18), Datenübertragbarkeit
+      (Art.&nbsp;20) und Widerspruch (Art.&nbsp;21&nbsp;DSGVO). Wende dich dazu an die oben
+      genannte Kontaktadresse. Außerdem steht dir ein Beschwerderecht bei einer
+      Datenschutz-Aufsichtsbehörde zu.
+    </p>
+  </section>
+
+  <p class="text-xs text-base-content/50">Stand: [DATUM EINSETZEN]</p>
+</div>
+{% endblock %}

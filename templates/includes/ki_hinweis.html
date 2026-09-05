@@ -1,0 +1,16 @@
+{% comment %}
+Sichtbarer KI-Transparenzhinweis (EU AI Act Art. 50).
+Direkt an jedem KI-Generator platzieren, damit Nutzer VOR der Interaktion
+erkennen, dass Inhalte von einer KI erzeugt werden.
+{% endcomment %}
+<div role="note" class="alert alert-info alert-soft text-xs items-start gap-2 py-2">
+  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+  </svg>
+  <span>
+    <strong>KI-Hinweis:</strong> Dieser Inhalt wird von einer künstlichen Intelligenz
+    (Anthropic&nbsp;Claude) erzeugt und kann Fehler enthalten. Bitte prüfe das Ergebnis
+    vor der Verwendung. Mehr dazu in der
+    <a href="{% url 'datenschutz' %}" class="link">Datenschutzerklärung</a>.
+  </span>
+</div>

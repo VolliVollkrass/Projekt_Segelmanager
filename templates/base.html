@@ -8,9 +8,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>{% block title %}Base Seite{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="{% static 'medien/favicon.png' %}">
-    <link href="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.css" rel="stylesheet"
-          integrity="sha384-6LFfkTKLRlzFtgx8xsWyBdKGpcMMQTkv+dB7rAbugeJAu1Ym2q1Aji1cjHBG12Xh"
-          crossorigin="anonymous"/>
+    <!-- cropperjs 1.6.2 – lokal gehostet (kein CDN), DSGVO-konform -->
+    <link href="{% static 'css/vendor/cropper.min.css' %}" rel="stylesheet"/>
   </head>
   <body class="flex flex-col min-h-screen w-full">
     <nav class="sticky top-0 z-40 shadow-md">
@@ -47,6 +46,12 @@
         </div>
         {% endif %}
         {% block content %}{% endblock %}
+
+        <!-- Mobile: Rechtslinks (Desktop nutzt den Footer) -->
+        <nav class="lg:hidden flex justify-center gap-4 text-xs text-base-content/60 py-6">
+          <a href="{% url 'impressum' %}" class="link link-hover">Impressum</a>
+          <a href="{% url 'datenschutz' %}" class="link link-hover">Datenschutz</a>
+        </nav>
     </main>
 
     <footer class="hidden lg:block">
@@ -54,9 +59,90 @@
     </footer>
 
     {% include "includes/bottom_nav.html" %}
-    <script src="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.js"
-            integrity="sha384-jrOgQzBlDeUNdmQn3rUt/PZD+pdcRBdWd/HWRqRo+n2OR2QtGyjSaJC0GiCeH+ir"
-            crossorigin="anonymous"></script>
+
+    <!-- Cookie-Hinweis: Diese App nutzt nur technisch notwendige Cookies, daher genügt
+         ein schlichter, wegklickbarer Hinweis (keine Einwilligung/Consent-Gate nötig). -->
+    <div id="cookie-hinweis" hidden
+         class="fixed inset-x-0 bottom-0 z-50 lg:bottom-4 lg:inset-x-auto lg:right-4 lg:max-w-sm
+                m-0 lg:m-0 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] lg:pb-4
+                bg-base-100 border-t lg:border lg:rounded-xl border-base-300 shadow-lg">
+      <p class="text-sm text-base-content/80">
+        Wir verwenden nur technisch notwendige Cookies, damit die Anmeldung und Sicherheit
+        funktionieren. Kein Tracking, keine Drittanbieter-Skripte. Mehr in der
+        <a href="{% url 'datenschutz' %}" class="link link-primary">Datenschutzerklärung</a>.
+      </p>
+      <div class="flex justify-end mt-3">
+        <button type="button" id="cookie-hinweis-ok" class="btn btn-primary btn-sm">Verstanden</button>
+      </div>
+    </div>
+    <script>
+    (function () {
+      const KEY = 'cookie_hinweis_ok_v1';
+      const box = document.getElementById('cookie-hinweis');
+      if (!box) return;
+      let done = false;
+      try { done = localStorage.getItem(KEY) === '1'; } catch {}
+      if (!done) box.hidden = false;
+      document.getElementById('cookie-hinweis-ok')?.addEventListener('click', function () {
+        try { localStorage.setItem(KEY, '1'); } catch {}
+        box.hidden = true;
+      });
+    })();
+    </script>
+
+    <!-- KI-Transparenz (AI Act Art. 50): einmalige Bestätigung vor der ersten KI-Nutzung -->
+    <dialog id="ki-hinweis-modal" class="modal">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold flex items-center gap-2">✨ Hinweis zur KI-Funktion</h3>
+        <p class="py-3 text-sm text-base-content/80">
+          Diese Funktion erzeugt Inhalte mithilfe einer künstlichen Intelligenz
+          (Anthropic&nbsp;Claude). Die Ergebnisse können <strong>fehlerhaft oder unvollständig</strong>
+          sein — bitte prüfe sie vor der Verwendung. Deine Eingaben werden zur Generierung
+          an den KI-Dienst übermittelt. Details findest du in der
+          <a href="{% url 'datenschutz' %}" class="link link-primary">Datenschutzerklärung</a>.
+        </p>
+        <div class="modal-action">
+          <form method="dialog">
+            <button class="btn btn-ghost btn-sm" value="cancel">Abbrechen</button>
+            <button class="btn btn-primary btn-sm" id="ki-hinweis-ok" value="ok">Verstanden, fortfahren</button>
+          </form>
+        </div>
+      </div>
+      <form method="dialog" class="modal-backdrop"><button>schließen</button></form>
+    </dialog>
+    <script>
+    // Zeigt vor der ERSTEN KI-Interaktion (pro Gerät) einen Bestätigungsdialog.
+    // Danach reicht der statische KI-Hinweis an der jeweiligen Funktion.
+    (function () {
+      const KEY = 'ki_hinweis_ack_v1';
+      const modal = document.getElementById('ki-hinweis-modal');
+      if (!modal) return;
+      let pending = null;
+      function acknowledged() {
+        try { return localStorage.getItem(KEY) === '1'; } catch { return false; }
+      }
+      document.addEventListener('click', function (e) {
+        const trigger = e.target.closest('[data-ki-generate]');
+        if (!trigger || acknowledged()) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        pending = trigger;
+        modal.showModal();
+      }, true);
+      document.getElementById('ki-hinweis-ok')?.addEventListener('click', function () {
+        try { localStorage.setItem(KEY, '1'); } catch {}
+        const t = pending; pending = null;
+        // Ursprüngliche Aktion nach Bestätigung erneut auslösen
+        if (t) setTimeout(() => t.click(), 0);
+      });
+      modal.addEventListener('close', function () {
+        if (modal.returnValue !== 'ok') pending = null;
+      });
+    })();
+    </script>
+
+    <!-- cropperjs 1.6.2 – lokal gehostet (kein CDN), DSGVO-konform -->
+    <script src="{% static 'js/vendor/cropper.min.js' %}"></script>
 
     <script>
     // In der iOS-WebApp (Standalone) öffnen PDFs ohne Navigations-Chrome und ohne Weg zurück.

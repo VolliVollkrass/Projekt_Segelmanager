@@ -85,3 +85,13 @@ def pdf_viewer(request):
         "mailto": request.GET.get("mailto", "").strip(),
         "betreff": request.GET.get("betreff", "").strip(),
     })
+
+
+def impressum(request):
+    """Impressum nach § 5 DDG (ehem. TMG). Angaben in templates/legal/impressum.html."""
+    return render(request, "legal/impressum.html")
+
+
+def datenschutz(request):
+    """Datenschutzerklärung nach Art. 13/14 DSGVO."""
+    return render(request, "legal/datenschutz.html")

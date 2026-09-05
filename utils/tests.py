@@ -89,6 +89,31 @@ class SecurityHeaderTests(TestCase):
         self.assertIn("object-src 'none'", resp["Content-Security-Policy"])
         self.assertIn("Permissions-Policy", resp)
 
+    def test_csp_ohne_externe_cdn(self):
+        """Nach der Lokalisierung von cropperjs darf kein CDN mehr erlaubt sein."""
+        csp = self.client.get("/")["Content-Security-Policy"]
+        self.assertNotIn("unpkg.com", csp)
+        self.assertNotIn("http", csp)  # keine externen http(s)-Quellen
+
+
+class LegalPageTests(TestCase):
+    """Impressum und Datenschutzerklärung müssen öffentlich erreichbar sein."""
+
+    def test_impressum_erreichbar(self):
+        resp = self.client.get("/impressum/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Impressum")
+
+    def test_datenschutz_erreichbar(self):
+        resp = self.client.get("/datenschutz/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Datenschutz")
+
+    def test_footer_verlinkt_rechtsseiten(self):
+        html = self.client.get("/").content.decode()
+        self.assertIn("/impressum/", html)
+        self.assertIn("/datenschutz/", html)
+
 
 class UrlGuardTests(TestCase):
     """SSRF-Schutz: interne/nicht-http-Ziele werden abgelehnt."""
