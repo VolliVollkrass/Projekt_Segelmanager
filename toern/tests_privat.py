@@ -85,6 +85,8 @@ class PrivaterToernTests(TestCase):
         )
 
     def test_startseite_versteckt_private(self):
+        # Startseite ist hinter Login; ein eingeloggter Fremder sieht nur öffentliche Törns
+        self.client.force_login(self.fremder)
         resp = self.client.get("/")
         self.assertNotContains(resp, "Geheimer Törn")
         self.assertContains(resp, "Offener Törn")

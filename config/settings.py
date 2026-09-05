@@ -75,6 +75,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "config.security_headers.SecurityHeadersMiddleware",
     "axes.middleware.AxesMiddleware",
+    "accounts.middleware.LoginRequiredMiddleware",
     "accounts.middleware.EmailVerificationMiddleware",
 ]
 
