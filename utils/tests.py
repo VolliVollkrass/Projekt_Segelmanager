@@ -110,9 +110,34 @@ class LegalPageTests(TestCase):
         self.assertContains(resp, "Datenschutz")
 
     def test_footer_verlinkt_rechtsseiten(self):
-        html = self.client.get("/").content.decode()
+        # Login-Seite ist öffentlich und rendert base.html inkl. Rechtslinks
+        html = self.client.get("/accounts/login/").content.decode()
         self.assertIn("/impressum/", html)
         self.assertIn("/datenschutz/", html)
+
+
+class LoginGateTests(TestCase):
+    """Die App ist hinter Login gesperrt — bis auf definierte öffentliche Seiten."""
+
+    def test_geschuetzte_seite_leitet_anonym_zum_login(self):
+        resp = self.client.get("/")
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn("/accounts/login/", resp["Location"])
+        self.assertIn("next=", resp["Location"])
+
+    def test_oeffentliche_seiten_ohne_login_erreichbar(self):
+        for pfad in ("/accounts/login/", "/accounts/register/",
+                     "/impressum/", "/datenschutz/"):
+            self.assertEqual(self.client.get(pfad).status_code, 200, msg=pfad)
+
+    def test_eingeloggt_erreicht_startseite(self):
+        u = User.objects.create(
+            email="crew-gate@example.com",
+            username="crew-gate@example.com",
+            email_verified=True,   # sonst greift die EmailVerificationMiddleware
+        )
+        self.client.force_login(u)
+        self.assertEqual(self.client.get("/").status_code, 200)
 
 
 class UrlGuardTests(TestCase):
