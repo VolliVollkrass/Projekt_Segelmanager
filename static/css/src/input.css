@@ -40,3 +40,11 @@
 }
 
 
+/* Mobile-Fix: DaisyUI setzt bei .label/.label-text(-alt) white-space:nowrap.
+   Lange Hinweistexte sprengen dadurch ihre Formularzeile und erzeugen
+   horizontalen Seiten-Overflow. Umbrechen + schrumpfen erlauben. */
+.label { flex-wrap: wrap; }
+.label-text,
+.label-text-alt { white-space: normal; min-width: 0; }
+
+

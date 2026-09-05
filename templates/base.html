@@ -45,10 +45,12 @@
             {% endfor %}
         </div>
         {% endif %}
-        {% block content %}{% endblock %}
+        {# Inhalt in EINEM Flex-Item kapseln: interne Abstände bleiben normales   #}
+        {# Block-Layout, das Item wächst und drückt die Rechtslinks nach unten.   #}
+        <div class="flex-1 min-w-0">{% block content %}{% endblock %}</div>
 
         <!-- Mobile: dezente Rechtslinks, ans untere Ende geheftet (Desktop nutzt den Footer) -->
-        <nav class="lg:hidden mt-auto flex justify-center items-center gap-2 text-[11px] text-base-content/40 pt-10 pb-3">
+        <nav class="lg:hidden flex justify-center items-center gap-2 text-[11px] text-base-content/40 pt-10 pb-3">
           <a href="{% url 'impressum' %}" class="hover:text-base-content/70 transition-colors">Impressum</a>
           <span aria-hidden="true">·</span>
           <a href="{% url 'datenschutz' %}" class="hover:text-base-content/70 transition-colors">Datenschutz</a>

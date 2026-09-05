@@ -939,7 +939,7 @@
                 <form method="post" action="{% url 'ausgabe_erstellen' toern.id boot.id %}" class="space-y-3">
                     {% csrf_token %}
 
-                    <div class="grid md:grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div class="form-control">
                             <label class="label py-1"><span class="label-text text-xs">Beschreibung</span></label>
                             <input type="text" name="beschreibung" required maxlength="200"
@@ -1187,7 +1187,7 @@
         <h3 class="font-bold text-lg mb-4">Ausgabe bearbeiten</h3>
         <form id="ausgabe-edit-form" method="post" action="" class="space-y-3">
             {% csrf_token %}
-            <div class="grid md:grid-cols-2 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div class="form-control">
                     <label class="label py-1"><span class="label-text text-xs">Beschreibung</span></label>
                     <input type="text" name="beschreibung" id="ae-beschreibung" required maxlength="200"
