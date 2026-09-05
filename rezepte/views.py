@@ -13,6 +13,9 @@ from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django_ratelimit.decorators import ratelimit
+
+from utils.url_guard import UnsafeUrlError, safe_get
 
 from .models import Rezept, RezeptSchritt, RezeptStern, RezeptZutat
 
@@ -194,6 +197,7 @@ def rezept_stern_toggle(request, pk):
 
 
 @login_required
+@ratelimit(key='user', rate='20/h', block=True)
 @require_POST
 def ki_schritte_generieren(request):
     from django.conf import settings as django_settings
@@ -241,12 +245,12 @@ def ki_schritte_generieren(request):
 
 
 @login_required
+@ratelimit(key='user', rate='10/h', block=True)
 @require_POST
 def ki_url_import(request):
     from django.conf import settings as django_settings
     import anthropic
     try:
-        import requests as http_requests
         from bs4 import BeautifulSoup
     except ImportError:
         return JsonResponse({"error": "Import-Bibliotheken nicht installiert."}, status=503)
@@ -261,7 +265,8 @@ def ki_url_import(request):
         return JsonResponse({"error": "Keine URL angegeben."}, status=400)
 
     try:
-        resp = http_requests.get(url, timeout=10, headers={
+        # SSRF-Schutz: nur öffentliche http/https-Ziele (siehe utils.url_guard)
+        resp = safe_get(url, timeout=10, headers={
             "User-Agent": "Mozilla/5.0 (compatible; Segelkochbuch/1.0)"
         })
         resp.raise_for_status()
@@ -271,8 +276,11 @@ def ki_url_import(request):
             tag.decompose()
         text = soup.get_text(separator="\n", strip=True)
         text = text[:6000]  # Token-Limit schonen
-    except Exception as e:
-        return JsonResponse({"error": f"Seite konnte nicht geladen werden: {e}"}, status=400)
+    except UnsafeUrlError:
+        # Generische Meldung — kein Rückschluss auf interne Adressen preisgeben.
+        return JsonResponse({"error": "Diese URL ist nicht erlaubt."}, status=400)
+    except Exception:
+        return JsonResponse({"error": "Seite konnte nicht geladen werden."}, status=400)
 
     client = anthropic.Anthropic(api_key=api_key)
     message = client.messages.create(

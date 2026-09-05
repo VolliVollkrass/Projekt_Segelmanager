@@ -2,7 +2,8 @@
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
-from django.views.static import serve
+
+from utils.protected_media import protected_media_serve
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -14,7 +15,9 @@ urlpatterns = [
     path('segelwissen/', include('segelwissen.urls')),
     path('andacht/', include('andacht.urls')),
     path('finance/', include('finance.urls')),
-    re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+    # Sensible Uploads (Lizenzen, Belege, Logbücher, Schadensfotos) werden hier
+    # autorisiert; öffentliche Medien wie bisher direkt ausgeliefert.
+    re_path(r'^media/(?P<path>.*)$', protected_media_serve),
 ]
 
 # schema_viewer zeigt die komplette DB-Struktur und hat KEINE Auth — nur lokal.
