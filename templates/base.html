@@ -8,7 +8,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>{% block title %}Base Seite{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="{% static 'medien/favicon.png' %}">
-    <link href="https://unpkg.com/cropperjs/dist/cropper.css" rel="stylesheet"/>
+    <link href="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.css" rel="stylesheet"
+          integrity="sha384-6LFfkTKLRlzFtgx8xsWyBdKGpcMMQTkv+dB7rAbugeJAu1Ym2q1Aji1cjHBG12Xh"
+          crossorigin="anonymous"/>
   </head>
   <body class="flex flex-col min-h-screen w-full">
     <nav class="sticky top-0 z-40 shadow-md">
@@ -52,7 +54,9 @@
     </footer>
 
     {% include "includes/bottom_nav.html" %}
-    <script src="https://unpkg.com/cropperjs"></script>
+    <script src="https://unpkg.com/cropperjs@1.6.2/dist/cropper.min.js"
+            integrity="sha384-jrOgQzBlDeUNdmQn3rUt/PZD+pdcRBdWd/HWRqRo+n2OR2QtGyjSaJC0GiCeH+ir"
+            crossorigin="anonymous"></script>
 
     <script>
     // In der iOS-WebApp (Standalone) öffnen PDFs ohne Navigations-Chrome und ohne Weg zurück.

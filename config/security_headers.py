@@ -16,7 +16,8 @@ CSP = "; ".join([
     "style-src 'self' 'unsafe-inline' https://unpkg.com",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    "connect-src 'self'",
+    # blob: für cropperjs (liest das hochgeladene Bild per XHR zur EXIF-Auswertung)
+    "connect-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
