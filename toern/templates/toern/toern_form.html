@@ -100,12 +100,13 @@
               ></textarea>
             </div>
             <div class="flex items-center gap-3 mt-3">
-              <button type="button" id="ki-generieren-btn" class="btn btn-secondary btn-sm gap-2">
+              <button type="button" id="ki-generieren-btn" data-ki-generate class="btn btn-secondary btn-sm gap-2">
                 <span id="ki-spinner" class="loading loading-spinner loading-xs hidden"></span>
                 ✨ Beschreibung generieren
               </button>
               <span id="ki-error" class="text-error text-xs hidden"></span>
             </div>
+            <div class="mt-3">{% include "includes/ki_hinweis.html" %}</div>
           </div>
         </div>
 

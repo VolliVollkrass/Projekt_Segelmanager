@@ -5,15 +5,16 @@ Inline-<script>-Blöcke und style="…"-Attribute nutzen (ein Umstieg auf
 Nonces/Hashes wäre ein größerer Umbau). Der Gewinn liegt trotzdem in:
 - object-src 'none' + base-uri 'self' + frame-ancestors 'none' (Clickjacking,
   base-tag-Injection, Plugin-Objekte)
-- Einschränkung externer Skript-/Style-Quellen auf self + unpkg (cropperjs).
+- Einschränkung aller Skript-/Style-Quellen auf 'self' (keine CDNs).
 
-Externe Ressourcen aktuell: cropperjs (CSS+JS) von https://unpkg.com.
+Externe Ressourcen: keine. cropperjs (CSS+JS) wird lokal aus static/*/vendor/
+ausgeliefert – DSGVO-konform, kein Drittanbieter-Request beim Seitenaufruf.
 """
 
 CSP = "; ".join([
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' https://unpkg.com",
-    "style-src 'self' 'unsafe-inline' https://unpkg.com",
+    "script-src 'self' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     # blob: für cropperjs (liest das hochgeladene Bild per XHR zur EXIF-Auswertung)

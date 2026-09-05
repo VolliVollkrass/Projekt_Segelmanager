@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Impressum · Meer erleben{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8 space-y-6">
+  <h1 class="text-2xl font-bold">Impressum</h1>
+
+  <section class="space-y-1">
+    <h2 class="text-lg font-semibold">Angaben gemäß § 5 DDG</h2>
+    <p>
+      [NAME / BETREIBER]<br>
+      [STRASSE UND HAUSNUMMER]<br>
+      [PLZ ORT]<br>
+      [LAND]
+    </p>
+  </section>
+
+  <section class="space-y-1">
+    <h2 class="text-lg font-semibold">Kontakt</h2>
+    <p>
+      Telefon: [TELEFONNUMMER]<br>
+      E-Mail: [KONTAKT-E-MAIL]
+    </p>
+  </section>
+
+  <section class="space-y-1">
+    <h2 class="text-lg font-semibold">Umsatzsteuer-ID</h2>
+    <p>
+      Umsatzsteuer-Identifikationsnummer gemäß § 27&nbsp;a Umsatzsteuergesetz:<br>
+      [USt-IdNr. — oder diesen Abschnitt entfernen, falls nicht vorhanden]
+    </p>
+  </section>
+
+  <section class="space-y-1">
+    <h2 class="text-lg font-semibold">Redaktionell verantwortlich</h2>
+    <p>
+      [NAME]<br>
+      [ANSCHRIFT WIE OBEN]
+    </p>
+  </section>
+
+  <section class="space-y-1">
+    <h2 class="text-lg font-semibold">EU-Streitschlichtung</h2>
+    <p class="text-sm text-base-content/70">
+      Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit:
+      <a href="https://ec.europa.eu/consumers/odr/" class="link" rel="noopener" target="_blank">https://ec.europa.eu/consumers/odr/</a>.
+      Unsere E-Mail-Adresse findest du oben im Impressum.
+    </p>
+    <p class="text-sm text-base-content/70">
+      Wir sind nicht bereit oder verpflichtet, an Streitbeilegungsverfahren vor einer
+      Verbraucherschlichtungsstelle teilzunehmen.
+    </p>
+  </section>
+
+  <div role="note" class="alert alert-warning alert-soft text-xs">
+    <span>Hinweis für den Betreiber: Bitte alle <code>[PLATZHALTER]</code> durch echte Angaben ersetzen
+    und diesen Text rechtlich prüfen lassen (z.&nbsp;B. anwaltlich oder mit einem geprüften Impressum-Generator).</span>
+  </div>
+
+  <p class="text-sm"><a href="{% url 'datenschutz' %}" class="link link-primary">Zur Datenschutzerklärung →</a></p>
+</div>
+{% endblock %}
