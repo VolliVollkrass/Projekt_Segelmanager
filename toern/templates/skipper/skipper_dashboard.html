@@ -42,6 +42,10 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 <span class="text-[10px] font-medium leading-tight">Crew</span>
             </button>
+            <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="post">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                <span class="text-[10px] font-medium leading-tight">Post</span>
+            </button>
             <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="packliste">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                 <span class="text-[10px] font-medium leading-tight">Packliste</span>
@@ -83,6 +87,9 @@
             </button>
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="crew">
                 Crew
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="post">
+                Post
             </button>
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="packliste">
                 Packliste
@@ -628,6 +635,226 @@
         {% endif %}
 
     </div>
+
+    <!-- ========================= TAB: POST (Rundmail) ========================= -->
+    <div id="tab-post" class="hidden space-y-5">
+
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4 sm:p-5">
+                <h2 class="text-lg font-bold flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Rundmail an die Crew
+                </h2>
+                <p class="text-sm text-base-content/60 -mt-1">
+                    Schreibe allen Mitfahrenden – z.&nbsp;B. eine Einladung zum Vortreffen.
+                    Antworten landen direkt bei dir.
+                </p>
+
+                <form id="rm-form" method="post" enctype="multipart/form-data"
+                      action="{% url 'rundmail_senden' toern.id %}" class="space-y-4 mt-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="aktion" id="rm-aktion" value="senden">
+                    <input type="hidden" name="rundmail_id" id="rm-id" value="">
+
+                    <!-- KI-Assistent -->
+                    <div class="rounded-xl bg-primary/5 border border-primary/20 p-3 space-y-2">
+                        <div class="flex items-center gap-2 text-sm font-semibold text-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"/></svg>
+                            KI-Textentwurf (optional)
+                        </div>
+                        <textarea id="rm-ki-stichpunkte" rows="2"
+                                  class="textarea textarea-bordered w-full text-sm"
+                                  placeholder="Stichpunkte, z.B.: Vortreffen digital, Ausrüstung besprechen, Fragen klären"></textarea>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <select id="rm-ki-ton" class="select select-bordered select-sm">
+                                <option value="herzlich">herzlich</option>
+                                <option value="locker">locker</option>
+                                <option value="sachlich">sachlich</option>
+                            </select>
+                            <button type="button" id="rm-ki-btn" onclick="rmKiGenerieren()"
+                                    class="btn btn-primary btn-sm">
+                                <span class="rm-ki-label">Entwurf erstellen</span>
+                                <span class="rm-ki-spin loading loading-spinner loading-xs hidden"></span>
+                            </button>
+                            <span class="text-xs text-base-content/50">Du kannst den Text danach frei bearbeiten.</span>
+                        </div>
+                        <p id="rm-ki-error" class="text-xs text-error hidden"></p>
+                    </div>
+
+                    <!-- Betreff -->
+                    <div>
+                        <label class="text-sm font-medium">Betreff</label>
+                        <input type="text" name="betreff" id="rm-betreff" maxlength="200" required
+                               class="input input-bordered w-full mt-1"
+                               placeholder="Einladung zum Vortreffen">
+                    </div>
+
+                    <!-- Bausteine -->
+                    <div>
+                        <div class="flex items-center justify-between flex-wrap gap-2">
+                            <label class="text-sm font-medium">Nachricht</label>
+                            <button type="button" onclick="rmTogglePreview()" id="rm-preview-btn"
+                                    class="btn btn-ghost btn-xs">Vorschau</button>
+                        </div>
+                        <div class="flex flex-wrap gap-1 my-1.5">
+                            <span class="text-xs text-base-content/50 self-center mr-1">Bausteine:</span>
+                            {% verbatim %}
+                            <button type="button" class="btn btn-xs btn-outline" onclick="rmInsert('{{vorname}}')">Vorname</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="rmInsert('{{name}}')">Voller Name</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="rmInsert('{{boot}}')">Boot</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="rmInsert('{{kabine}}')">Kabine</button>
+                            <button type="button" class="btn btn-xs btn-outline" onclick="rmInsert('{{toern}}')">Törn</button>
+                            {% endverbatim %}
+                        </div>
+                        <textarea name="text" id="rm-text" rows="9" required
+                                  class="textarea textarea-bordered w-full font-mono text-sm"
+                                  placeholder="Hallo {% templatetag openvariable %}vorname{% templatetag closevariable %},&#10;&#10;ich lade dich herzlich zu unserem Vortreffen ein …"></textarea>
+                        <div id="rm-preview" class="hidden mt-2 rounded-xl border border-base-300 bg-base-200 p-3 text-sm whitespace-pre-wrap"></div>
+                    </div>
+
+                    <!-- Meeting-Link -->
+                    <div>
+                        <label class="text-sm font-medium">Meeting-Link (optional)</label>
+                        <input type="url" name="meeting_link" id="rm-meeting" class="input input-bordered w-full mt-1"
+                               placeholder="https://teams.microsoft.com/… oder Zoom-Link">
+                    </div>
+
+                    <!-- Kalendertermin -->
+                    <details class="rounded-xl border border-base-300 p-3">
+                        <summary class="cursor-pointer text-sm font-medium select-none">📅 Kalendertermin hinzufügen (optional)</summary>
+                        <div class="mt-3 space-y-3">
+                            <p class="text-xs text-base-content/50">Wird als Kalenderdatei (.ics) angehängt – ein Klick fügt den Termin in Outlook, Apple- oder Google-Kalender ein.</p>
+                            <div>
+                                <label class="text-xs font-medium">Titel des Termins</label>
+                                <input type="text" name="termin_titel" id="rm-t-titel" maxlength="200"
+                                       class="input input-bordered input-sm w-full mt-1" placeholder="Vortreffen {{ toern.titel }}">
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label class="text-xs font-medium">Beginn</label>
+                                    <input type="datetime-local" name="termin_start" id="rm-t-start" class="input input-bordered input-sm w-full mt-1">
+                                </div>
+                                <div>
+                                    <label class="text-xs font-medium">Ende</label>
+                                    <input type="datetime-local" name="termin_ende" id="rm-t-ende" class="input input-bordered input-sm w-full mt-1">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="text-xs font-medium">Ort</label>
+                                <input type="text" name="termin_ort" id="rm-t-ort" maxlength="200"
+                                       class="input input-bordered input-sm w-full mt-1" placeholder="Online / Hafen / Adresse">
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Anhang -->
+                    <div>
+                        <label class="text-sm font-medium">Datei-Anhang (optional)</label>
+                        <input type="file" name="anhang" class="file-input file-input-bordered file-input-sm w-full mt-1">
+                    </div>
+
+                    <!-- Empfänger -->
+                    <div class="rounded-xl border border-base-300 p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm font-medium">Empfänger</span>
+                            <label class="label cursor-pointer gap-2 py-0">
+                                <span class="text-xs">Alle</span>
+                                <input type="checkbox" id="rm-alle" class="checkbox checkbox-sm" checked onchange="rmToggleAlle(this)">
+                            </label>
+                        </div>
+                        {% if boote_count > 1 %}
+                        <div class="flex flex-wrap gap-1 mb-2" id="rm-boot-filter">
+                            <button type="button" class="btn btn-xs btn-ghost" onclick="rmFilterBoot('')">Alle Boote</button>
+                            {% for b in toern.boote.all %}
+                            <button type="button" class="btn btn-xs btn-ghost" onclick="rmFilterBoot('{{ b.id }}')">{{ b.name }}</button>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <div class="max-h-56 overflow-y-auto space-y-1">
+                            {% for t in rundmail_empfaenger %}
+                            <label class="rm-emp flex items-center gap-2 p-1.5 rounded-lg hover:bg-base-200 cursor-pointer"
+                                   data-boot="{{ t.boot.id|default:'' }}"
+                                   data-vorname="{{ t.user.first_name|default:'' }}"
+                                   data-name="{{ t.user.get_full_name|default:t.user.first_name }}"
+                                   data-bootname="{{ t.boot.name|default:'' }}"
+                                   data-kabine="{{ t.kabine.name|default:'' }}">
+                                <input type="checkbox" name="empfaenger" value="{{ t.id }}"
+                                       class="checkbox checkbox-sm rm-emp-cb" {% if t.user.email_verified %}checked{% else %}disabled{% endif %}
+                                       onchange="rmUpdateCount()">
+                                <span class="flex-1 text-sm">{{ t.user.get_full_name|default:t.user.email }}</span>
+                                {% if t.status == "angemeldet" %}<span class="badge badge-ghost badge-xs">angemeldet</span>{% endif %}
+                                {% if not t.user.email_verified %}<span class="badge badge-warning badge-xs" title="E-Mail nicht bestätigt – erhält keine Mail">unbestätigt</span>{% endif %}
+                            </label>
+                            {% empty %}
+                            <p class="text-sm text-base-content/50">Noch keine Crew-Mitglieder.</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Aktionen -->
+                    <div class="flex flex-wrap gap-2 pt-1">
+                        <button type="button" onclick="rmSpeichern()" class="btn btn-outline btn-sm">Als Entwurf speichern</button>
+                        <button type="button" onclick="rmSendenModal()" class="btn btn-primary btn-sm flex-1">
+                            Rundmail senden
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Archiv -->
+        <div class="card bg-base-100 border border-base-300">
+            <div class="card-body p-4 sm:p-5">
+                <h3 class="font-bold">Archiv</h3>
+                <p class="text-xs text-base-content/50 -mt-1">Frühere Rundmails & Entwürfe – erneut als Vorlage nutzen.</p>
+                <div class="space-y-2 mt-2">
+                    {% for m in rundmails %}
+                    <div class="flex items-center gap-2 p-2 rounded-lg border border-base-200">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="font-medium text-sm truncate">{{ m.betreff }}</span>
+                                {% if m.status == "entwurf" %}
+                                <span class="badge badge-ghost badge-xs shrink-0">Entwurf</span>
+                                {% else %}
+                                <span class="badge badge-success badge-xs shrink-0">{{ m.empfaenger_count }}&nbsp;gesendet</span>
+                                {% endif %}
+                            </div>
+                            <div class="text-xs text-base-content/50">
+                                {% if m.gesendet_am %}{{ m.gesendet_am|date:"d.m.Y H:i" }}{% else %}{{ m.erstellt_am|date:"d.m.Y H:i" }}{% endif %}
+                                {% if m.absender %}· {{ m.absender.get_full_name|default:m.absender.first_name }}{% endif %}
+                            </div>
+                        </div>
+                        <button type="button" onclick="rmVorlage({{ m.id }})" class="btn btn-ghost btn-xs" title="Als Vorlage laden">Vorlage</button>
+                        <form method="post" action="{% url 'rundmail_loeschen' m.id %}" onsubmit="return confirm('Diese Rundmail löschen?');">
+                            {% csrf_token %}
+                            <button class="btn btn-ghost btn-xs text-error px-2" title="Löschen">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </form>
+                    </div>
+                    {% empty %}
+                    <p class="text-sm text-base-content/50">Noch keine Rundmails verschickt.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bestätigungsdialog Rundmail -->
+    <dialog id="rundmailSendModal" class="modal modal-bottom sm:modal-middle">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg">Rundmail senden?</h3>
+            <p class="py-3 text-sm">
+                Die Nachricht geht an <span id="rm-count" class="font-semibold">0</span> Crew-Mitglied(er)
+                mit bestätigter E-Mail-Adresse. Du erhältst eine Kopie.
+            </p>
+            <div class="modal-action">
+                <form method="dialog"><button class="btn btn-ghost btn-sm">Abbrechen</button></form>
+                <button type="button" onclick="rmSendenBestaetigt()" class="btn btn-primary btn-sm">Jetzt senden</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>schließen</button></form>
+    </dialog>
 
     <!-- ========================= TAB: PACKLISTE ========================= -->
     <div id="tab-packliste" class="hidden space-y-4">
@@ -2042,5 +2269,152 @@ function submitDokStandardSpeichern() {
     });
 }
 </script>
+
+<!-- ===================== RUNDMAIL (POST-TAB) ===================== -->
+<script>
+const RM_CFG = {
+    toernId: {{ toern.id }},
+    kiUrl: "{% url 'rundmail_ki_generieren' %}",
+    vorlageUrl: "{% url 'rundmail_vorlage_get' 0 %}",  // /0/ wird durch echte ID ersetzt
+};
+</script>
+{% verbatim %}
+<script>
+function rmCsrf() {
+    return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1];
+}
+
+// Baustein an Cursorposition einfügen
+function rmInsert(token) {
+    const ta = document.getElementById('rm-text');
+    const start = ta.selectionStart, end = ta.selectionEnd;
+    ta.value = ta.value.slice(0, start) + token + ta.value.slice(end);
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = start + token.length;
+}
+
+// Platzhalter für Vorschau ersetzen (erster ausgewählter Empfänger als Beispiel)
+function rmRender(text) {
+    const cb = document.querySelector('.rm-emp-cb:checked');
+    const label = cb ? cb.closest('.rm-emp') : document.querySelector('.rm-emp');
+    const d = label ? label.dataset : {};
+    const map = {
+        vorname: d.vorname || 'Vorname',
+        name: d.name || 'Name',
+        boot: d.bootname || '',
+        kabine: d.kabine || '',
+        toern: document.title.replace(/^Skipper.\s*/, ''),
+        skipper: '',
+    };
+    return text.replace(/\{\{\s*(vorname|nachname|name|boot|kabine|toern|skipper)\s*\}\}/g,
+        (m, k) => map[k] !== undefined ? map[k] : '');
+}
+
+function rmTogglePreview() {
+    const box = document.getElementById('rm-preview');
+    const btn = document.getElementById('rm-preview-btn');
+    if (box.classList.contains('hidden')) {
+        box.textContent = rmRender(document.getElementById('rm-text').value || '(noch kein Text)');
+        box.classList.remove('hidden');
+        btn.textContent = 'Vorschau schließen';
+    } else {
+        box.classList.add('hidden');
+        btn.textContent = 'Vorschau';
+    }
+}
+
+function rmVisibleCheckboxes() {
+    return [...document.querySelectorAll('.rm-emp')]
+        .filter(l => l.style.display !== 'none')
+        .map(l => l.querySelector('.rm-emp-cb'))
+        .filter(cb => cb && !cb.disabled);
+}
+
+function rmToggleAlle(cb) {
+    rmVisibleCheckboxes().forEach(c => c.checked = cb.checked);
+    rmUpdateCount();
+}
+
+function rmFilterBoot(bootId) {
+    document.querySelectorAll('.rm-emp').forEach(l => {
+        l.style.display = (!bootId || l.dataset.boot === bootId) ? '' : 'none';
+    });
+}
+
+function rmUpdateCount() {
+    const n = document.querySelectorAll('.rm-emp-cb:checked').length;
+    const el = document.getElementById('rm-count');
+    if (el) el.textContent = n;
+    return n;
+}
+
+function rmSpeichern() {
+    document.getElementById('rm-aktion').value = 'entwurf';
+    document.getElementById('rm-form').submit();
+}
+
+function rmSendenModal() {
+    const betreff = document.getElementById('rm-betreff').value.trim();
+    const text = document.getElementById('rm-text').value.trim();
+    if (!betreff || !text) { alert('Bitte Betreff und Nachricht ausfüllen.'); return; }
+    if (rmUpdateCount() === 0) { alert('Bitte mindestens einen Empfänger mit bestätigter E-Mail auswählen.'); return; }
+    document.getElementById('rundmailSendModal').showModal();
+}
+
+function rmSendenBestaetigt() {
+    document.getElementById('rm-aktion').value = 'senden';
+    document.getElementById('rm-form').submit();
+}
+
+function rmKiGenerieren() {
+    const stich = document.getElementById('rm-ki-stichpunkte').value.trim();
+    const err = document.getElementById('rm-ki-error');
+    err.classList.add('hidden');
+    if (!stich) { err.textContent = 'Bitte ein paar Stichpunkte eingeben.'; err.classList.remove('hidden'); return; }
+
+    const btn = document.getElementById('rm-ki-btn');
+    btn.disabled = true;
+    btn.querySelector('.rm-ki-label').classList.add('hidden');
+    btn.querySelector('.rm-ki-spin').classList.remove('hidden');
+
+    fetch(RM_CFG.kiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': rmCsrf() },
+        body: JSON.stringify({
+            toern_id: RM_CFG.toernId,
+            stichpunkte: stich,
+            ton: document.getElementById('rm-ki-ton').value,
+        }),
+    }).then(r => r.json()).then(data => {
+        if (data.error) { err.textContent = data.error; err.classList.remove('hidden'); return; }
+        if (data.betreff) document.getElementById('rm-betreff').value = data.betreff;
+        if (data.text) document.getElementById('rm-text').value = data.text;
+    }).catch(() => {
+        err.textContent = 'Netzwerkfehler. Bitte erneut versuchen.'; err.classList.remove('hidden');
+    }).finally(() => {
+        btn.disabled = false;
+        btn.querySelector('.rm-ki-label').classList.remove('hidden');
+        btn.querySelector('.rm-ki-spin').classList.add('hidden');
+    });
+}
+
+function rmVorlage(id) {
+    fetch(RM_CFG.vorlageUrl.replace('/0/', '/' + id + '/'))
+        .then(r => r.json()).then(d => {
+            document.getElementById('rm-id').value = '';  // Vorlage = neue Mail
+            document.getElementById('rm-betreff').value = d.betreff || '';
+            document.getElementById('rm-text').value = d.text || '';
+            document.getElementById('rm-meeting').value = d.meeting_link || '';
+            document.getElementById('rm-t-titel').value = d.termin_titel || '';
+            document.getElementById('rm-t-start').value = d.termin_start || '';
+            document.getElementById('rm-t-ende').value = d.termin_ende || '';
+            document.getElementById('rm-t-ort').value = d.termin_ort || '';
+            document.getElementById('tab-post').scrollIntoView({ behavior: 'smooth' });
+        });
+}
+
+document.addEventListener('DOMContentLoaded', rmUpdateCount);
+</script>
+{% endverbatim %}
 
 {% endblock %}

@@ -15,8 +15,8 @@ from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE, SKIPPER_LISTE
 from utils.rezept_skalierung import skaliere_menge, summiere_mengen
-from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, PacklisteStandard, PacklisteStandardEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage, Schadensmeldung
-from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen
+from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, PacklisteStandard, PacklisteStandardEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage, Schadensmeldung, Rundmail
+from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen, mail_rundmail
 from .crew_utils import fehlende_crew_felder
 from django.db.models import Q
 from django.contrib.auth.decorators import login_required
@@ -29,6 +29,7 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth import get_user_model
 from django.views.decorators.http import require_POST
 from django.utils.timezone import now
+from django.utils import timezone
 import json
 from django.http import JsonResponse, Http404
 from datetime import date, timedelta
@@ -1042,6 +1043,12 @@ def skipper_dashboard(request, toern_id):
         "topf_summe": topf_summe,
         "topf_rest": topf_rest,
         "topf_kategorien": TopfAusgabe.KATEGORIE_CHOICES,
+
+        # Rundmail (Post-Tab)
+        "rundmail_empfaenger": teilnahmen.filter(
+            status__in=["angemeldet", "bestaetigt"]
+        ).order_by("user__last_name", "user__first_name"),
+        "rundmails": Rundmail.objects.filter(toern=toern).select_related("absender"),
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)
@@ -3252,6 +3259,219 @@ def toern_beschreibung_generieren(request):
         return JsonResponse({"error": "Claude hat kein gültiges JSON zurückgegeben."}, status=500)
     except Exception as e:
         return JsonResponse({"error": f"API-Fehler: {str(e)}"}, status=500)
+
+
+# =========================
+# SKIPPER-RUNDMAIL
+# =========================
+def _parse_termin(raw):
+    """HTML datetime-local ('YYYY-MM-DDTHH:MM') -> aware datetime in lokaler Zone."""
+    from django.utils.dateparse import parse_datetime
+    if not raw:
+        return None
+    dt = parse_datetime(raw)
+    if dt and timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt
+
+
+@login_required
+@require_POST
+def rundmail_senden(request, toern_id):
+    """Speichert eine Rundmail als Entwurf oder verschickt sie an die Crew."""
+    from django.utils import timezone
+    toern = get_object_or_404(Toern, id=toern_id)
+    if not _hat_skipper_berechtigung(request, toern):
+        raise PermissionDenied
+
+    aktion = request.POST.get("aktion", "senden")
+    betreff = request.POST.get("betreff", "").strip()
+    text = request.POST.get("text", "").strip()
+    redirect_url = reverse("skipper_dashboard", args=[toern_id]) + "?tab=post"
+
+    if not betreff or not text:
+        messages.error(request, "Betreff und Text dürfen nicht leer sein.")
+        return redirect(redirect_url)
+
+    rundmail_id = request.POST.get("rundmail_id")
+    rundmail = None
+    if rundmail_id:
+        rundmail = Rundmail.objects.filter(id=rundmail_id, toern=toern).first()
+    if rundmail is None:
+        rundmail = Rundmail(toern=toern)
+
+    rundmail.absender = request.user
+    rundmail.betreff = betreff
+    rundmail.text = text
+    rundmail.meeting_link = request.POST.get("meeting_link", "").strip()
+    rundmail.termin_start = _parse_termin(request.POST.get("termin_start", "").strip())
+    rundmail.termin_ende = _parse_termin(request.POST.get("termin_ende", "").strip())
+    rundmail.termin_titel = request.POST.get("termin_titel", "").strip()
+    rundmail.termin_ort = request.POST.get("termin_ort", "").strip()
+    if request.FILES.get("anhang"):
+        rundmail.anhang = request.FILES["anhang"]
+
+    if aktion == "entwurf":
+        rundmail.status = "entwurf"
+        rundmail.save()
+        messages.success(request, "Entwurf gespeichert.")
+        return redirect(redirect_url)
+
+    # --- Senden ---
+    empfaenger_ids = request.POST.getlist("empfaenger")
+    empfaenger_qs = Teilnahme.objects.filter(
+        toern=toern, id__in=empfaenger_ids,
+        status__in=["angemeldet", "bestaetigt"],
+    ).select_related("user", "boot", "kabine")
+    empfaenger = [t for t in empfaenger_qs if t.user.email and t.user.email_verified]
+
+    if not empfaenger:
+        messages.error(request, "Keine gültigen Empfänger ausgewählt (nur verifizierte Crew erhält Mails).")
+        rundmail.status = "entwurf"
+        rundmail.save()
+        return redirect(redirect_url)
+
+    rundmail.status = "gesendet"
+    rundmail.gesendet_am = timezone.now()
+    rundmail.empfaenger_count = len(empfaenger)
+    rundmail.save()
+
+    from .rundmail_utils import build_ics
+    ics_text = build_ics(rundmail, organisator_email=(request.user.email or None))
+
+    anhang_bytes = None
+    anhang_name = None
+    if rundmail.anhang:
+        rundmail.anhang.open("rb")
+        anhang_bytes = rundmail.anhang.read()
+        rundmail.anhang.close()
+        anhang_name = os.path.basename(rundmail.anhang.name)
+
+    for t in empfaenger:
+        mail_rundmail(rundmail, t, ics_text=ics_text,
+                      anhang_bytes=anhang_bytes, anhang_name=anhang_name)
+
+    # Kopie an den Absender selbst (falls nicht ohnehin Empfänger)
+    if request.user.email and not any(t.user_id == request.user.id for t in empfaenger):
+        selbst = Teilnahme(toern=toern, user=request.user)
+        mail_rundmail(rundmail, selbst, ics_text=ics_text,
+                      anhang_bytes=anhang_bytes, anhang_name=anhang_name)
+
+    messages.success(request, f"Rundmail an {len(empfaenger)} Crew-Mitglied(er) versendet.")
+    return redirect(redirect_url)
+
+
+@login_required
+@require_POST
+def rundmail_ki_generieren(request):
+    """KI-Entwurf fuer eine Rundmail (warm, persoenlich, mit Baustein {{vorname}})."""
+    from django.conf import settings as django_settings
+    import anthropic
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Ungültige JSON-Daten."}, status=400)
+
+    toern = Toern.objects.filter(id=data.get("toern_id")).first()
+    if not toern:
+        return JsonResponse({"error": "Törn nicht gefunden."}, status=404)
+    if not _hat_skipper_berechtigung(request, toern):
+        return JsonResponse({"error": "Keine Berechtigung."}, status=403)
+
+    stichpunkte = data.get("stichpunkte", "").strip()
+    if not stichpunkte:
+        return JsonResponse({"error": "Bitte ein paar Stichpunkte eingeben."}, status=400)
+    ton = data.get("ton", "herzlich").strip()
+
+    api_key = django_settings.ANTHROPIC_API_KEY
+    if not api_key:
+        return JsonResponse({"error": "Kein API-Key konfiguriert. Bitte ANTHROPIC_API_KEY in der .env setzen."}, status=503)
+
+    skipper_name = (request.user.first_name or "").strip()
+    ton_map = {
+        "herzlich": "herzlich und persönlich",
+        "locker": "locker und freundschaftlich",
+        "sachlich": "freundlich, aber sachlich und knapp",
+    }
+    ton_text = ton_map.get(ton, "herzlich und persönlich")
+
+    prompt = (
+        f"Schreibe eine E-Mail eines Skippers an seine Segelcrew.\n"
+        f"Törn: {toern.titel}\n"
+        f"Revier: {toern.revier or 'nicht angegeben'}\n"
+        f"Inhalt/Stichpunkte des Skippers: {stichpunkte}\n"
+        f"Absender (Skipper): {skipper_name or 'der Skipper'}\n"
+        f"Tonalität: {ton_text}.\n\n"
+        f"Wichtige Regeln:\n"
+        f"- Die Crew wird geduzt.\n"
+        f"- Beginne die Anrede mit dem Baustein {{{{vorname}}}} (z.B. 'Hallo {{{{vorname}}}},'), "
+        f"damit jede Person persönlich angesprochen wird.\n"
+        f"- Klinge wie ein echter Mensch, nicht wie eine Werbemail oder eine Behörde. "
+        f"Warm, natürlich, nicht überschwänglich, keine Floskeln.\n"
+        f"- Unterschreibe am Ende mit dem Vornamen des Skippers"
+        f"{' (' + skipper_name + ')' if skipper_name else ''}.\n"
+        f"- Erwähne KEINE konkreten Links oder Termine im Text (die werden automatisch ergänzt).\n\n"
+        f'Antworte ausschließlich als JSON ohne Markdown-Codeblöcke: {{"betreff": "...", "text": "..."}}'
+    )
+
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1200,
+            system="Du hilfst einem Segel-Skipper, persönliche, menschlich klingende E-Mails an seine Crew zu schreiben. Kein Marketing-Ton, keine leeren Floskeln.",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = message.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+        result = json.loads(raw)
+        return JsonResponse({
+            "betreff": result.get("betreff", "")[:200],
+            "text": result.get("text", ""),
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({"error": "Claude hat kein gültiges JSON zurückgegeben."}, status=500)
+    except Exception as e:
+        return JsonResponse({"error": f"API-Fehler: {str(e)}"}, status=500)
+
+
+@login_required
+def rundmail_vorlage_get(request, rundmail_id):
+    """Liefert die Felder einer gespeicherten Rundmail (fuer 'Als Vorlage nutzen')."""
+    rundmail = get_object_or_404(Rundmail, id=rundmail_id)
+    if not _hat_skipper_berechtigung(request, rundmail.toern):
+        raise PermissionDenied
+
+    def _iso(dt):
+        return timezone.localtime(dt).strftime("%Y-%m-%dT%H:%M") if dt else ""
+
+    return JsonResponse({
+        "betreff": rundmail.betreff,
+        "text": rundmail.text,
+        "meeting_link": rundmail.meeting_link,
+        "termin_start": _iso(rundmail.termin_start),
+        "termin_ende": _iso(rundmail.termin_ende),
+        "termin_titel": rundmail.termin_titel,
+        "termin_ort": rundmail.termin_ort,
+    })
+
+
+@login_required
+@require_POST
+def rundmail_loeschen(request, rundmail_id):
+    """Loescht eine Rundmail (Entwurf oder Archiv-Eintrag)."""
+    rundmail = get_object_or_404(Rundmail, id=rundmail_id)
+    toern_id = rundmail.toern_id
+    if not _hat_skipper_berechtigung(request, rundmail.toern):
+        raise PermissionDenied
+    rundmail.delete()
+    messages.success(request, "Rundmail gelöscht.")
+    return redirect(reverse("skipper_dashboard", args=[toern_id]) + "?tab=post")
 
 
 @login_required
