@@ -199,3 +199,66 @@ def mail_teilnahme_abgelehnt(teilnahme, request):
         body=body,
         recipient=user.email,
     )
+
+
+def _termin_text(rundmail):
+    """Deutschsprachiger Termin-Block fuer den Mailtext (falls Termin gesetzt)."""
+    if not rundmail.termin_start:
+        return ""
+    from django.utils import timezone
+    start = timezone.localtime(rundmail.termin_start)
+    zeile = start.strftime("%d.%m.%Y um %H:%M Uhr")
+    if rundmail.termin_ende:
+        ende = timezone.localtime(rundmail.termin_ende)
+        if ende.date() == start.date():
+            zeile += ende.strftime(" - %H:%M Uhr")
+        else:
+            zeile += ende.strftime(" bis %d.%m.%Y %H:%M Uhr")
+    block = f"\n\nTermin: {zeile}"
+    ort = rundmail.termin_ort or ("Online" if rundmail.meeting_link else "")
+    if ort:
+        block += f"\nOrt: {ort}"
+    block += "\n(Der Termin haengt als Kalenderdatei an dieser Mail.)"
+    return block
+
+
+def mail_rundmail(rundmail, teilnahme, ics_text=None, anhang_bytes=None, anhang_name=None):
+    """Versendet eine personalisierte Rundmail an ein Crew-Mitglied.
+
+    - Bausteine ({{vorname}} etc.) werden pro Empfaenger gerendert.
+    - Reply-To zeigt auf den Skipper, damit Antworten direkt bei ihm landen.
+    - Optionaler .ics-Termin und eine Datei werden als Anhang mitgeschickt.
+    """
+    from .rundmail_utils import render_platzhalter
+
+    absender = rundmail.absender
+    user = teilnahme.user
+
+    betreff = render_platzhalter(rundmail.betreff, teilnahme, absender)
+    body = render_platzhalter(rundmail.text, teilnahme, absender)
+
+    if rundmail.meeting_link:
+        body += f"\n\nZum digitalen Treffen:\n{rundmail.meeting_link}"
+    body += _termin_text(rundmail)
+
+    if absender and absender.email:
+        reply_to = [absender.email]
+    elif settings.REPLY_TO_EMAIL:
+        reply_to = [settings.REPLY_TO_EMAIL]
+    else:
+        reply_to = []
+
+    mail = EmailMessage(
+        subject=betreff,
+        body=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+        reply_to=reply_to,
+    )
+
+    if ics_text:
+        mail.attach("Termin.ics", ics_text, "text/calendar")
+    if anhang_bytes and anhang_name:
+        mail.attach(anhang_name, anhang_bytes)
+
+    mail.send(fail_silently=True)

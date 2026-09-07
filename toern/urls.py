@@ -95,6 +95,11 @@ urlpatterns = [
     path("mahlzeit/<int:mahlzeit_id>/delete/", delete_mahlzeit, name="delete_mahlzeit"),
     path("<int:toern_id>/erinnerung/senden/", send_reminder_toern, name="send_reminder_toern"),
     path("beschreibung/generieren/", toern_beschreibung_generieren, name="toern_beschreibung_generieren"),
+    # Skipper-Rundmail
+    path("<int:toern_id>/rundmail/senden/", rundmail_senden, name="rundmail_senden"),
+    path("rundmail/ki/", rundmail_ki_generieren, name="rundmail_ki_generieren"),
+    path("rundmail/<int:rundmail_id>/vorlage/", rundmail_vorlage_get, name="rundmail_vorlage_get"),
+    path("rundmail/<int:rundmail_id>/loeschen/", rundmail_loeschen, name="rundmail_loeschen"),
     path("<int:toern_id>/pinnwand/add/", pinnwand_nachricht_erstellen, name="pinnwand_nachricht_erstellen"),
     path("pinnwand/<int:nachricht_id>/loeschen/", pinnwand_nachricht_loeschen, name="pinnwand_nachricht_loeschen"),
     path("<int:toern_id>/mitfahrt/add/", mitfahrangebot_erstellen, name="mitfahrangebot_erstellen"),

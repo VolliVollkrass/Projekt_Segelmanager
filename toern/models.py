@@ -629,3 +629,55 @@ class Schadensbild(models.Model):
 
     def __str__(self):
         return f"Bild zu {self.meldung_id}"
+
+
+class Rundmail(models.Model):
+    """Rundmail eines Skippers/Anbieters an die Crew (z.B. Einladung zum Vortreffen).
+
+    Dient gleichzeitig als Archiv: gesendete Mails bleiben erhalten und koennen
+    per "Als Vorlage nutzen" erneut verschickt werden. Entwuerfe (status='entwurf')
+    lassen sich spaeter weiterbearbeiten.
+    """
+    STATUS_CHOICES = [
+        ("entwurf", "Entwurf"),
+        ("gesendet", "Gesendet"),
+    ]
+
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="rundmails")
+    absender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name="rundmails",
+    )
+    betreff = models.CharField(max_length=200)
+    text = models.TextField(help_text="Darf Bausteine wie {{vorname}} enthalten.")
+
+    # Digitales Vortreffen
+    meeting_link = models.URLField(blank=True)
+
+    # Optionaler Kalendertermin (als .ics-Anhang versendet)
+    termin_start = models.DateTimeField(null=True, blank=True)
+    termin_ende = models.DateTimeField(null=True, blank=True)
+    termin_titel = models.CharField(max_length=200, blank=True)
+    termin_ort = models.CharField(max_length=200, blank=True, help_text="z.B. 'Online' oder ein Treffpunkt.")
+
+    anhang = models.FileField(upload_to="rundmail/%Y/%m/", null=True, blank=True)
+
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="entwurf")
+    empfaenger_count = models.PositiveIntegerField(default=0)
+
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+    gesendet_am = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-erstellt_am"]
+
+    def __str__(self):
+        return f"{self.betreff} ({self.toern.titel})"
+
+    @property
+    def hat_termin(self):
+        return bool(self.termin_start)
+
+    def delete(self, *args, **kwargs):
+        delete_file(self.anhang)
+        super().delete(*args, **kwargs)
