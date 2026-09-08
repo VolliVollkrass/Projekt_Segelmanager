@@ -13,6 +13,11 @@ from .schaden_views import (
     schaden_status, schaden_bild_loeschen,
 )
 from .schaden_pdf import schaden_gesamt_pdf, schaden_einzel_pdf
+from .briefing_views import (
+    briefing_liste, briefing_toggle, briefing_reihenfolge,
+    briefing_baustein_hinzufuegen, briefing_baustein_suche,
+)
+from .briefing_pdf import briefing_pdf
 
 urlpatterns = [
     path('detail/<int:pk>/', toern_detail, name='toern_detail'),  # Detailseite
@@ -91,6 +96,13 @@ urlpatterns = [
     path("packliste/standards/<int:standard_id>/loeschen/", packl_standard_loeschen, name="packl_standard_loeschen"),
     path("packliste/standards/<int:standard_id>/default/", packl_standard_default, name="packl_standard_default"),
     path("<int:toern_id>/vorlage/<str:typ>/", vorlage_items_get, name="vorlage_items_get"),
+    # Briefing-Bausteine (Skipper-Dashboard-Tab)
+    path("<int:toern_id>/briefing/", briefing_liste, name="briefing_liste"),
+    path("<int:toern_id>/briefing/toggle/<int:auswahl_id>/", briefing_toggle, name="briefing_toggle"),
+    path("<int:toern_id>/briefing/reihenfolge/", briefing_reihenfolge, name="briefing_reihenfolge"),
+    path("<int:toern_id>/briefing/hinzufuegen/", briefing_baustein_hinzufuegen, name="briefing_baustein_hinzufuegen"),
+    path("<int:toern_id>/briefing/suche/", briefing_baustein_suche, name="briefing_baustein_suche"),
+    path("<int:toern_id>/briefing/pdf/", briefing_pdf, name="briefing_pdf"),
     path("<int:toern_id>/mahlzeit/add/", add_mahlzeit, name="add_mahlzeit"),
     path("mahlzeit/<int:mahlzeit_id>/delete/", delete_mahlzeit, name="delete_mahlzeit"),
     path("<int:toern_id>/erinnerung/senden/", send_reminder_toern, name="send_reminder_toern"),

@@ -451,6 +451,25 @@ class DokumentStandardEintrag(models.Model):
         return f"[{self.sektion}] {self.text}"
 
 
+class BriefingAuswahl(models.Model):
+    """Verweist auf einen globalen Baustein aus der Briefing-Bibliothek (briefing.BriefingBaustein);
+    hält den törn-spezifischen Zustand (aktiv/inaktiv, Reihenfolge). Beim ersten Öffnen des
+    Briefing-Tabs wird diese Auswahl aus den Standard-Bausteinen befüllt (siehe
+    toern/briefing_views.py::get_or_create_briefing_auswahl) und ist danach unabhängig von
+    späteren Änderungen an der globalen Bibliothek."""
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name='briefing_auswahl')
+    baustein = models.ForeignKey('briefing.BriefingBaustein', on_delete=models.CASCADE, related_name='toern_auswahl')
+    aktiv = models.BooleanField(default=True)
+    reihenfolge = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = [('toern', 'baustein')]
+        ordering = ['reihenfolge', 'id']
+
+    def __str__(self):
+        return f"{self.toern} · {self.baustein} · {'aktiv' if self.aktiv else 'inaktiv'}"
+
+
 class PinnwandNachricht(models.Model):
     toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="pinnwand_nachrichten")
     autor = models.ForeignKey(

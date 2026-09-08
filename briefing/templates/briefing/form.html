@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{% if action == "bearbeiten" %}{{ baustein.titel }} bearbeiten{% else %}Neuer Baustein{% endif %} – Briefing-Bausteine{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
+
+  <a href="{% if action == 'bearbeiten' %}{% url 'briefing_baustein_detail' baustein.pk %}{% if next %}?next={{ next|urlencode }}{% endif %}{% elif next %}{{ next }}{% else %}{% url 'briefing_bibliothek' %}{% endif %}"
+     class="flex items-center gap-1 text-sm text-base-content/50 hover:text-base-content transition-colors mb-4">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Zurück
+  </a>
+
+  <h1 class="text-xl font-bold mb-1">
+    {% if action == "bearbeiten" %}Baustein bearbeiten{% else %}Neuen Baustein eintragen{% endif %}
+  </h1>
+  <p class="text-sm text-base-content/50 mb-5">
+    {% if action == "bearbeiten" %}
+    Jede Änderung ist sofort für alle Skipper sichtbar — ein echtes Gemeinschaftsdokument.
+    {% else %}
+    Wird sofort Teil der gemeinsamen Bibliothek und kann von jedem Skipper für sein eigenes Briefing ausgewählt werden.
+    {% endif %}
+  </p>
+
+  {% if fehler %}
+  <div class="alert alert-error text-sm mb-4">{{ fehler }}</div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="space-y-5">
+    {% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-3">
+      <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Grundinfos</p>
+
+      <div>
+        <label class="label label-text text-xs">Titel *</label>
+        <input type="text" name="titel" required
+               value="{{ baustein.titel|default:'' }}"
+               placeholder="z. B. Mann über Bord" class="input input-bordered input-sm w-full">
+      </div>
+
+      <div>
+        <label class="label label-text text-xs">Kategorie</label>
+        <select name="kategorie" class="select select-bordered select-sm w-full">
+          {% for k_val, k_label in kategorien %}
+          <option value="{{ k_val }}" {% if baustein.kategorie == k_val %}selected{% endif %}>{{ k_label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-2">
+      <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Text *</p>
+      <textarea name="text" rows="8" required
+                placeholder="Fließtext, Absätze durch Leerzeile trennen…"
+                class="textarea textarea-bordered w-full text-sm leading-relaxed">{{ baustein.text|default:'' }}</textarea>
+    </div>
+
+    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-2">
+      <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Bild (optional)</p>
+      {% if baustein.bild %}
+      <div class="rounded-lg overflow-hidden h-32 mb-2">
+        <img src="{{ baustein.bild.url }}" class="w-full h-full object-cover">
+      </div>
+      <label class="label cursor-pointer justify-start gap-2">
+        <input type="checkbox" name="bild_entfernen" value="1" class="checkbox checkbox-sm">
+        <span class="label-text text-xs">Bild entfernen</span>
+      </label>
+      {% endif %}
+      <input type="file" name="bild" accept="image/*" class="file-input file-input-sm file-input-bordered w-full">
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-block">
+      {% if action == "bearbeiten" %}Änderungen speichern{% else %}Baustein speichern{% endif %}
+    </button>
+  </form>
+
+</div>
+{% endblock %}
