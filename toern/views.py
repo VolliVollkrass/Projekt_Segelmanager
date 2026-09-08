@@ -3390,28 +3390,31 @@ def rundmail_ki_generieren(request):
 
     skipper_name = (request.user.first_name or "").strip()
     ton_map = {
-        "herzlich": "herzlich und persönlich",
-        "locker": "locker und freundschaftlich",
-        "sachlich": "freundlich, aber sachlich und knapp",
+        "herzlich": "herzlich und persönlich, so wie man an Menschen schreibt, die man mag",
+        "locker": "locker und entspannt, wie eine kurze Nachricht an Bekannte",
+        "maritim": "mit ein paar dezenten seglerischen Anklängen (z.B. 'an Bord', 'Leinen los'), aber sparsam und ohne Kitsch",
+        "sachlich": "freundlich, aber knapp und sachlich, ohne viel Drumherum",
     }
-    ton_text = ton_map.get(ton, "herzlich und persönlich")
+    ton_text = ton_map.get(ton, ton_map["herzlich"])
 
     prompt = (
-        f"Schreibe eine E-Mail eines Skippers an seine Segelcrew.\n"
+        f"Du bist {skipper_name or 'der Skipper'} und schreibst selbst eine kurze E-Mail an deine Segelcrew. "
+        f"Schreib sie so, als würdest du sie gerade wirklich tippen – nicht als KI, nicht als Werbetext.\n\n"
         f"Törn: {toern.titel}\n"
         f"Revier: {toern.revier or 'nicht angegeben'}\n"
-        f"Inhalt/Stichpunkte des Skippers: {stichpunkte}\n"
-        f"Absender (Skipper): {skipper_name or 'der Skipper'}\n"
-        f"Tonalität: {ton_text}.\n\n"
-        f"Wichtige Regeln:\n"
-        f"- Die Crew wird geduzt.\n"
-        f"- Beginne die Anrede mit dem Baustein {{{{vorname}}}} (z.B. 'Hallo {{{{vorname}}}},'), "
-        f"damit jede Person persönlich angesprochen wird.\n"
-        f"- Klinge wie ein echter Mensch, nicht wie eine Werbemail oder eine Behörde. "
-        f"Warm, natürlich, nicht überschwänglich, keine Floskeln.\n"
-        f"- Unterschreibe am Ende mit dem Vornamen des Skippers"
+        f"Das willst du sagen (Stichpunkte): {stichpunkte}\n"
+        f"Tonfall: {ton_text}.\n\n"
+        f"So schreibst du:\n"
+        f"- Duze die Crew. Beginne mit 'Hallo {{{{vorname}}}},' (der Baustein {{{{vorname}}}} wird später pro Person ersetzt).\n"
+        f"- Kurz halten: 4–8 Sätze reichen. Sag nur, was in den Stichpunkten steht – erfinde nichts dazu.\n"
+        f"- Natürliche, unterschiedlich lange Sätze. Ein Gedanke pro Satz, keine Wiederholungen, keine Aufzählung von Synonymen.\n"
+        f"- Unterschreibe am Ende schlicht mit deinem Vornamen"
         f"{' (' + skipper_name + ')' if skipper_name else ''}.\n"
-        f"- Erwähne KEINE konkreten Links oder Termine im Text (die werden automatisch ergänzt).\n\n"
+        f"- Erwähne KEINE Links oder konkreten Termine/Uhrzeiten im Text – die werden automatisch darunter ergänzt.\n\n"
+        f"Vermeide unbedingt typische KI- und Floskel-Sätze wie: 'Ich hoffe, diese E-Mail erreicht dich gut', "
+        f"'ich freue mich riesig', 'voller Vorfreude', 'in freudiger Erwartung', 'gemeinsam unvergessliche Momente', "
+        f"'lasst uns …'. Keine Ausrufezeichen-Ketten, kein überschwänglicher Ton, keine leeren Superlative. "
+        f"Lieber ein Satz zu wenig als einer zu viel.\n\n"
         f'Antworte ausschließlich als JSON ohne Markdown-Codeblöcke: {{"betreff": "...", "text": "..."}}'
     )
 
@@ -3420,7 +3423,11 @@ def rundmail_ki_generieren(request):
         message = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=1200,
-            system="Du hilfst einem Segel-Skipper, persönliche, menschlich klingende E-Mails an seine Crew zu schreiben. Kein Marketing-Ton, keine leeren Floskeln.",
+            system=(
+                "Du bist ein Segel-Skipper und schreibst deine E-Mails selbst. "
+                "Du klingst wie ein echter Mensch: direkt, konkret, mit eigener Stimme und ohne Floskeln. "
+                "Du hasst Marketing-Sprech, Wiederholungen und aufgeblähte Sätze."
+            ),
             messages=[{"role": "user", "content": prompt}],
         )
         raw = message.content[0].text.strip()
