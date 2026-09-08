@@ -40,15 +40,35 @@
     {% endif %}
   </div>
 
-  {% if baustein.bild %}
+  {% if baustein.bild and baustein.bild_position == "oben" %}
   <div class="rounded-2xl overflow-hidden">
-    <img src="{{ baustein.bild.url }}" alt="{{ baustein.titel }}" class="w-full object-cover">
+    <img src="{{ baustein.bild.url }}" alt="{{ baustein.titel }}" class="w-full">
   </div>
   {% endif %}
 
   <div class="bg-base-100 border border-base-300 rounded-2xl p-5">
-    {{ text_html|safe }}
+    {% if baustein.bild and baustein.bild_position == "links" %}
+      <div class="sm:flex sm:gap-5 sm:items-start">
+        <img src="{{ baustein.bild.url }}" alt="{{ baustein.titel }}"
+             class="rounded-lg mb-4 sm:mb-0 sm:w-2/5 shrink-0">
+        <div class="min-w-0">{{ text_html|safe }}</div>
+      </div>
+    {% elif baustein.bild and baustein.bild_position == "rechts" %}
+      <div class="sm:flex sm:gap-5 sm:items-start">
+        <div class="min-w-0 order-first">{{ text_html|safe }}</div>
+        <img src="{{ baustein.bild.url }}" alt="{{ baustein.titel }}"
+             class="rounded-lg mt-4 sm:mt-0 sm:w-2/5 shrink-0">
+      </div>
+    {% else %}
+      {{ text_html|safe }}
+    {% endif %}
   </div>
+
+  {% if baustein.bild and baustein.bild_position == "unten" %}
+  <div class="rounded-2xl overflow-hidden">
+    <img src="{{ baustein.bild.url }}" alt="{{ baustein.titel }}" class="w-full">
+  </div>
+  {% endif %}
 
   <p class="text-xs text-base-content/40">
     Angelegt von {{ baustein.autor.first_name|default:"unbekannt" }} {{ baustein.autor.last_name }}

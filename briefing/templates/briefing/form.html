@@ -122,6 +122,15 @@
       </label>
       {% endif %}
       <input type="file" name="bild" accept="image/*" class="file-input file-input-sm file-input-bordered w-full">
+
+      <div class="pt-1">
+        <label class="label label-text text-xs">Position des Bildes</label>
+        <select name="bild_position" class="select select-bordered select-sm w-full">
+          {% for wert, label in bild_positionen %}
+          <option value="{{ wert }}" {% if baustein.bild_position == wert %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </div>
 
     <button type="submit" class="btn btn-primary btn-block">

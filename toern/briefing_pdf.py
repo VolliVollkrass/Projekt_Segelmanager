@@ -30,6 +30,22 @@ from .models import Toern
 
 LOGO_PATH = os.path.join(settings.BASE_DIR, 'static', 'medien', 'Logo_Meer_erleben.png')
 
+_logo_weiss_cache = None
+
+
+def _logo_weiss():
+    """Logo in Weiß, für den dunkelblauen Kopfblock. Die Alpha-Maske der PNG bleibt
+    erhalten, nur die Farbkanäle werden auf Weiß gesetzt — dasselbe, was die
+    Web-Navigation über den CSS-Filter brightness(0) invert(1) macht."""
+    global _logo_weiss_cache
+    if _logo_weiss_cache is None:
+        from PIL import Image
+        original = Image.open(LOGO_PATH).convert('RGBA')
+        weiss = Image.new('RGBA', original.size, (255, 255, 255, 0))
+        weiss.putalpha(original.getchannel('A'))
+        _logo_weiss_cache = ImageReader(weiss)
+    return _logo_weiss_cache
+
 PRIMARY = colors.HexColor('#1e3a5f')
 SECONDARY = colors.HexColor('#0D9488')
 ROT = colors.HexColor('#B91C1C')
@@ -104,11 +120,19 @@ def _deckblatt(canvas, doc, toern, boot, skipper_name):
     _wellen(canvas, h - block_h + 1.2 * cm, w, SECONDARY, 0.55)
     _wellen(canvas, h - block_h + 2.0 * cm, w, colors.white, 0.14)
 
+    logo_links_kante = w - RAND   # Rückfallwert, falls kein Logo vorhanden
     if os.path.exists(LOGO_PATH):
-        logo_h = 1.5 * cm
-        ow, oh = ImageReader(LOGO_PATH).getSize()
-        canvas.drawImage(LOGO_PATH, w - RAND - logo_h * ow / oh, h - RAND - logo_h,
-                         width=logo_h * ow / oh, height=logo_h, mask='auto')
+        logo_h = 2.8 * cm
+        bild = _logo_weiss()
+        ow, oh = bild.getSize()
+        logo_w = logo_h * ow / oh
+        # Mittig zwischen dem Ende der Überschrift und dem rechten Seitenrand
+        text_ende = RAND + canvas.stringWidth('Crew-Briefing', 'Helvetica-Bold', 30)
+        mitte_x = (text_ende + (w - RAND)) / 2
+        logo_x = mitte_x - logo_w / 2
+        canvas.drawImage(bild, logo_x, h - 6.1 * cm,
+                         width=logo_w, height=logo_h, mask='auto')
+        logo_links_kante = logo_x
 
     canvas.setFillColor(SECONDARY)
     canvas.setFont('Helvetica-Bold', 10)
@@ -120,7 +144,13 @@ def _deckblatt(canvas, doc, toern, boot, skipper_name):
 
     canvas.setFillColor(colors.HexColor('#A8C4DC'))
     canvas.setFont('Helvetica', 13)
-    canvas.drawString(RAND, h - 6.3 * cm, toern.titel[:60])
+    max_breite = logo_links_kante - RAND - 0.6 * cm
+    titel = toern.titel
+    while titel and canvas.stringWidth(titel, 'Helvetica', 13) > max_breite:
+        titel = titel[:-1]
+    if titel != toern.titel:
+        titel = titel[:-1] + '…'
+    canvas.drawString(RAND, h - 6.3 * cm, titel)
     canvas.setFont('Helvetica-Oblique', 10.5)
     canvas.drawString(RAND, h - 7.2 * cm, 'Damit aus unterschiedlichen Erfahrungen eine Crew wird.')
 
@@ -255,6 +285,67 @@ def _bloecke_zu_flowables(text, breite):
     return out
 
 
+def briefing_boot(user, toern):
+    """Das Boot, auf das sich dieses Briefing bezieht: das des anfragenden Skippers.
+
+    Bei Flotten-Törns hängen mehrere Boote am selben Törn, jedes mit eigener Crew.
+    Einfach `toern.boote.first()` zu nehmen zeigt dann das falsche Boot auf dem
+    Deckblatt. Fällt nur zurück, wenn der Nutzer keinem Boot zugeordnet ist."""
+    from .models import Teilnahme
+    teilnahme = (
+        Teilnahme.objects.filter(user=user, toern=toern, boot__isnull=False)
+        .select_related('boot').first()
+    )
+    return teilnahme.boot if teilnahme else toern.boote.first()
+
+
+def _bild_flowable(baustein, max_breite, max_hoehe=85 * mm):
+    """Skaliertes Bild-Flowable oder None, wenn kein Bild da ist / es nicht lesbar ist."""
+    if not baustein.bild:
+        return None
+    try:
+        ow, oh = ImageReader(baustein.bild.path).getSize()
+    except Exception:
+        return None
+    skalierung = min(max_breite / ow, max_hoehe / oh, 1)
+    return RLImage(baustein.bild.path, width=ow * skalierung, height=oh * skalierung)
+
+
+def _baustein_flowables(baustein, breite):
+    """Titel, Text und Bild eines Bausteins — angeordnet nach baustein.bild_position."""
+    titel = Paragraph(baustein.titel, STIL['baustein'])
+    text = _bloecke_zu_flowables(baustein.text, breite)
+    position = baustein.bild_position or 'unten'
+
+    if position in ('links', 'rechts'):
+        bild_breite = breite * 0.38
+        spalte = breite - bild_breite - 4 * mm
+        bild = _bild_flowable(baustein, bild_breite, max_hoehe=120 * mm)
+        if bild is not None:
+            text_spalte = _bloecke_zu_flowables(baustein.text, spalte)
+            zellen = ([bild, text_spalte] if position == 'links' else [text_spalte, bild])
+            breiten = ([bild_breite, spalte + 4 * mm] if position == 'links'
+                       else [spalte + 4 * mm, bild_breite])
+            tabelle = Table([zellen], colWidths=breiten)
+            tabelle.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (0, -1), 0),
+                ('RIGHTPADDING', (-1, 0), (-1, -1), 0),
+                ('LEFTPADDING', (1, 0), (1, -1), 4 * mm),
+                ('TOPPADDING', (0, 0), (-1, -1), 0),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+            ]))
+            return [titel, tabelle, Spacer(1, 3 * mm)]
+
+    bild = _bild_flowable(baustein, breite)
+    if bild is None:
+        return [titel] + text
+
+    if position == 'oben':
+        return [titel, bild, Spacer(1, 3 * mm)] + text
+    return [titel] + text + [Spacer(1, 2 * mm), bild, Spacer(1, 3 * mm)]
+
+
 @login_required
 def briefing_pdf(request, toern_id):
     from .views import _hat_skipper_oder_anbieter
@@ -267,7 +358,7 @@ def briefing_pdf(request, toern_id):
         .order_by('reihenfolge', 'id')
     )
 
-    boot = toern.boote.first()
+    boot = briefing_boot(request.user, toern)
     skipper_name = f'{request.user.first_name} {request.user.last_name}'.strip() or request.user.email
 
     buffer = BytesIO()
@@ -299,25 +390,10 @@ def briefing_pdf(request, toern_id):
                     kategorie_labels.get(aktuelle_kategorie, aktuelle_kategorie), breite))
                 story.append(Spacer(1, 2 * mm))
 
-            # Titel und erster Block zusammenhalten, damit keine Überschrift allein steht
-            inhalt = _bloecke_zu_flowables(baustein.text, breite)
-            kopf = [Paragraph(baustein.titel, STIL['baustein'])]
-            if inhalt:
-                story.append(KeepTogether(kopf + inhalt[:1]))
-                story.extend(inhalt[1:])
-            else:
-                story.extend(kopf)
-
-            if baustein.bild:
-                try:
-                    ow, oh = ImageReader(baustein.bild.path).getSize()
-                    skalierung = min(breite / ow, (85 * mm) / oh, 1)
-                    story.append(Spacer(1, 2 * mm))
-                    story.append(RLImage(baustein.bild.path,
-                                         width=ow * skalierung, height=oh * skalierung))
-                    story.append(Spacer(1, 3 * mm))
-                except Exception:
-                    pass
+            # Titel und ersten Block zusammenhalten, damit keine Überschrift allein steht
+            teile = _baustein_flowables(baustein, breite)
+            story.append(KeepTogether(teile[:2]))
+            story.extend(teile[2:])
 
     doc.build(
         story,
