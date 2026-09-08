@@ -126,9 +126,10 @@ def _deckblatt(canvas, doc, toern, boot, skipper_name):
         bild = _logo_weiss()
         ow, oh = bild.getSize()
         logo_w = logo_h * ow / oh
-        # Mittig zwischen dem Ende der Überschrift und dem rechten Seitenrand
+        # Mittig im sichtbaren Freiraum: der blaue Block läuft randlos bis zur
+        # Seitenkante, der Freiraum endet also bei w und nicht beim Textrand.
         text_ende = RAND + canvas.stringWidth('Crew-Briefing', 'Helvetica-Bold', 30)
-        mitte_x = (text_ende + (w - RAND)) / 2
+        mitte_x = (text_ende + w) / 2
         logo_x = mitte_x - logo_w / 2
         canvas.drawImage(bild, logo_x, h - 6.1 * cm,
                          width=logo_w, height=logo_h, mask='auto')
