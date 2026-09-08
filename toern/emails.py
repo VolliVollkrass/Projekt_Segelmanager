@@ -1,5 +1,8 @@
-from django.core.mail import EmailMessage
+import os
+
+from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.conf import settings
+from django.utils.html import escape
 
 
 def _send(subject, body, recipient):
@@ -201,32 +204,121 @@ def mail_teilnahme_abgelehnt(teilnahme, request):
     )
 
 
-def _termin_text(rundmail):
-    """Deutschsprachiger Termin-Block fuer den Mailtext (falls Termin gesetzt)."""
+def _termin_zeile(rundmail):
+    """Formatierte Datums-/Zeitzeile eines Termins, z.B. '12.09.2026 um 19:00 – 20:30 Uhr'."""
     if not rundmail.termin_start:
         return ""
     from django.utils import timezone
     start = timezone.localtime(rundmail.termin_start)
-    zeile = start.strftime("%d.%m.%Y um %H:%M Uhr")
+    zeile = start.strftime("%d.%m.%Y um %H:%M")
     if rundmail.termin_ende:
         ende = timezone.localtime(rundmail.termin_ende)
         if ende.date() == start.date():
-            zeile += ende.strftime(" - %H:%M Uhr")
+            zeile += ende.strftime(" – %H:%M Uhr")
         else:
-            zeile += ende.strftime(" bis %d.%m.%Y %H:%M Uhr")
+            zeile += ende.strftime(" Uhr bis %d.%m.%Y %H:%M Uhr")
+    else:
+        zeile += " Uhr"
+    return zeile
+
+
+def _termin_text(rundmail):
+    """Termin-Block für den Plaintext-Teil der Mail (ohne technische Hinweise)."""
+    zeile = _termin_zeile(rundmail)
+    if not zeile:
+        return ""
     block = f"\n\nTermin: {zeile}"
     ort = rundmail.termin_ort or ("Online" if rundmail.meeting_link else "")
     if ort:
         block += f"\nOrt: {ort}"
-    block += "\n(Der Termin haengt als Kalenderdatei an dieser Mail.)"
     return block
+
+
+_LOGO_CACHE = None
+
+
+def _logo_bytes():
+    """Logo einmalig einlesen und cachen (leerer Bytes-String, falls nicht vorhanden)."""
+    global _LOGO_CACHE
+    if _LOGO_CACHE is None:
+        pfad = os.path.join(settings.BASE_DIR, "static", "medien", "Logo_Meer_erleben.png")
+        try:
+            with open(pfad, "rb") as f:
+                _LOGO_CACHE = f.read()
+        except OSError:
+            _LOGO_CACHE = b""
+    return _LOGO_CACHE
+
+
+def _rundmail_html(body_text, rundmail, logo_cid=None):
+    """Baut die HTML-Variante der Rundmail im Corporate-Design (Logo, Farben)."""
+    primary = "#0f2942"   # dunkles Blau
+    teal = "#0D9488"      # Secondary
+
+    text_html = escape(body_text).replace("\n", "<br>")
+
+    logo_html = ""
+    if logo_cid:
+        logo_html = (
+            f'<img src="cid:{logo_cid}" alt="Meer erleben" '
+            f'width="150" style="display:block;margin:0 auto;max-width:150px;height:auto;">'
+        )
+
+    info_blocks = ""
+    if rundmail.meeting_link:
+        link = escape(rundmail.meeting_link)
+        info_blocks += (
+            f'<tr><td style="padding:6px 0;">'
+            f'<a href="{link}" style="display:inline-block;background:{teal};color:#ffffff;'
+            f'text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:600;font-size:15px;">'
+            f'💻 Zum digitalen Treffen</a></td></tr>'
+        )
+    termin_zeile = _termin_zeile(rundmail)
+    if termin_zeile:
+        ort = rundmail.termin_ort or ("Online" if rundmail.meeting_link else "")
+        ort_html = (f'<div style="color:#4b5563;font-size:14px;margin-top:2px;">📍 {escape(ort)}</div>'
+                    if ort else "")
+        info_blocks += (
+            f'<tr><td style="padding:10px 0 0;">'
+            f'<div style="background:#f1f5f9;border-radius:10px;padding:14px 16px;">'
+            f'<div style="color:{primary};font-weight:600;font-size:15px;">📅 {escape(termin_zeile)}</div>'
+            f'{ort_html}'
+            f'<div style="color:#94a3b8;font-size:12px;margin-top:6px;">Termin liegt dieser Mail als Kalenderdatei bei.</div>'
+            f'</div></td></tr>'
+        )
+
+    return f"""\
+<!DOCTYPE html>
+<html lang="de">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#eef2f5;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f5;padding:24px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:1px solid #e5e7eb;">
+        <tr><td style="background:#ffffff;padding:26px 24px 20px;text-align:center;">{logo_html}</td></tr>
+        <tr><td style="height:3px;background:{teal};line-height:3px;font-size:0;">&nbsp;</td></tr>
+        <tr><td style="padding:28px 28px 8px;color:#1f2937;font-size:16px;line-height:1.6;">
+          {text_html}
+        </td></tr>
+        <tr><td style="padding:4px 28px 24px;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">{info_blocks}</table>
+        </td></tr>
+        <tr><td style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e5e7eb;text-align:center;color:#94a3b8;font-size:12px;">
+          Meer erleben · Diese Mail wurde über den Segelmanager verschickt.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
 
 
 def mail_rundmail(rundmail, teilnahme, ics_text=None, anhang_bytes=None, anhang_name=None):
     """Versendet eine personalisierte Rundmail an ein Crew-Mitglied.
 
-    - Bausteine ({{vorname}} etc.) werden pro Empfaenger gerendert.
+    - Bausteine ({{vorname}} etc.) werden pro Empfänger gerendert.
     - Reply-To zeigt auf den Skipper, damit Antworten direkt bei ihm landen.
+    - HTML-Variante im Corporate-Design mit Logo; Plaintext als Fallback.
     - Optionaler .ics-Termin und eine Datei werden als Anhang mitgeschickt.
     """
     from .rundmail_utils import render_platzhalter
@@ -237,9 +329,11 @@ def mail_rundmail(rundmail, teilnahme, ics_text=None, anhang_bytes=None, anhang_
     betreff = render_platzhalter(rundmail.betreff, teilnahme, absender)
     body = render_platzhalter(rundmail.text, teilnahme, absender)
 
+    # Plaintext-Variante (Fallback + Zustellbarkeit)
+    plain = body
     if rundmail.meeting_link:
-        body += f"\n\nZum digitalen Treffen:\n{rundmail.meeting_link}"
-    body += _termin_text(rundmail)
+        plain += f"\n\nZum digitalen Treffen:\n{rundmail.meeting_link}"
+    plain += _termin_text(rundmail)
 
     if absender and absender.email:
         reply_to = [absender.email]
@@ -248,13 +342,25 @@ def mail_rundmail(rundmail, teilnahme, ics_text=None, anhang_bytes=None, anhang_
     else:
         reply_to = []
 
-    mail = EmailMessage(
+    mail = EmailMultiAlternatives(
         subject=betreff,
-        body=body,
+        body=plain,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[user.email],
         reply_to=reply_to,
     )
+
+    # Logo als Inline-Bild (CID) einbetten, falls vorhanden
+    logo_cid = None
+    logo = _logo_bytes()
+    if logo:
+        try:
+            from anymail.message import attach_inline_image
+            logo_cid = attach_inline_image(mail, logo, subtype="png")
+        except Exception:
+            logo_cid = None
+
+    mail.attach_alternative(_rundmail_html(body, rundmail, logo_cid=logo_cid), "text/html")
 
     if ics_text:
         mail.attach("Termin.ics", ics_text, "text/calendar")

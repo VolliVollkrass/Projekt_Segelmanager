@@ -136,8 +136,27 @@ class RundmailVersandTests(RundmailTestBase):
             "empfaenger": [self.t_crew1.id],
         })
         m = mail.outbox[0]
-        namen = [a[0] for a in m.attachments]
+        # Nur echte Datei-Anhänge (Tupel) prüfen – das Inline-Logo ist ein MIMEImage-Objekt.
+        namen = [a[0] for a in m.attachments if isinstance(a, tuple)]
         self.assertIn("Termin.ics", namen)
+
+    def test_html_variante_mit_logo_und_ohne_utf8_reste(self):
+        self.client.force_login(self.skipper)
+        start = (timezone.now() + timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
+        self.client.post(self._url(), {
+            "aktion": "senden", "betreff": "Vortreffen", "text": "Hallo {{vorname}}",
+            "termin_start": start, "termin_titel": "Vortreffen", "termin_ort": "Online",
+            "empfaenger": [self.t_crew1.id],
+        })
+        m = mail.outbox[0]
+        # HTML-Alternative vorhanden, referenziert das Inline-Logo per cid
+        html = next((c for c, t in m.alternatives if t == "text/html"), "")
+        self.assertIn("<html", html.lower())
+        self.assertIn("cid:", html)
+        # Der technische Hinweis darf NICHT im Plaintext stehen
+        self.assertNotIn("haengt als Kalenderdatei", m.body)
+        # Saubere Umlaute im Plaintext-Termin (kein 'ae'-Ersatz)
+        self.assertNotIn("haengt", m.body)
 
     def test_entwurf_speichern_versendet_nichts(self):
         self.client.force_login(self.skipper)
