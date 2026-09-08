@@ -1,6 +1,10 @@
-"""Crew-Briefing als PDF: stellt aus den für einen Törn aktiven Briefing-Bausteinen
-(toern.BriefingAuswahl -> briefing.BriefingBaustein) ein zusammenhängendes PDF-Handout
-zusammen. Farben/Aufbau analog andacht/pdf_export.py (Segelmanager-Theme)."""
+"""Crew-Briefing als PDF.
+
+Stellt aus den für einen Törn aktiven Briefing-Bausteinen
+(toern.BriefingAuswahl -> briefing.BriefingBaustein) ein Handout zusammen.
+Die Auszeichnungen im Baustein-Text (Warnung, Hinweis, Merksatz, Liste,
+Tabelle) werden über briefing.markup geparst — derselbe Parser, den auch
+Web-Ansicht und Vorschau benutzen."""
 import os
 from datetime import date
 from io import BytesIO
@@ -16,9 +20,11 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
-    Image as RLImage, Paragraph, SimpleDocTemplate, Spacer, HRFlowable,
+    Image as RLImage, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate,
+    Spacer, Table, TableStyle,
 )
 
+from briefing import markup
 from briefing.models import BriefingBaustein
 from .models import Toern
 
@@ -26,46 +32,227 @@ LOGO_PATH = os.path.join(settings.BASE_DIR, 'static', 'medien', 'Logo_Meer_erleb
 
 PRIMARY = colors.HexColor('#1e3a5f')
 SECONDARY = colors.HexColor('#0D9488')
+ROT = colors.HexColor('#B91C1C')
+ROT_HELL = colors.HexColor('#FDECEC')
+TEAL_HELL = colors.HexColor('#E6F4F2')
+HELLGRAU = colors.HexColor('#F3F4F6')
 GRAY = colors.HexColor('#9ca3af')
 GRAY_LIGHT = colors.HexColor('#d1d5db')
 
-FOOTER_TEXT = 'Erstellt mit den Briefing-Bausteinen · Segelmanager.undmeererleben.de'
+RAND = 2.2 * cm
+FOOTER_TEXT = 'Crew-Briefing · Segelmanager.undmeererleben.de'
+
+STIL = {
+    'deckblatt_titel': ParagraphStyle('DTitel', fontSize=30, leading=35, textColor=colors.white,
+                                      fontName='Helvetica-Bold'),
+    'deckblatt_unter': ParagraphStyle('DUnter', fontSize=13, leading=18,
+                                      textColor=colors.HexColor('#A8C4DC')),
+    'kapitel': ParagraphStyle('Kapitel', fontSize=18, leading=22, textColor=PRIMARY,
+                              fontName='Helvetica-Bold'),
+    'baustein': ParagraphStyle('BausteinTitel', fontSize=12, leading=16, textColor=PRIMARY,
+                               fontName='Helvetica-Bold', spaceBefore=10, spaceAfter=4),
+    'body': ParagraphStyle('Body', fontSize=10, leading=14.5, spaceAfter=5, alignment=4),
+    'boxkopf': ParagraphStyle('BoxKopf', fontSize=8, leading=11, fontName='Helvetica-Bold'),
+    'boxtext': ParagraphStyle('BoxText', fontSize=9.8, leading=13.5, spaceAfter=2),
+    'merksatz': ParagraphStyle('Merksatz', fontSize=11, leading=15, fontName='Helvetica-Bold',
+                               textColor=colors.white),
+    'zelle': ParagraphStyle('Zelle', fontSize=9.5, leading=12.5),
+    'zellekopf': ParagraphStyle('ZelleKopf', fontSize=9.5, leading=12.5,
+                                fontName='Helvetica-Bold', textColor=colors.white),
+}
 
 
-def _footer(canvas, doc):
+def _fusszeile(canvas, doc):
     canvas.saveState()
     w, _h = A4
-    margin = 2.5 * cm
-    footer_y = margin - 0.8 * cm
-
+    y = RAND - 0.8 * cm
     canvas.setStrokeColor(GRAY_LIGHT)
     canvas.setLineWidth(0.5)
-    canvas.line(margin, footer_y + 0.5 * cm, w - margin, footer_y + 0.5 * cm)
-
+    canvas.line(RAND, y + 0.5 * cm, w - RAND, y + 0.5 * cm)
     canvas.setFont('Helvetica', 7)
     canvas.setFillColor(GRAY)
-    canvas.drawString(margin, footer_y, FOOTER_TEXT)
-
-    seite_text = f'{date.today().strftime("%d.%m.%Y")}  |  Seite {canvas.getPageNumber()}'
-    canvas.drawRightString(w - margin, footer_y, seite_text)
+    canvas.drawString(RAND, y, FOOTER_TEXT)
+    canvas.drawRightString(w - RAND, y, f'Seite {canvas.getPageNumber() - 1}')
     canvas.restoreState()
 
 
-def _first_page(canvas, doc):
+def _wellen(canvas, y, breite, farbe, alpha):
+    canvas.saveState()
+    canvas.setStrokeColor(farbe)
+    canvas.setLineWidth(1.6)
+    canvas.setStrokeAlpha(alpha)
+    pfad = canvas.beginPath()
+    pfad.moveTo(0, y)
+    schritt, x, hoch = 14 * mm, 0, True
+    while x < breite:
+        versatz = 5 * mm if hoch else -5 * mm
+        pfad.curveTo(x + schritt * 0.3, y + versatz, x + schritt * 0.7, y + versatz, x + schritt, y)
+        x += schritt
+        hoch = not hoch
+    canvas.drawPath(pfad, stroke=1, fill=0)
+    canvas.restoreState()
+
+
+def _deckblatt(canvas, doc, toern, boot, skipper_name):
+    """Erste Seite: dunkelblauer Kopfblock mit Wellen, darunter die Törndaten."""
     canvas.saveState()
     w, h = A4
-    margin = 2.5 * cm
+    block_h = 11.5 * cm
+
+    canvas.setFillColor(PRIMARY)
+    canvas.rect(0, h - block_h, w, block_h, stroke=0, fill=1)
+    _wellen(canvas, h - block_h + 1.2 * cm, w, SECONDARY, 0.55)
+    _wellen(canvas, h - block_h + 2.0 * cm, w, colors.white, 0.14)
 
     if os.path.exists(LOGO_PATH):
-        logo_h = 1.8 * cm
-        orig_w, orig_h = ImageReader(LOGO_PATH).getSize()
-        logo_w = logo_h * orig_w / orig_h
-        canvas.drawImage(
-            LOGO_PATH, (w - logo_w) / 2, h - margin - logo_h,
-            width=logo_w, height=logo_h, mask='auto',
-        )
+        logo_h = 1.5 * cm
+        ow, oh = ImageReader(LOGO_PATH).getSize()
+        canvas.drawImage(LOGO_PATH, w - RAND - logo_h * ow / oh, h - RAND - logo_h,
+                         width=logo_h * ow / oh, height=logo_h, mask='auto')
+
+    canvas.setFillColor(SECONDARY)
+    canvas.setFont('Helvetica-Bold', 10)
+    canvas.drawString(RAND, h - 3.0 * cm, 'SEGELMANAGER  ·  MEER ERLEBEN')
+
+    canvas.setFillColor(colors.white)
+    canvas.setFont('Helvetica-Bold', 30)
+    canvas.drawString(RAND, h - 5.0 * cm, 'Crew-Briefing')
+
+    canvas.setFillColor(colors.HexColor('#A8C4DC'))
+    canvas.setFont('Helvetica', 13)
+    canvas.drawString(RAND, h - 6.3 * cm, toern.titel[:60])
+    canvas.setFont('Helvetica-Oblique', 10.5)
+    canvas.drawString(RAND, h - 7.2 * cm, 'Damit aus unterschiedlichen Erfahrungen eine Crew wird.')
+
+    # Törndaten
+    y = h - block_h - 2.2 * cm
+    zeilen = [
+        ('BOOT', boot.name if boot else '—'),
+        ('TÖRN', toern.titel),
+        ('SKIPPER', skipper_name),
+        ('DATUM', date.today().strftime('%d.%m.%Y')),
+    ]
+    for label, wert in zeilen:
+        canvas.setFillColor(PRIMARY)
+        canvas.setFont('Helvetica-Bold', 9)
+        canvas.drawString(RAND, y, label)
+        canvas.setFillColor(colors.black)
+        canvas.setFont('Helvetica', 11)
+        canvas.drawString(RAND + 3.6 * cm, y, str(wert)[:60])
+        canvas.setStrokeColor(GRAY_LIGHT)
+        canvas.setLineWidth(0.5)
+        canvas.line(RAND + 3.6 * cm, y - 0.2 * cm, A4[0] - RAND, y - 0.2 * cm)
+        y -= 1.3 * cm
+
+    canvas.setFillColor(GRAY)
+    canvas.setFont('Helvetica', 8.5)
+    canvas.drawString(RAND, 2.4 * cm,
+                      'Dieses Briefing ersetzt keine Sicherheitseinweisung an Bord — es strukturiert sie.')
+    canvas.drawString(RAND, 1.9 * cm,
+                      'Bitte vor dem Ablegen einmal gemeinsam durchgehen und offene Punkte klären.')
     canvas.restoreState()
-    _footer(canvas, doc)
+
+
+def _kapitelkopf(titel, breite):
+    """Kapitelüberschrift mit Teal-Balken links."""
+    t = Table([[Paragraph(titel, STIL['kapitel'])]], colWidths=[breite])
+    t.setStyle(TableStyle([
+        ('LINEBEFORE', (0, 0), (0, -1), 3.2 * mm, SECONDARY),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5 * mm),
+        ('TOPPADDING', (0, 0), (-1, -1), 3 * mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3 * mm),
+    ]))
+    return t
+
+
+def _box(zeilen, label, bg, akzent, breite):
+    inhalt = [Paragraph(label.upper(), ParagraphStyle('bk', parent=STIL['boxkopf'], textColor=akzent))]
+    inhalt += [Paragraph(z, STIL['boxtext']) for z in zeilen]
+    t = Table([[inhalt]], colWidths=[breite])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), bg),
+        ('LINEBEFORE', (0, 0), (0, -1), 3.2 * mm, akzent),
+        ('LEFTPADDING', (0, 0), (-1, -1), 6 * mm),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 4 * mm),
+        ('TOPPADDING', (0, 0), (-1, -1), 3 * mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3 * mm),
+    ]))
+    return t
+
+
+def _bloecke_zu_flowables(text, breite):
+    """Markup-Blöcke (briefing.markup) in ReportLab-Flowables übersetzen."""
+    out = []
+    for block in markup.parse(text):
+        typ = block['typ']
+
+        if typ == markup.ABSATZ:
+            out.append(Paragraph('<br/>'.join(block['zeilen']), STIL['body']))
+
+        elif typ == markup.WARNUNG:
+            out.append(_box(block['zeilen'], 'Warnung', ROT_HELL, ROT, breite))
+            out.append(Spacer(1, 3 * mm))
+
+        elif typ == markup.HINWEIS:
+            out.append(_box(block['zeilen'], 'Hinweis', TEAL_HELL, SECONDARY, breite))
+            out.append(Spacer(1, 3 * mm))
+
+        elif typ == markup.MERKSATZ:
+            p = Paragraph('<br/>'.join(block['zeilen']), STIL['merksatz'])
+            t = Table([[p]], colWidths=[breite])
+            t.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, -1), PRIMARY),
+                ('LEFTPADDING', (0, 0), (-1, -1), 5 * mm),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 5 * mm),
+                ('TOPPADDING', (0, 0), (-1, -1), 3.5 * mm),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 3.5 * mm),
+            ]))
+            out.append(t)
+            out.append(Spacer(1, 3 * mm))
+
+        elif typ == markup.LISTE:
+            zeilen = [[Paragraph('•', ParagraphStyle('bl', fontSize=10, leading=14.5,
+                                                     textColor=SECONDARY)),
+                       Paragraph(p, STIL['body'])] for p in block['punkte']]
+            t = Table(zeilen, colWidths=[5 * mm, breite - 5 * mm])
+            t.setStyle(TableStyle([
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+                ('TOPPADDING', (0, 0), (-1, -1), 0.5),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 2),
+            ]))
+            out.append(t)
+            out.append(Spacer(1, 2 * mm))
+
+        elif typ == markup.TABELLE:
+            zeilen = block['zeilen']
+            if not zeilen:
+                continue
+            spalten = max(len(z) for z in zeilen)
+            spaltenbreite = breite / spalten
+            daten = []
+            for i, zeile in enumerate(zeilen):
+                gefuellt = list(zeile) + [''] * (spalten - len(zeile))
+                stil = STIL['zellekopf'] if i == 0 else STIL['zelle']
+                daten.append([Paragraph(z, stil) for z in gefuellt])
+            t = Table(daten, colWidths=[spaltenbreite] * spalten, repeatRows=1)
+            stil_cmds = [
+                ('BACKGROUND', (0, 0), (-1, 0), PRIMARY),
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('TOPPADDING', (0, 0), (-1, -1), 4),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+                ('LEFTPADDING', (0, 0), (-1, -1), 5),
+                ('LINEBELOW', (0, 1), (-1, -2), 0.4, GRAY_LIGHT),
+            ]
+            for i in range(1, len(daten)):
+                if i % 2 == 1:
+                    stil_cmds.append(('BACKGROUND', (0, i), (-1, i), HELLGRAU))
+            t.setStyle(TableStyle(stil_cmds))
+            out.append(t)
+            out.append(Spacer(1, 3 * mm))
+
+    return out
 
 
 @login_required
@@ -86,69 +273,57 @@ def briefing_pdf(request, toern_id):
     buffer = BytesIO()
     doc = SimpleDocTemplate(
         buffer, pagesize=A4,
-        leftMargin=2.5 * cm, rightMargin=2.5 * cm,
-        topMargin=4.0 * cm, bottomMargin=2.5 * cm,
+        leftMargin=RAND, rightMargin=RAND, topMargin=RAND, bottomMargin=RAND,
+        title=f'Crew-Briefing — {toern.titel}',
     )
+    breite = doc.width
 
-    titel_style = ParagraphStyle('Titel', fontSize=22, leading=27, textColor=PRIMARY,
-                                 fontName='Helvetica-Bold', spaceAfter=4)
-    untertitel_style = ParagraphStyle('Untertitel', fontSize=11, leading=15, textColor=SECONDARY, spaceAfter=4)
-    meta_style = ParagraphStyle('Meta', fontSize=9, leading=13, textColor=GRAY, spaceAfter=16)
-    kapitel_style = ParagraphStyle('Kapitel', fontSize=14, leading=18, textColor=PRIMARY,
-                                   fontName='Helvetica-Bold', spaceBefore=16, spaceAfter=8)
-    baustein_titel_style = ParagraphStyle('BausteinTitel', fontSize=11.5, leading=15, textColor=PRIMARY,
-                                          fontName='Helvetica-Bold', spaceBefore=10, spaceAfter=4)
-    body_style = ParagraphStyle('Body', fontSize=10, leading=15, spaceAfter=6)
-
-    story = []
-    story.append(Paragraph('Crew-Briefing', titel_style))
-    story.append(Paragraph(toern.titel, untertitel_style))
-    meta_teile = []
-    if boot:
-        meta_teile.append(boot.name)
-    meta_teile.append(f'Skipper: {skipper_name}')
-    meta_teile.append(date.today().strftime('%d.%m.%Y'))
-    story.append(Paragraph('  ·  '.join(meta_teile), meta_style))
-    story.append(HRFlowable(width='100%', thickness=1, color=PRIMARY, spaceAfter=10))
+    story = [PageBreak()]  # Seite 1 ist das Deckblatt (rein per Canvas gezeichnet)
 
     if not auswahl:
         story.append(Paragraph(
             'Für diesen Törn sind noch keine Briefing-Bausteine ausgewählt. '
             'Im Skipper-Dashboard unter „Briefing“ lassen sich Bausteine aus der '
             'gemeinsamen Bibliothek hinzufügen.',
-            body_style,
+            STIL['body'],
         ))
     else:
-        aktuelle_kategorie = None
         kategorie_labels = dict(BriefingBaustein.KATEGORIE_CHOICES)
+        aktuelle_kategorie = None
         for a in auswahl:
             baustein = a.baustein
             if baustein.kategorie != aktuelle_kategorie:
                 aktuelle_kategorie = baustein.kategorie
-                story.append(Paragraph(kategorie_labels.get(aktuelle_kategorie, aktuelle_kategorie), kapitel_style))
+                story.append(Spacer(1, 4 * mm))
+                story.append(_kapitelkopf(
+                    kategorie_labels.get(aktuelle_kategorie, aktuelle_kategorie), breite))
+                story.append(Spacer(1, 2 * mm))
 
-            story.append(Paragraph(baustein.titel, baustein_titel_style))
-            for absatz in baustein.text.split('\n\n'):
-                absatz = absatz.strip()
-                if absatz:
-                    story.append(Paragraph(absatz.replace('\n', '<br/>'), body_style))
+            # Titel und erster Block zusammenhalten, damit keine Überschrift allein steht
+            inhalt = _bloecke_zu_flowables(baustein.text, breite)
+            kopf = [Paragraph(baustein.titel, STIL['baustein'])]
+            if inhalt:
+                story.append(KeepTogether(kopf + inhalt[:1]))
+                story.extend(inhalt[1:])
+            else:
+                story.extend(kopf)
 
             if baustein.bild:
                 try:
-                    bild_reader = ImageReader(baustein.bild.path)
-                    orig_w, orig_h = bild_reader.getSize()
-                    max_w = doc.width
-                    max_h = 90 * mm
-                    scale = min(max_w / orig_w, max_h / orig_h, 1)
+                    ow, oh = ImageReader(baustein.bild.path).getSize()
+                    skalierung = min(breite / ow, (85 * mm) / oh, 1)
                     story.append(Spacer(1, 2 * mm))
-                    story.append(RLImage(
-                        baustein.bild.path, width=orig_w * scale, height=orig_h * scale,
-                    ))
+                    story.append(RLImage(baustein.bild.path,
+                                         width=ow * skalierung, height=oh * skalierung))
                     story.append(Spacer(1, 3 * mm))
                 except Exception:
                     pass
 
-    doc.build(story, onFirstPage=_first_page, onLaterPages=_footer)
+    doc.build(
+        story,
+        onFirstPage=lambda c, d: _deckblatt(c, d, toern, boot, skipper_name),
+        onLaterPages=_fusszeile,
+    )
     buffer.seek(0)
 
     response = HttpResponse(buffer, content_type='application/pdf')
