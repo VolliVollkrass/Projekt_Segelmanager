@@ -33,10 +33,12 @@
         {% endif %}
       {% endif %}
 
-      <li><a href="{% url 'segelwissen_uebersicht' %}" class="rounded-lg">Segelwissen</a></li>
-
       {% if user.is_authenticated %}
         <li><a href="{% url 'kochbuch_liste' %}" class="rounded-lg">Kochbuch</a></li>
+
+        {% if nav_zeigt_briefing %}
+          <li><a href="{% url 'briefing_bibliothek' %}" class="rounded-lg">Briefing</a></li>
+        {% endif %}
 
         {% if user.is_anbieter or user.is_staff %}
           <li><a href="{% url 'anbieter_dashboard' %}" class="rounded-lg">Anbieterbereich</a></li>

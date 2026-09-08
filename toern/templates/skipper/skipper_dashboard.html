@@ -54,6 +54,10 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 <span class="text-[10px] font-medium leading-tight">Dokumente</span>
             </button>
+            <button class="mtab-btn flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="briefing">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                <span class="text-[10px] font-medium leading-tight">Briefing</span>
+            </button>
             <button class="mtab-btn relative flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[4.5rem] text-base-content/50 transition-colors" data-tab="kasse">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                 <span class="text-[10px] font-medium leading-tight">Kasse</span>
@@ -96,6 +100,9 @@
             </button>
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="dokumente">
                 Dokumente
+            </button>
+            <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="briefing">
+                Briefing
             </button>
             <button class="tab-btn px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-base-content/50 hover:text-base-content whitespace-nowrap" data-tab="kasse">
                 Kasse
@@ -1059,6 +1066,53 @@
 
     </div>
 
+    <!-- ========================= TAB: BRIEFING ========================= -->
+    <div id="tab-briefing" class="hidden space-y-4">
+
+        <p class="text-sm text-base-content/60">
+            Das Crew-Briefing für diesen Törn — zusammengestellt aus der gemeinsamen
+            <a href="{% url 'briefing_bibliothek' %}" class="link link-primary" target="_blank">Briefing-Bibliothek</a>.
+            Schalte ab, was für diese Crew nicht passt, und ergänze eigene Bausteine — Änderungen wirken
+            sich nur auf dieses Törn-Briefing aus.
+        </p>
+
+        <div class="flex flex-wrap gap-2">
+            <a href="{% url 'briefing_pdf' toern.id %}" target="_blank" class="btn btn-primary btn-sm gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 9.414V19a2 2 0 01-2 2z"/>
+                </svg>
+                Briefing-PDF erzeugen
+            </a>
+            <button onclick="openBriefingHinzufuegen()" class="btn btn-outline btn-sm">+ Baustein hinzufügen</button>
+        </div>
+
+        <div id="briefing-loading" class="flex justify-center py-6">
+            <span class="loading loading-spinner loading-md"></span>
+        </div>
+        <div id="briefing-list" class="hidden space-y-5"></div>
+
+        <!-- Modal: Baustein aus der Bibliothek hinzufügen -->
+        <dialog id="briefing-hinzufuegen-modal" class="modal">
+            <div class="modal-box max-w-md">
+                <h3 class="font-bold text-lg mb-3">Baustein hinzufügen</h3>
+                <input type="text" id="briefing-suche-input" placeholder="In der Bibliothek suchen…"
+                       class="input input-bordered input-sm w-full mb-3" oninput="briefingSucheDebounced()">
+                <div id="briefing-suche-ergebnisse" class="space-y-1 max-h-80 overflow-y-auto"></div>
+                <p class="text-xs text-base-content/50 mt-3">
+                    Nichts Passendes dabei?
+                    <a href="{% url 'briefing_baustein_erstellen' %}?next={{ request.path|urlencode }}%3Ftab%3Dbriefing"
+                       class="link link-primary">Neuen Baustein vorschlagen</a>
+                    — erscheint sofort in der Bibliothek und in diesem Briefing.
+                </p>
+                <div class="modal-action">
+                    <form method="dialog"><button class="btn btn-sm">Schließen</button></form>
+                </div>
+            </div>
+            <form method="dialog" class="modal-backdrop"><button>close</button></form>
+        </dialog>
+
+    </div>
+
     <!-- ========================= TAB: KASSE (Skipper-Topf) ========================= -->
     <div id="tab-kasse" class="hidden space-y-5">
 
@@ -1689,6 +1743,7 @@ const avoidMap = {
         panels.forEach(p => p.classList.toggle('hidden', p.id !== 'tab-' + tabId));
         if (tabId === 'packliste') loadVorlage();
         if (tabId === 'dokumente') loadDokument();
+        if (tabId === 'briefing') loadBriefing();
     }
 
     [...buttons, ...mButtons].forEach(btn => {
@@ -2128,6 +2183,121 @@ function resetDokument() {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
         body: JSON.stringify({ typ: dokTyp })
     }).then(() => loadDokument());
+}
+
+// ===================== BRIEFING =====================
+let briefingItems = [];
+
+function loadBriefing() {
+    document.getElementById('briefing-loading').classList.remove('hidden');
+    document.getElementById('briefing-list').classList.add('hidden');
+    fetch("{% url 'briefing_liste' toern.id %}")
+        .then(r => r.json())
+        .then(data => { briefingItems = data.items; renderBriefingList(); });
+}
+
+function renderBriefingList() {
+    const list = document.getElementById('briefing-list');
+    list.innerHTML = '';
+
+    if (briefingItems.length === 0) {
+        list.innerHTML = '<p class="text-sm opacity-50 text-center py-4">Noch keine Bausteine ausgewählt.</p>';
+    } else {
+        // Nach Kategorie gruppieren, Reihenfolge innerhalb der Kategorie bleibt erhalten
+        const kategorien = [];
+        const gruppen = {};
+        briefingItems.forEach(item => {
+            if (!gruppen[item.kategorie]) { gruppen[item.kategorie] = []; kategorien.push(item.kategorie); }
+            gruppen[item.kategorie].push(item);
+        });
+        kategorien.forEach(kat => {
+            const kopf = document.createElement('p');
+            kopf.className = 'text-xs font-bold uppercase tracking-widest text-base-content/50 pt-1';
+            kopf.textContent = gruppen[kat][0].kategorie_label;
+            list.appendChild(kopf);
+            gruppen[kat].forEach((item, idxInKat) => {
+                list.appendChild(buildBriefingRow(item));
+            });
+        });
+    }
+    document.getElementById('briefing-loading').classList.add('hidden');
+    list.classList.remove('hidden');
+}
+
+function buildBriefingRow(item) {
+    const div = document.createElement('div');
+    div.className = 'flex items-center gap-2 bg-base-100 rounded-lg px-3 py-2' + (item.aktiv ? '' : ' opacity-40');
+    div.innerHTML = `
+        ${item.bild_url ? `<img src="${item.bild_url}" class="w-10 h-10 rounded object-cover shrink-0">` : ''}
+        <a href="/briefing/${item.baustein_id}/" target="_blank" class="flex-1 text-sm hover:text-primary transition-colors truncate">${escapeHtml(item.titel)}</a>
+        <button onclick="moveBriefingItem(${item.id}, -1)" class="btn btn-xs btn-ghost px-1.5" title="Nach oben">▲</button>
+        <button onclick="moveBriefingItem(${item.id}, 1)" class="btn btn-xs btn-ghost px-1.5" title="Nach unten">▼</button>
+        <input type="checkbox" class="toggle toggle-sm toggle-primary" ${item.aktiv ? 'checked' : ''}
+               onchange="toggleBriefingItem(${item.id})">`;
+    return div;
+}
+
+function toggleBriefingItem(auswahlId) {
+    fetch(`{% url 'briefing_toggle' toern.id 9999 %}`.replace('9999', auswahlId), {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(() => loadBriefing());
+}
+
+function moveBriefingItem(auswahlId, richtung) {
+    const idx = briefingItems.findIndex(i => i.id === auswahlId);
+    if (idx === -1) return;
+    const zielIdx = idx + richtung;
+    if (zielIdx < 0 || zielIdx >= briefingItems.length) return;
+    // Nur innerhalb derselben Kategorie tauschen
+    if (briefingItems[zielIdx].kategorie !== briefingItems[idx].kategorie) return;
+    [briefingItems[idx], briefingItems[zielIdx]] = [briefingItems[zielIdx], briefingItems[idx]];
+    renderBriefingList();
+    fetch("{% url 'briefing_reihenfolge' toern.id %}", {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ ids: briefingItems.map(i => i.id) })
+    });
+}
+
+function openBriefingHinzufuegen() {
+    document.getElementById('briefing-hinzufuegen-modal').showModal();
+    document.getElementById('briefing-suche-input').value = '';
+    briefingSuche('');
+}
+
+let briefingSucheTimer = null;
+function briefingSucheDebounced() {
+    clearTimeout(briefingSucheTimer);
+    briefingSucheTimer = setTimeout(() => briefingSuche(document.getElementById('briefing-suche-input').value), 250);
+}
+
+function briefingSuche(q) {
+    fetch(`{% url 'briefing_baustein_suche' toern.id %}?q=${encodeURIComponent(q)}`)
+        .then(r => r.json())
+        .then(data => {
+            const box = document.getElementById('briefing-suche-ergebnisse');
+            if (data.items.length === 0) {
+                box.innerHTML = '<p class="text-sm opacity-50 text-center py-4">Nichts gefunden.</p>';
+                return;
+            }
+            box.innerHTML = data.items.map(b => `
+                <button type="button" onclick="briefingHinzufuegen(${b.id}, this)"
+                        class="w-full text-left flex items-center justify-between gap-2 px-3 py-2 rounded-lg hover:bg-base-200 transition-colors ${b.bereits_ausgewaehlt ? 'opacity-40' : ''}"
+                        ${b.bereits_ausgewaehlt ? 'disabled' : ''}>
+                    <span class="text-sm">${escapeHtml(b.titel)}</span>
+                    <span class="badge badge-outline badge-xs shrink-0">${escapeHtml(b.kategorie_label)}</span>
+                </button>`).join('');
+        });
+}
+
+function briefingHinzufuegen(bausteinId, btn) {
+    fetch("{% url 'briefing_baustein_hinzufuegen' toern.id %}", {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ baustein_id: bausteinId })
+    }).then(() => {
+        btn.disabled = true;
+        btn.classList.add('opacity-40');
+        loadBriefing();
+    });
 }
 
 // ===================== PERSÖNLICHE STANDARDS =====================

@@ -6,7 +6,7 @@ Logbücher, Schadensfotos) prüfen wir hier vor der Auslieferung, ob der
 angemeldete Nutzer die zugehörige Datei sehen darf.
 
 Nicht als sensibel gelistete Pfade (Profilbilder, Boot-/Törn-Bilder, Rezepte,
-Segelwissen) werden wie bisher direkt ausgeliefert.
+Briefing-Bausteine) werden wie bisher direkt ausgeliefert.
 
 WICHTIG: Neue sensible Upload-Typen (models.FileField/ImageField) müssen unten
 in SENSIBLE_PREFIXE ergänzt werden, sonst sind sie öffentlich abrufbar.

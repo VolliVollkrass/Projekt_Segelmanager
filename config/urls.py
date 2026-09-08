@@ -12,7 +12,7 @@ urlpatterns = [
     path('toern/', include('toern.urls')),
     path('boote/', include('boote.urls')),
     path('kochbuch/', include('rezepte.urls')),
-    path('segelwissen/', include('segelwissen.urls')),
+    path('briefing/', include('briefing.urls')),
     path('andacht/', include('andacht.urls')),
     path('finance/', include('finance.urls')),
     # Sensible Uploads (Lizenzen, Belege, Logbücher, Schadensfotos) werden hier

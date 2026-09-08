@@ -56,7 +56,7 @@ INSTALLED_APPS = [
     'logistik',
     'finance',
     'rezepte',
-    'segelwissen',
+    'briefing',
     'andacht',
 ]
 
@@ -110,6 +110,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'toern.context_processors.active_boot_dashboard',
+                'toern.context_processors.briefing_nav',
             ],
         },
     },

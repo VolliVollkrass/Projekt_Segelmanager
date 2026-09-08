@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Briefing-Bausteine{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
+
+  {% if next %}
+  <a href="{{ next }}" class="flex items-center gap-1 text-sm text-base-content/50 hover:text-base-content transition-colors mb-4">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+    </svg>
+    Zurück zum Törn
+  </a>
+  {% endif %}
+
+  <div class="flex items-center justify-between mb-5">
+    <div>
+      <h1 class="text-2xl font-bold">⛵ Briefing-Bausteine</h1>
+      <p class="text-sm text-base-content/50 mt-0.5">Das wachsende Erfahrungsbuch für Crew-Briefings</p>
+    </div>
+    <a href="{% url 'briefing_baustein_erstellen' %}{% if next %}?next={{ next|urlencode }}{% endif %}" class="btn btn-primary btn-sm gap-1.5">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+      </svg>
+      Baustein hinzufügen
+    </a>
+  </div>
+
+  <form method="get" class="mb-6 space-y-2">
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <div class="flex gap-2">
+      <div class="relative flex-1">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-base-content/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 115 11a6 6 0 0112 0z"/>
+        </svg>
+        <input type="text" name="q" value="{{ q }}" placeholder="Baustein suchen…"
+               class="input input-bordered input-sm w-full pl-9">
+      </div>
+      <button type="submit" class="btn btn-sm btn-primary">Suchen</button>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+      <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}"
+         class="badge {% if not kategorie %}badge-primary{% else %}badge-outline{% endif %} cursor-pointer">Alle</a>
+      {% for k_val, k_label in kategorien %}
+      <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}kategorie={{ k_val }}"
+         class="badge {% if kategorie == k_val %}badge-primary{% else %}badge-outline{% endif %} cursor-pointer">{{ k_label }}</a>
+      {% endfor %}
+    </div>
+  </form>
+
+  {% if page_obj.object_list %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    {% for baustein in page_obj %}
+    <a href="{% url 'briefing_baustein_detail' baustein.pk %}{% if next %}?next={{ next|urlencode }}{% endif %}" class="group card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-md transition-all overflow-hidden">
+      {% if baustein.bild %}
+      <figure class="h-32 overflow-hidden">
+        <img src="{{ baustein.bild.url }}" alt="{{ baustein.titel }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+      </figure>
+      {% else %}
+      <div class="h-32 bg-base-200 flex items-center justify-center text-4xl">⛵</div>
+      {% endif %}
+      <div class="p-4">
+        <h2 class="font-semibold text-sm leading-tight group-hover:text-primary transition-colors">{{ baustein.titel }}</h2>
+        <div class="flex items-center gap-2 mt-2 text-xs text-base-content/40">
+          <span class="badge badge-outline badge-xs">{{ baustein.get_kategorie_display }}</span>
+          {% if baustein.ist_standard %}<span class="badge badge-secondary badge-xs">Standard</span>{% endif %}
+        </div>
+        <p class="text-xs text-base-content/40 mt-1.5">
+          von {{ baustein.autor.first_name|default:"unbekannt" }} {{ baustein.autor.last_name }}
+        </p>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% if page_obj.has_other_pages %}
+  <div class="flex justify-center gap-2 mt-6">
+    {% if page_obj.has_previous %}
+    <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}page={{ page_obj.previous_page_number }}"
+       class="btn btn-sm btn-ghost">← Zurück</a>
+    {% endif %}
+    <span class="btn btn-sm btn-disabled">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}
+    <a href="?{% if next %}next={{ next|urlencode }}&{% endif %}{% if q %}q={{ q }}&{% endif %}{% if kategorie %}kategorie={{ kategorie }}&{% endif %}page={{ page_obj.next_page_number }}"
+       class="btn btn-sm btn-ghost">Weiter →</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="text-center py-16 text-base-content/30">
+    <p class="text-4xl mb-3">⛵</p>
+    <p class="text-sm">
+      {% if q or kategorie %}Keine Bausteine gefunden.
+      {% else %}Noch keine Bausteine in der Bibliothek.{% endif %}
+    </p>
+    {% if not q and not kategorie %}
+    <a href="{% url 'briefing_baustein_erstellen' %}" class="btn btn-sm btn-primary mt-4">Ersten Baustein eintragen</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
