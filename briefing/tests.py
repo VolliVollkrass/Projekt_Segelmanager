@@ -116,3 +116,96 @@ class BriefingZugriffTests(TestCase):
         r = self.client.post(reverse("briefing_baustein_loeschen", args=[baustein.pk]))
         self.assertEqual(r.status_code, 403)
         self.assertTrue(BriefingBaustein.objects.filter(pk=baustein.pk).exists())
+
+
+class BriefingAuswahlTests(TestCase):
+    """Reihenfolge und Boot-Zuordnung — beides waren Fehler in der ersten Fassung."""
+
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        from boote.models import Boot
+        from toern.models import BriefingAuswahl
+
+        self.skipper = _user("s@example.test")
+        self.toern = Toern.objects.create(
+            titel="T", anbieter=self.skipper,
+            startdatum=timezone.now(), enddatum=timezone.now() + timedelta(days=7),
+            revier="R", preis_pro_person=1,
+        )
+        self.erstes_boot = Boot.objects.create(name="Erstes", toern=self.toern)
+        self.mein_boot = Boot.objects.create(name="Meins", toern=self.toern)
+        Teilnahme.objects.create(user=self.skipper, toern=self.toern, rolle="skipper",
+                                 status="bestaetigt", boot=self.mein_boot)
+        self.client.force_login(self.skipper)
+
+    def test_briefing_nennt_das_boot_des_skippers(self):
+        """Bei Flotten-Törns nicht einfach das erste Boot des Törns nehmen."""
+        from toern.briefing_pdf import briefing_boot
+        self.assertEqual(briefing_boot(self.skipper, self.toern), self.mein_boot)
+
+    def test_boot_faellt_zurueck_wenn_keine_zuordnung(self):
+        from toern.briefing_pdf import briefing_boot
+        gast = _user("gast@example.test")
+        self.assertEqual(briefing_boot(gast, self.toern), self.erstes_boot)
+
+    def test_pdf_wird_erzeugt(self):
+        r = self.client.get(reverse("briefing_pdf", args=[self.toern.id]))
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "application/pdf")
+
+    def test_neuer_baustein_landet_in_seiner_kategorie(self):
+        import json
+        from toern.models import BriefingAuswahl
+
+        for kat, titel in [("kommunikation", "K"), ("sonstiges", "S")]:
+            b = BriefingBaustein.objects.create(titel=titel, text="x", kategorie=kat,
+                                                ist_standard=True)
+        self.client.get(reverse("briefing_liste", args=[self.toern.id]))  # Auto-Befüllung
+
+        nachzuegler = BriefingBaustein.objects.create(
+            titel="Später dazu", text="x", kategorie="kommunikation")
+        self.client.post(
+            reverse("briefing_baustein_hinzufuegen", args=[self.toern.id]),
+            data=json.dumps({"baustein_id": nachzuegler.id}),
+            content_type="application/json",
+        )
+
+        auswahl = list(BriefingAuswahl.objects.filter(toern=self.toern)
+                       .select_related("baustein").order_by("reihenfolge"))
+        kategorien = [a.baustein.kategorie for a in auswahl]
+        # Der Nachzügler steht bei seiner Kategorie, nicht am Ende der Liste
+        index = [a.baustein_id for a in auswahl].index(nachzuegler.id)
+        self.assertEqual(kategorien[index], "kommunikation")
+        self.assertNotEqual(index, len(auswahl) - 1)
+
+        # und die Kategorie-Blöcke bleiben zusammenhängend
+        gesehen = []
+        for k in kategorien:
+            if k not in gesehen:
+                gesehen.append(k)
+            else:
+                self.assertEqual(gesehen[-1], k, "Kategorie-Block ist zerrissen")
+
+
+class BildPositionTests(TestCase):
+    def test_standardwert_ist_unten(self):
+        b = BriefingBaustein.objects.create(titel="X", text="x")
+        self.assertEqual(b.bild_position, "unten")
+
+    def test_position_wird_gespeichert(self):
+        skipper = _user("p@example.test")
+        toern = Toern.objects.create(
+            titel="T", anbieter=skipper,
+            startdatum="2026-01-01T10:00:00Z", enddatum="2026-01-08T10:00:00Z",
+            revier="R", preis_pro_person=1)
+        Teilnahme.objects.create(user=skipper, toern=toern, rolle="skipper", status="bestaetigt")
+        baustein = BriefingBaustein.objects.create(titel="X", text="x")
+
+        self.client.force_login(skipper)
+        self.client.post(
+            reverse("briefing_baustein_bearbeiten", args=[baustein.pk]),
+            {"titel": "X", "kategorie": "sonstiges", "text": "x", "bild_position": "links"},
+        )
+        baustein.refresh_from_db()
+        self.assertEqual(baustein.bild_position, "links")

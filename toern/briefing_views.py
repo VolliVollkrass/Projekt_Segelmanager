@@ -33,6 +33,23 @@ def get_or_create_briefing_auswahl(toern):
     return toern.briefing_auswahl.select_related('baustein').all()
 
 
+def reihenfolge_normalisieren(toern):
+    """Nummeriert die Auswahl neu durch, sortiert nach Kategorie-Rang und bisheriger
+    Reihenfolge. Hält die Kategorie-Blöcke zusammenhängend — sonst landet ein später
+    hinzugefügter Baustein am Ende der Liste statt in seiner Kategorie, und die
+    Auf/Ab-Knöpfe können ihn nicht mehr bewegen, weil beide Nachbarn zu einer
+    anderen Kategorie gehören."""
+    rang = {code: i for i, (code, _) in enumerate(BriefingBaustein.KATEGORIE_CHOICES)}
+    eintraege = sorted(
+        toern.briefing_auswahl.select_related('baustein'),
+        key=lambda a: (rang.get(a.baustein.kategorie, 999), a.reihenfolge, a.id),
+    )
+    for i, auswahl in enumerate(eintraege):
+        if auswahl.reihenfolge != i:
+            auswahl.reihenfolge = i
+            auswahl.save(update_fields=['reihenfolge'])
+
+
 def _auswahl_json(auswahl_qs):
     return [
         {
@@ -109,9 +126,12 @@ def briefing_baustein_hinzufuegen(request, toern_id):
         auswahl.aktiv = True
         auswahl.save(update_fields=['aktiv'])
     if created:
+        # Ans Ende stellen, dann neu durchnummerieren — dadurch rutscht der Baustein
+        # ans Ende seiner eigenen Kategorie statt ans Ende der ganzen Liste.
         max_reihenfolge = toern.briefing_auswahl.aggregate(m=Max('reihenfolge'))['m'] or 0
         auswahl.reihenfolge = max_reihenfolge + 1
         auswahl.save(update_fields=['reihenfolge'])
+        reihenfolge_normalisieren(toern)
 
     return JsonResponse({'status': 'ok', 'id': auswahl.id})
 

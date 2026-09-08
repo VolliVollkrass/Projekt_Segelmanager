@@ -37,6 +37,16 @@ class BriefingBaustein(models.Model):
         blank=True,
         null=True,
     )
+    BILD_POSITION_CHOICES = [
+        ("unten", "Unter dem Text"),
+        ("oben", "Über dem Text"),
+        ("links", "Links neben dem Text"),
+        ("rechts", "Rechts neben dem Text"),
+    ]
+    bild_position = models.CharField(
+        max_length=10, choices=BILD_POSITION_CHOICES, default="unten",
+        help_text="Wo das Bild relativ zum Text steht — im PDF und in der Leseansicht",
+    )
     autor = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True, related_name="briefing_bausteine",

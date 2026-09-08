@@ -74,6 +74,7 @@ def baustein_erstellen(request):
         return _baustein_speichern(request, baustein=None)
     return render(request, "briefing/form.html", {
         "kategorien": BriefingBaustein.KATEGORIE_CHOICES,
+        "bild_positionen": BriefingBaustein.BILD_POSITION_CHOICES,
         "block_labels": markup.BLOCK_LABELS,
         "action": "erstellen",
         "next": _safe_next(request),
@@ -89,6 +90,7 @@ def baustein_bearbeiten(request, pk):
     return render(request, "briefing/form.html", {
         "baustein": baustein,
         "kategorien": BriefingBaustein.KATEGORIE_CHOICES,
+        "bild_positionen": BriefingBaustein.BILD_POSITION_CHOICES,
         "block_labels": markup.BLOCK_LABELS,
         "action": "bearbeiten",
         "next": _safe_next(request),
@@ -104,6 +106,7 @@ def _baustein_speichern(request, baustein):
         kontext = {
             "baustein": baustein,
             "kategorien": BriefingBaustein.KATEGORIE_CHOICES,
+            "bild_positionen": BriefingBaustein.BILD_POSITION_CHOICES,
             "block_labels": markup.BLOCK_LABELS,
             "action": "bearbeiten" if baustein else "erstellen",
             "next": _safe_next(request),
@@ -119,6 +122,8 @@ def _baustein_speichern(request, baustein):
     baustein.kategorie = kategorie
     baustein.text = text
     baustein.zuletzt_bearbeitet_von = request.user
+
+    baustein.bild_position = request.POST.get("bild_position", "unten")
 
     if "bild" in request.FILES:
         baustein.bild = request.FILES["bild"]
