@@ -51,11 +51,63 @@
       </div>
     </div>
 
+    <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-3">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Text *</p>
+        <button type="button" onclick="kiKorrektur()" id="ki-btn" data-ki-generate
+                class="btn btn-xs btn-secondary gap-1">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+          </svg>
+          Rechtschreibung prüfen
+        </button>
+      </div>
+
+      <!-- Formatier-Werkzeuge -->
+      <div class="flex flex-wrap gap-1">
+        {% for zeichen, label, typ in block_labels %}
+        <button type="button" onclick="markiere('{{ zeichen }}')"
+                class="btn btn-xs btn-ghost border border-base-300 font-normal"
+                title="Zeile als {{ label }} auszeichnen">
+          <span class="font-mono font-bold mr-1">{{ zeichen }}</span>{{ label }}
+        </button>
+        {% endfor %}
+        <button type="button" onclick="markiere('')"
+                class="btn btn-xs btn-ghost border border-base-300 font-normal" title="Auszeichnung entfernen">
+          Normal
+        </button>
+      </div>
+      <p class="text-xs text-base-content/40">
+        Cursor in eine Zeile setzen (oder mehrere markieren) und auf einen Knopf klicken.
+        Leerzeile trennt Absätze.
+      </p>
+
+      <textarea name="text" id="field-text" rows="12" required
+                oninput="vorschauAktualisieren()"
+                placeholder="Fließtext schreiben. Absätze durch Leerzeile trennen…"
+                class="textarea textarea-bordered w-full text-sm leading-relaxed font-mono">{{ baustein.text|default:'' }}</textarea>
+    </div>
+
+    <!-- KI-Vorschlag -->
+    <div id="ki-box" class="hidden bg-secondary/5 border border-secondary/40 rounded-xl p-4 space-y-3">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-widest text-secondary">Korrekturvorschlag</p>
+          <p id="ki-zusammenfassung" class="text-xs text-base-content/60 mt-1"></p>
+        </div>
+        <button type="button" onclick="kiVerwerfen()" class="btn btn-ghost btn-xs">Verwerfen</button>
+      </div>
+      <div id="ki-vorschau" class="bg-base-100 rounded-lg p-3 max-h-64 overflow-y-auto"></div>
+      <button type="button" onclick="kiUebernehmen()" class="btn btn-secondary btn-sm">Übernehmen</button>
+      {% include "includes/ki_hinweis.html" %}
+    </div>
+
+    <!-- Live-Vorschau -->
     <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-2">
-      <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Text *</p>
-      <textarea name="text" rows="8" required
-                placeholder="Fließtext, Absätze durch Leerzeile trennen…"
-                class="textarea textarea-bordered w-full text-sm leading-relaxed">{{ baustein.text|default:'' }}</textarea>
+      <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Vorschau</p>
+      <div id="vorschau" class="bg-base-200/40 rounded-lg p-4 min-h-[4rem]">
+        <p class="text-sm text-base-content/30">Noch kein Text.</p>
+      </div>
     </div>
 
     <div class="bg-base-100 border border-base-300 rounded-xl p-4 space-y-2">
@@ -78,4 +130,116 @@
   </form>
 
 </div>
+
+<script>
+const feld = document.getElementById('field-text');
+const PRAEFIXE = ['!', '>', '*', '-', '|'];
+
+// ─── Formatier-Werkzeuge ────────────────────────────────────────────────────
+function markiere(zeichen) {
+    const text = feld.value;
+    const start = feld.selectionStart, ende = feld.selectionEnd;
+
+    // Zeilenbereich der Auswahl bestimmen
+    const zeilenStart = text.lastIndexOf('\n', start - 1) + 1;
+    let zeilenEnde = text.indexOf('\n', ende);
+    if (zeilenEnde === -1) zeilenEnde = text.length;
+
+    const zeilen = text.slice(zeilenStart, zeilenEnde).split('\n').map(zeile => {
+        const ohne = zeile.replace(/^\s*/, '');
+        const bereinigt = PRAEFIXE.includes(ohne[0]) ? ohne.slice(1).replace(/^\s*/, '') : ohne;
+        if (!zeichen) return bereinigt;
+        // Tabellenzeilen brauchen abschließendes | für saubere Spalten
+        if (zeichen === '|') return bereinigt.startsWith('|') ? bereinigt : `| ${bereinigt} |`;
+        return `${zeichen} ${bereinigt}`;
+    });
+
+    const neuerText = text.slice(0, zeilenStart) + zeilen.join('\n') + text.slice(zeilenEnde);
+    feld.value = neuerText;
+    feld.focus();
+    feld.setSelectionRange(zeilenStart, zeilenStart + zeilen.join('\n').length);
+    vorschauAktualisieren();
+}
+
+// ─── Live-Vorschau (serverseitig gerendert — eine Parser-Implementierung) ────
+let vorschauTimer = null;
+function vorschauAktualisieren() {
+    clearTimeout(vorschauTimer);
+    vorschauTimer = setTimeout(async () => {
+        const text = feld.value;
+        const box = document.getElementById('vorschau');
+        if (!text.trim()) {
+            box.innerHTML = '<p class="text-sm text-base-content/30">Noch kein Text.</p>';
+            return;
+        }
+        try {
+            const res = await fetch("{% url 'briefing_vorschau' %}", {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+                body: JSON.stringify({text}),
+            });
+            const data = await res.json();
+            box.innerHTML = data.html || '<p class="text-sm text-base-content/30">Noch kein Text.</p>';
+        } catch (e) { /* Vorschau ist Beiwerk — Fehler nicht dem Nutzer zumuten */ }
+    }, 300);
+}
+
+// ─── KI-Korrektorat ─────────────────────────────────────────────────────────
+let kiVorschlag = null;
+
+async function kiKorrektur() {
+    const text = feld.value.trim();
+    if (!text) { alert('Bitte zuerst einen Text schreiben.'); return; }
+
+    const btn = document.getElementById('ki-btn');
+    const alt = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading loading-spinner loading-xs"></span> Prüfe…';
+
+    try {
+        const res = await fetch("{% url 'briefing_ki_korrektur' %}", {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+            body: JSON.stringify({text}),
+        });
+        const data = await res.json();
+        if (data.error) { alert(data.error); return; }
+
+        if (data.unveraendert) {
+            document.getElementById('ki-zusammenfassung').textContent =
+                'Keine Fehler gefunden — der Text bleibt, wie er ist.';
+            document.getElementById('ki-vorschau').innerHTML = '';
+            document.querySelector('#ki-box button[onclick="kiUebernehmen()"]').classList.add('hidden');
+        } else {
+            kiVorschlag = data.text;
+            const liste = (data.aenderungen || []);
+            document.getElementById('ki-zusammenfassung').textContent =
+                liste.length ? liste.join(' · ') : 'Korrektur vorgeschlagen.';
+            document.getElementById('ki-vorschau').innerHTML = data.html || '';
+            document.querySelector('#ki-box button[onclick="kiUebernehmen()"]').classList.remove('hidden');
+        }
+        document.getElementById('ki-box').classList.remove('hidden');
+    } catch (e) {
+        alert('Die Prüfung hat nicht geklappt. Bitte noch einmal versuchen.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = alt;
+    }
+}
+
+function kiUebernehmen() {
+    if (kiVorschlag !== null) {
+        feld.value = kiVorschlag;
+        vorschauAktualisieren();
+    }
+    kiVerwerfen();
+}
+
+function kiVerwerfen() {
+    kiVorschlag = null;
+    document.getElementById('ki-box').classList.add('hidden');
+}
+
+vorschauAktualisieren();
+</script>
 {% endblock %}
