@@ -358,20 +358,6 @@ class Schrittkette(Flowable):
             y = unten - self.ABSTAND
 
 
-def briefing_boot(user, toern):
-    """Das Boot, auf das sich dieses Briefing bezieht: das des anfragenden Skippers.
-
-    Bei Flotten-Törns hängen mehrere Boote am selben Törn, jedes mit eigener Crew.
-    Einfach `toern.boote.first()` zu nehmen zeigt dann das falsche Boot auf dem
-    Deckblatt. Fällt nur zurück, wenn der Nutzer keinem Boot zugeordnet ist."""
-    from .models import Teilnahme
-    teilnahme = (
-        Teilnahme.objects.filter(user=user, toern=toern, boot__isnull=False)
-        .select_related('boot').first()
-    )
-    return teilnahme.boot if teilnahme else toern.boote.first()
-
-
 def _bild_flowable(baustein, max_breite, max_hoehe=85 * mm):
     """Skaliertes Bild-Flowable oder None, wenn kein Bild da ist / es nicht lesbar ist."""
     if not baustein.bild:
@@ -420,18 +406,19 @@ def _baustein_flowables(baustein, breite):
 
 
 @login_required
-def briefing_pdf(request, toern_id):
-    from .views import _hat_skipper_oder_anbieter
-    toern = get_object_or_404(Toern, id=toern_id)
-    _hat_skipper_oder_anbieter(request, toern)
+def briefing_pdf(request, boot_id):
+    from boote.models import Boot
+    from .briefing_views import hat_briefing_recht
+    boot = get_object_or_404(Boot.objects.select_related('toern'), id=boot_id)
+    hat_briefing_recht(request, boot)
+    toern = boot.toern
 
     auswahl = list(
-        toern.briefing_auswahl.filter(aktiv=True)
+        boot.briefing_auswahl.filter(aktiv=True)
         .select_related('baustein')
         .order_by('reihenfolge', 'id')
     )
 
-    boot = briefing_boot(request.user, toern)
     skipper_name = f'{request.user.first_name} {request.user.last_name}'.strip() or request.user.email
 
     buffer = BytesIO()
@@ -446,7 +433,7 @@ def briefing_pdf(request, toern_id):
 
     if not auswahl:
         story.append(Paragraph(
-            'Für diesen Törn sind noch keine Briefing-Bausteine ausgewählt. '
+            'Für dieses Boot sind noch keine Briefing-Bausteine ausgewählt. '
             'Im Skipper-Dashboard unter „Briefing“ lassen sich Bausteine aus der '
             'gemeinsamen Bibliothek hinzufügen.',
             STIL['body'],
@@ -476,5 +463,5 @@ def briefing_pdf(request, toern_id):
     buffer.seek(0)
 
     response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="Crew-Briefing_{toern.id}.pdf"'
+    response['Content-Disposition'] = f'inline; filename="Crew-Briefing_{boot.id}.pdf"'
     return response
