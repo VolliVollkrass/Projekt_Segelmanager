@@ -2248,9 +2248,24 @@ function loadBriefing() {
     document.getElementById('briefing-loading').classList.remove('hidden');
     document.getElementById('briefing-list').classList.add('hidden');
     fetch(`/toern/boot/${briefingBootId}/briefing/`)
-        .then(r => r.json())
-        .then(data => { briefingItems = data.items; renderBriefingList(); });
+        .then(r => {
+            // Ohne diese Prüfung landet eine Fehlerseite in r.json(), die Kette bricht
+            // ab und der Ladekringel bleibt kommentarlos stehen.
+            if (!r.ok) throw new Error(r.status === 403
+                ? 'Für dieses Boot fehlt dir die Berechtigung.'
+                : 'Das Briefing konnte nicht geladen werden.');
+            return r.json();
+        })
+        .then(data => { briefingItems = data.items; renderBriefingList(); })
+        .catch(fehler => zeigeBriefingFehler(fehler.message));
     loadBriefingVorlagen();
+}
+
+function zeigeBriefingFehler(text) {
+    document.getElementById('briefing-loading').classList.add('hidden');
+    const list = document.getElementById('briefing-list');
+    list.innerHTML = `<div class="alert alert-warning text-sm">${escapeHtml(text)}</div>`;
+    list.classList.remove('hidden');
 }
 
 function renderBriefingList() {

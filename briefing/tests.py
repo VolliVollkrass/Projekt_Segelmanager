@@ -161,9 +161,23 @@ class BriefingAuswahlTests(TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r["Content-Type"], "application/pdf")
 
-    def test_fremdes_boot_ist_gesperrt(self):
-        """Ein Skipper darf nicht im Briefing eines fremden Boots schalten."""
+    def test_skipper_erreicht_alle_boote_seines_toerns(self):
+        """Wer das Skipper-Dashboard sehen darf, darf für jedes Boot des Törns
+        vorbereiten — auf Flottentörns macht das meist eine Person."""
         r = self.client.get(reverse("briefing_liste", args=[self.anderes_boot.id]))
+        self.assertEqual(r.status_code, 200)
+
+    def test_fremder_toern_bleibt_gesperrt(self):
+        """Die Grenze verläuft am Törn: fremde Törns bleiben zu."""
+        from datetime import timedelta
+        from django.utils import timezone
+        from boote.models import Boot
+        fremder = Toern.objects.create(
+            titel="Fremd", anbieter=_user("fremd-anbieter@example.test"),
+            startdatum=timezone.now(), enddatum=timezone.now() + timedelta(days=7),
+            revier="R", preis_pro_person=1)
+        fremdes_boot = Boot.objects.create(name="Fremdes", toern=fremder)
+        r = self.client.get(reverse("briefing_liste", args=[fremdes_boot.id]))
         self.assertEqual(r.status_code, 403)
 
     def test_boote_haben_getrennte_auswahl(self):
