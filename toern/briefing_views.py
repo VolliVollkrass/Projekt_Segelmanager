@@ -20,15 +20,17 @@ from .models import BriefingAuswahl, BriefingStandard, BriefingStandardEintrag, 
 
 
 def hat_briefing_recht(request, boot):
-    """Skipper/Co-Skipper dieses Boots, Anbieter des Törns oder Staff.
+    """Wer das Skipper-Dashboard dieses Törns öffnen darf, darf auch die Briefings
+    seiner Boote zusammenstellen — also Skipper, Co-Skipper und Anbieter des Törns.
 
-    Enger als die törnweite Prüfung: Auf einem Flottentörn soll nicht jeder
-    Skipper im Briefing eines fremden Boots herumschalten."""
-    user = request.user
-    if user.is_superuser or boot.toern.anbieter_id == user.id:
+    Bewusst dieselbe Grenze wie das Dashboard und nicht enger: Wer die Seite ohnehin
+    sieht, soll auch für die Nachbarboote vorbereiten können — auf Flottentörns macht
+    das meist eine Person, bevor die Co-Skipper überhaupt zugeteilt sind. Die Inhalte
+    bleiben davon unberührt getrennt: jedes Boot hat seine eigene Auswahl."""
+    from .views import _ist_skipper_oder_anbieter
+    if request.user.is_superuser:
         return
-    teilnahme = Teilnahme.objects.filter(user=user, boot=boot).first()
-    if not (teilnahme and teilnahme.rolle in ("skipper", "coskipper")):
+    if not _ist_skipper_oder_anbieter(request.user, boot.toern):
         raise PermissionDenied
 
 
