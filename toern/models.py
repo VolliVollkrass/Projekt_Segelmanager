@@ -453,21 +453,60 @@ class DokumentStandardEintrag(models.Model):
 
 class BriefingAuswahl(models.Model):
     """Verweist auf einen globalen Baustein aus der Briefing-Bibliothek (briefing.BriefingBaustein);
-    hält den törn-spezifischen Zustand (aktiv/inaktiv, Reihenfolge). Beim ersten Öffnen des
-    Briefing-Tabs wird diese Auswahl aus den Standard-Bausteinen befüllt (siehe
-    toern/briefing_views.py::get_or_create_briefing_auswahl) und ist danach unabhängig von
-    späteren Änderungen an der globalen Bibliothek."""
-    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name='briefing_auswahl')
-    baustein = models.ForeignKey('briefing.BriefingBaustein', on_delete=models.CASCADE, related_name='toern_auswahl')
+    hält den boots-spezifischen Zustand (aktiv/inaktiv, Reihenfolge).
+
+    Pro Boot, nicht pro Törn: Bei Flottentörns hat jedes Boot eine eigene Crew mit eigenen
+    Erfahrungsständen, also braucht jeder Skipper sein eigenes Briefing. Beim ersten Öffnen
+    des Briefing-Tabs wird die Auswahl befüllt (siehe
+    toern/briefing_views.py::get_or_create_briefing_auswahl) — aus der persönlichen
+    Default-Vorlage des Skippers, sonst aus den Standard-Bausteinen. Danach ist sie
+    unabhängig von späteren Änderungen an der globalen Bibliothek."""
+    boot = models.ForeignKey(Boot, on_delete=models.CASCADE, related_name='briefing_auswahl')
+    baustein = models.ForeignKey('briefing.BriefingBaustein', on_delete=models.CASCADE, related_name='boot_auswahl')
     aktiv = models.BooleanField(default=True)
     reihenfolge = models.PositiveIntegerField(default=0)
 
     class Meta:
-        unique_together = [('toern', 'baustein')]
+        unique_together = [('boot', 'baustein')]
         ordering = ['reihenfolge', 'id']
 
     def __str__(self):
-        return f"{self.toern} · {self.baustein} · {'aktiv' if self.aktiv else 'inaktiv'}"
+        return f"{self.boot} · {self.baustein} · {'aktiv' if self.aktiv else 'inaktiv'}"
+
+
+class BriefingStandard(models.Model):
+    """Persönliche, benannte Briefing-Vorlage eines Skippers — törnunabhängig wiederverwendbar.
+
+    Gleiches Muster wie PacklisteStandard und DokumentStandard: Der Skipper speichert die
+    Zusammenstellung, die für ihn funktioniert, und lädt sie auf dem nächsten Törn wieder."""
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='briefing_standards')
+    name = models.CharField(max_length=100)
+    ist_default = models.BooleanField(
+        default=False,
+        help_text="Wird bei neuen Booten automatisch als Start-Briefing verwendet (max. eine)",
+    )
+    aktualisiert_am = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('user', 'name')]
+        ordering = ['-ist_default', 'name']
+
+    def __str__(self):
+        return f"{self.name} – {self.user}"
+
+
+class BriefingStandardEintrag(models.Model):
+    standard = models.ForeignKey(BriefingStandard, on_delete=models.CASCADE, related_name='eintraege')
+    baustein = models.ForeignKey('briefing.BriefingBaustein', on_delete=models.CASCADE, related_name='+')
+    reihenfolge = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        unique_together = [('standard', 'baustein')]
+        ordering = ['reihenfolge', 'id']
+
+    def __str__(self):
+        return f"{self.standard.name}: {self.baustein}"
 
 
 class PinnwandNachricht(models.Model):

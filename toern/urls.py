@@ -16,6 +16,8 @@ from .schaden_pdf import schaden_gesamt_pdf, schaden_einzel_pdf
 from .briefing_views import (
     briefing_liste, briefing_toggle, briefing_reihenfolge,
     briefing_baustein_hinzufuegen, briefing_baustein_suche,
+    briefing_standard_list, briefing_standard_speichern, briefing_standard_laden,
+    briefing_standard_loeschen, briefing_standard_default,
 )
 from .briefing_pdf import briefing_pdf
 
@@ -96,13 +98,19 @@ urlpatterns = [
     path("packliste/standards/<int:standard_id>/loeschen/", packl_standard_loeschen, name="packl_standard_loeschen"),
     path("packliste/standards/<int:standard_id>/default/", packl_standard_default, name="packl_standard_default"),
     path("<int:toern_id>/vorlage/<str:typ>/", vorlage_items_get, name="vorlage_items_get"),
-    # Briefing-Bausteine (Skipper-Dashboard-Tab)
-    path("<int:toern_id>/briefing/", briefing_liste, name="briefing_liste"),
-    path("<int:toern_id>/briefing/toggle/<int:auswahl_id>/", briefing_toggle, name="briefing_toggle"),
-    path("<int:toern_id>/briefing/reihenfolge/", briefing_reihenfolge, name="briefing_reihenfolge"),
-    path("<int:toern_id>/briefing/hinzufuegen/", briefing_baustein_hinzufuegen, name="briefing_baustein_hinzufuegen"),
-    path("<int:toern_id>/briefing/suche/", briefing_baustein_suche, name="briefing_baustein_suche"),
-    path("<int:toern_id>/briefing/pdf/", briefing_pdf, name="briefing_pdf"),
+    # Briefing-Bausteine (Skipper-Dashboard-Tab) — pro Boot
+    path("boot/<int:boot_id>/briefing/", briefing_liste, name="briefing_liste"),
+    path("boot/<int:boot_id>/briefing/toggle/<int:auswahl_id>/", briefing_toggle, name="briefing_toggle"),
+    path("boot/<int:boot_id>/briefing/reihenfolge/", briefing_reihenfolge, name="briefing_reihenfolge"),
+    path("boot/<int:boot_id>/briefing/hinzufuegen/", briefing_baustein_hinzufuegen, name="briefing_baustein_hinzufuegen"),
+    path("boot/<int:boot_id>/briefing/suche/", briefing_baustein_suche, name="briefing_baustein_suche"),
+    path("boot/<int:boot_id>/briefing/pdf/", briefing_pdf, name="briefing_pdf"),
+    # Persönliche Briefing-Vorlagen
+    path("briefing/vorlagen/", briefing_standard_list, name="briefing_standard_list"),
+    path("boot/<int:boot_id>/briefing/vorlage/speichern/", briefing_standard_speichern, name="briefing_standard_speichern"),
+    path("boot/<int:boot_id>/briefing/vorlage/laden/", briefing_standard_laden, name="briefing_standard_laden"),
+    path("briefing/vorlagen/<int:standard_id>/loeschen/", briefing_standard_loeschen, name="briefing_standard_loeschen"),
+    path("briefing/vorlagen/<int:standard_id>/default/", briefing_standard_default, name="briefing_standard_default"),
     path("<int:toern_id>/mahlzeit/add/", add_mahlzeit, name="add_mahlzeit"),
     path("mahlzeit/<int:mahlzeit_id>/delete/", delete_mahlzeit, name="delete_mahlzeit"),
     path("<int:toern_id>/erinnerung/senden/", send_reminder_toern, name="send_reminder_toern"),

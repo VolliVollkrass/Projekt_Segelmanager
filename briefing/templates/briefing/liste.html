@@ -51,7 +51,7 @@
   {% if page_obj.object_list %}
   <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
     {% for baustein in page_obj %}
-    <a href="{% url 'briefing_baustein_detail' baustein.pk %}{% if next %}?next={{ next|urlencode }}{% endif %}" class="group card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-md transition-all overflow-hidden">
+    <a href="{% url 'briefing_baustein_detail' baustein.pk %}?next={{ request.get_full_path|urlencode }}" class="group card bg-base-100 border border-base-300 hover:border-primary/40 hover:shadow-md transition-all overflow-hidden">
       {% if baustein.bild %}
       <figure class="h-32 overflow-hidden">
         <img src="{{ baustein.bild.url }}" alt="{{ baustein.titel }}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">

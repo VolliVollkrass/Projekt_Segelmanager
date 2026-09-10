@@ -1070,14 +1070,22 @@
     <div id="tab-briefing" class="hidden space-y-4">
 
         <p class="text-sm text-base-content/60">
-            Das Crew-Briefing für diesen Törn — zusammengestellt aus der gemeinsamen
-            <a href="{% url 'briefing_bibliothek' %}" class="link link-primary" target="_blank">Briefing-Bibliothek</a>.
-            Schalte ab, was für diese Crew nicht passt, und ergänze eigene Bausteine — Änderungen wirken
-            sich nur auf dieses Törn-Briefing aus.
+            Das Crew-Briefing — pro Boot zusammengestellt aus der gemeinsamen
+            <a href="{% url 'briefing_bibliothek' %}" class="link link-primary">Briefing-Bibliothek</a>.
+            Jedes Boot hat seine eigene Zusammenstellung, denn jede Crew ist anders.
         </p>
 
+        {% if toern.boote.all %}
+        <!-- Boot-Auswahl -->
+        <div role="tablist" class="tabs tabs-box">
+            {% for boot in toern.boote.all %}
+            <button role="tab" id="briefing-boot-{{ boot.id }}" class="tab"
+                    onclick="setBriefingBoot({{ boot.id }})">{{ boot.name }}</button>
+            {% endfor %}
+        </div>
+
         <div class="flex flex-wrap gap-2">
-            <a href="{% url 'briefing_pdf' toern.id %}" target="_blank" class="btn btn-primary btn-sm gap-2">
+            <a id="briefing-pdf-link" href="#" target="_blank" class="btn btn-primary btn-sm gap-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 9.414V19a2 2 0 01-2 2z"/>
                 </svg>
@@ -1090,6 +1098,23 @@
             <span class="loading loading-spinner loading-md"></span>
         </div>
         <div id="briefing-list" class="hidden space-y-5"></div>
+
+        <!-- Meine Vorlagen -->
+        <div class="bg-base-200 rounded-2xl p-4 space-y-3">
+            <div class="flex items-center justify-between gap-2">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-widest text-base-content/40">Meine Vorlagen</p>
+                    <p class="text-xs text-base-content/50 mt-1">
+                        Deine gespeicherten Briefing-Zusammenstellungen — auf jedem Törn wiederverwendbar.
+                        ★ = wird bei neuen Booten automatisch als Start-Briefing verwendet.
+                    </p>
+                </div>
+                <button onclick="briefingVorlageSpeichern()" class="btn btn-xs btn-outline whitespace-nowrap">Als Vorlage speichern…</button>
+            </div>
+            <div id="briefing-vorlagen" class="space-y-2">
+                <p class="text-sm text-base-content/40">Noch keine Vorlage gespeichert.</p>
+            </div>
+        </div>
 
         <!-- Modal: Baustein aus der Bibliothek hinzufügen -->
         <dialog id="briefing-hinzufuegen-modal" class="modal">
@@ -1110,6 +1135,10 @@
             </div>
             <form method="dialog" class="modal-backdrop"><button>close</button></form>
         </dialog>
+
+        {% else %}
+        <p class="text-sm text-base-content/40">Diesem Törn sind noch keine Boote zugeordnet — ohne Boot gibt es kein Briefing.</p>
+        {% endif %}
 
     </div>
 
@@ -2187,13 +2216,41 @@ function resetDokument() {
 
 // ===================== BRIEFING =====================
 let briefingItems = [];
+let briefingBootId = {{ briefing_eigenes_boot_id|default:"null" }};
+
+// Rücksprungziel für Links in die Bibliothek: dieses Dashboard, Briefing-Tab offen
+function briefingRuecksprung() {
+    return encodeURIComponent(location.pathname + '?tab=briefing');
+}
+
+function setBriefingBoot(bootId) {
+    briefingBootId = bootId;
+    document.querySelectorAll('[id^="briefing-boot-"]').forEach(b => {
+        b.classList.toggle('tab-active', b.id === 'briefing-boot-' + bootId);
+    });
+    document.getElementById('briefing-pdf-link').href = `/toern/boot/${bootId}/briefing/pdf/`;
+    loadBriefing();
+}
 
 function loadBriefing() {
+    // Ohne Boot kein Briefing — erstes Boot wählen, falls der Nutzer keinem zugeordnet ist
+    if (!briefingBootId) {
+        const erster = document.querySelector('[id^="briefing-boot-"]');
+        if (!erster) return;
+        setBriefingBoot(parseInt(erster.id.replace('briefing-boot-', '')));
+        return;
+    }
+    document.querySelectorAll('[id^="briefing-boot-"]').forEach(b => {
+        b.classList.toggle('tab-active', b.id === 'briefing-boot-' + briefingBootId);
+    });
+    document.getElementById('briefing-pdf-link').href = `/toern/boot/${briefingBootId}/briefing/pdf/`;
+
     document.getElementById('briefing-loading').classList.remove('hidden');
     document.getElementById('briefing-list').classList.add('hidden');
-    fetch("{% url 'briefing_liste' toern.id %}")
+    fetch(`/toern/boot/${briefingBootId}/briefing/`)
         .then(r => r.json())
         .then(data => { briefingItems = data.items; renderBriefingList(); });
+    loadBriefingVorlagen();
 }
 
 function renderBriefingList() {
@@ -2232,7 +2289,7 @@ function buildBriefingRow(item, istErster, istLetzter) {
     // deaktiviert, damit sichtbar ist, dass hier Schluss ist.
     div.innerHTML = `
         ${item.bild_url ? `<img src="${item.bild_url}" class="w-10 h-10 rounded object-cover shrink-0">` : ''}
-        <a href="/briefing/${item.baustein_id}/" target="_blank" class="flex-1 text-sm hover:text-primary transition-colors truncate">${escapeHtml(item.titel)}</a>
+        <a href="/briefing/${item.baustein_id}/?next=${briefingRuecksprung()}" class="flex-1 text-sm hover:text-primary transition-colors truncate">${escapeHtml(item.titel)}</a>
         <button onclick="moveBriefingItem(${item.id}, -1)" class="btn btn-xs btn-ghost px-1.5"
                 ${istErster ? 'disabled' : ''} title="Innerhalb der Kategorie nach oben">▲</button>
         <button onclick="moveBriefingItem(${item.id}, 1)" class="btn btn-xs btn-ghost px-1.5"
@@ -2243,7 +2300,7 @@ function buildBriefingRow(item, istErster, istLetzter) {
 }
 
 function toggleBriefingItem(auswahlId) {
-    fetch(`{% url 'briefing_toggle' toern.id 9999 %}`.replace('9999', auswahlId), {
+    fetch(`/toern/boot/${briefingBootId}/briefing/toggle/${auswahlId}/`, {
         method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
     }).then(() => loadBriefing());
 }
@@ -2257,7 +2314,7 @@ function moveBriefingItem(auswahlId, richtung) {
     if (briefingItems[zielIdx].kategorie !== briefingItems[idx].kategorie) return;
     [briefingItems[idx], briefingItems[zielIdx]] = [briefingItems[zielIdx], briefingItems[idx]];
     renderBriefingList();
-    fetch("{% url 'briefing_reihenfolge' toern.id %}", {
+    fetch(`/toern/boot/${briefingBootId}/briefing/reihenfolge/`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
         body: JSON.stringify({ ids: briefingItems.map(i => i.id) })
     });
@@ -2276,7 +2333,7 @@ function briefingSucheDebounced() {
 }
 
 function briefingSuche(q) {
-    fetch(`{% url 'briefing_baustein_suche' toern.id %}?q=${encodeURIComponent(q)}`)
+    fetch(`/toern/boot/${briefingBootId}/briefing/suche/?q=${encodeURIComponent(q)}`)
         .then(r => r.json())
         .then(data => {
             const box = document.getElementById('briefing-suche-ergebnisse');
@@ -2295,7 +2352,7 @@ function briefingSuche(q) {
 }
 
 function briefingHinzufuegen(bausteinId, btn) {
-    fetch("{% url 'briefing_baustein_hinzufuegen' toern.id %}", {
+    fetch(`/toern/boot/${briefingBootId}/briefing/hinzufuegen/`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
         body: JSON.stringify({ baustein_id: bausteinId })
     }).then(() => {
@@ -2303,6 +2360,67 @@ function briefingHinzufuegen(bausteinId, btn) {
         btn.classList.add('opacity-40');
         loadBriefing();
     });
+}
+
+// ─── Persönliche Vorlagen ───────────────────────────────────────────────────
+function loadBriefingVorlagen() {
+    fetch("{% url 'briefing_standard_list' %}")
+        .then(r => r.json())
+        .then(data => renderBriefingVorlagen(data.standards || []));
+}
+
+function renderBriefingVorlagen(standards) {
+    const box = document.getElementById('briefing-vorlagen');
+    if (standards.length === 0) {
+        box.innerHTML = '<p class="text-sm text-base-content/40">Noch keine Vorlage gespeichert.</p>';
+        return;
+    }
+    box.innerHTML = standards.map(s => `
+        <div class="flex items-center gap-2 bg-base-100 rounded-lg px-3 py-2">
+            <button onclick="briefingVorlageDefault(${s.id})" class="btn btn-xs btn-ghost px-1"
+                    title="${s.ist_default ? 'Nicht mehr automatisch verwenden' : 'Automatisch bei neuen Booten verwenden'}">
+                ${s.ist_default ? '★' : '☆'}
+            </button>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm truncate">${escapeHtml(s.name)}</p>
+                <p class="text-xs text-base-content/40">${s.anzahl} Bausteine · ${s.aktualisiert_am}</p>
+            </div>
+            <button onclick="briefingVorlageLaden(${s.id})" class="btn btn-xs btn-outline">Laden</button>
+            <button onclick="briefingVorlageLoeschen(${s.id})" class="btn btn-xs btn-ghost text-error">🗑</button>
+        </div>`).join('');
+}
+
+function briefingVorlageSpeichern() {
+    const name = prompt('Name für diese Vorlage:');
+    if (!name || !name.trim()) return;
+    fetch(`/toern/boot/${briefingBootId}/briefing/vorlage/speichern/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ name: name.trim() })
+    }).then(r => r.json()).then(d => {
+        if (d.error) { alert(d.error); return; }
+        loadBriefingVorlagen();
+    });
+}
+
+function briefingVorlageLaden(standardId) {
+    if (!confirm('Vorlage laden?\nDie aktuelle Zusammenstellung dieses Boots wird ersetzt.')) return;
+    fetch(`/toern/boot/${briefingBootId}/briefing/vorlage/laden/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCSRFToken() },
+        body: JSON.stringify({ standard_id: standardId })
+    }).then(() => loadBriefing());
+}
+
+function briefingVorlageLoeschen(standardId) {
+    if (!confirm('Diese Vorlage löschen?')) return;
+    fetch(`/toern/briefing/vorlagen/${standardId}/loeschen/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(() => loadBriefingVorlagen());
+}
+
+function briefingVorlageDefault(standardId) {
+    fetch(`/toern/briefing/vorlagen/${standardId}/default/`, {
+        method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() }
+    }).then(() => loadBriefingVorlagen());
 }
 
 // ===================== PERSÖNLICHE STANDARDS =====================

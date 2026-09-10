@@ -1049,6 +1049,13 @@ def skipper_dashboard(request, toern_id):
             status__in=["angemeldet", "bestaetigt"]
         ).order_by("user__last_name", "user__first_name"),
         "rundmails": Rundmail.objects.filter(toern=toern).select_related("absender"),
+
+        # Briefing-Tab: das eigene Boot vorauswählen, damit ein Skipper auf einem
+        # Flottentörn nicht erst suchen muss, welches seines ist.
+        "briefing_eigenes_boot_id": (
+            teilnahmen.filter(user=request.user, boot__isnull=False)
+            .values_list("boot_id", flat=True).first()
+        ),
     }
 
     return render(request, "skipper/skipper_dashboard.html", context)

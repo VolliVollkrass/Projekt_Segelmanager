@@ -20,7 +20,7 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm, mm
 from reportlab.lib.utils import ImageReader
 from reportlab.platypus import (
-    Image as RLImage, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate,
+    Flowable, Image as RLImage, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate,
     Spacer, Table, TableStyle,
 )
 
@@ -256,6 +256,10 @@ def _bloecke_zu_flowables(text, breite):
             out.append(t)
             out.append(Spacer(1, 2 * mm))
 
+        elif typ == markup.SCHRITTE:
+            out.append(Schrittkette(block['punkte']))
+            out.append(Spacer(1, 3 * mm))
+
         elif typ == markup.TABELLE:
             zeilen = block['zeilen']
             if not zeilen:
@@ -286,18 +290,72 @@ def _bloecke_zu_flowables(text, breite):
     return out
 
 
-def briefing_boot(user, toern):
-    """Das Boot, auf das sich dieses Briefing bezieht: das des anfragenden Skippers.
+class Schrittkette(Flowable):
+    """Nummerierte Ablaufschritte: Kreis mit Nummer, Textkasten, Pfeil zum nächsten.
 
-    Bei Flotten-Törns hängen mehrere Boote am selben Törn, jedes mit eigener Crew.
-    Einfach `toern.boote.first()` zu nehmen zeigt dann das falsche Boot auf dem
-    Deckblatt. Fällt nur zurück, wenn der Nutzer keinem Boot zugeordnet ist."""
-    from .models import Teilnahme
-    teilnahme = (
-        Teilnahme.objects.filter(user=user, toern=toern, boot__isnull=False)
-        .select_related('boot').first()
-    )
-    return teilnahme.boot if teilnahme else toern.boote.first()
+    Bildet das Ablauf-Diagramm der ursprünglichen Handout-Gestaltung nach — mit dem
+    Unterschied, dass die Schritte jetzt aus dem Baustein-Text kommen und damit von
+    jedem Skipper änderbar sind, statt in einer festen Grafik zu stecken."""
+
+    KREIS_R = 5.0 * mm
+    SPALTE = 16 * mm      # Platz links für Kreis und Verbindungslinie
+    ABSTAND = 4 * mm      # Luft zwischen zwei Schritten
+
+    def __init__(self, punkte, akzent=SECONDARY):
+        Flowable.__init__(self)
+        self.punkte = punkte
+        self.akzent = akzent
+
+    def _aufbauen(self, breite):
+        self.width = breite
+        self.absaetze, self.hoehen = [], []
+        textbreite = breite - self.SPALTE - 8 * mm
+        for text in self.punkte:
+            p = Paragraph(text, STIL['boxtext'])
+            _, h = p.wrap(textbreite, 500 * mm)
+            self.absaetze.append(p)
+            self.hoehen.append(max(h + 6 * mm, 2 * self.KREIS_R + 2 * mm))
+        return sum(self.hoehen) + self.ABSTAND * (len(self.punkte) - 1)
+
+    def wrap(self, verfuegbare_breite, verfuegbare_hoehe):
+        self.height = self._aufbauen(verfuegbare_breite)
+        return self.width, self.height
+
+    def draw(self):
+        c = self.canv
+        y = self.height
+        for i, (absatz, hoehe) in enumerate(zip(self.absaetze, self.hoehen)):
+            oben, unten = y, y - hoehe
+            mitte = oben - hoehe / 2
+
+            c.setFillColor(HELLGRAU)
+            c.roundRect(self.SPALTE, unten, self.width - self.SPALTE, hoehe, 2 * mm, stroke=0, fill=1)
+            c.setFillColor(self.akzent)
+            c.roundRect(self.SPALTE, unten, 1.6 * mm, hoehe, 0.8 * mm, stroke=0, fill=1)
+
+            c.setFillColor(self.akzent)
+            c.circle(self.KREIS_R + 1 * mm, mitte, self.KREIS_R, stroke=0, fill=1)
+            c.setFillColor(colors.white)
+            c.setFont('Helvetica-Bold', 10)
+            c.drawCentredString(self.KREIS_R + 1 * mm, mitte - 3.4, str(i + 1))
+
+            absatz.drawOn(c, self.SPALTE + 4 * mm, unten + 3 * mm)
+
+            if i < len(self.punkte) - 1:
+                x = self.KREIS_R + 1 * mm
+                pfeil_spitze = unten - self.ABSTAND + 1 * mm
+                c.setStrokeColor(self.akzent)
+                c.setLineWidth(1.2)
+                c.line(x, mitte - self.KREIS_R, x, pfeil_spitze + 1.8 * mm)
+                c.setFillColor(self.akzent)
+                pfad = c.beginPath()
+                pfad.moveTo(x, pfeil_spitze)
+                pfad.lineTo(x - 1.4 * mm, pfeil_spitze + 2.2 * mm)
+                pfad.lineTo(x + 1.4 * mm, pfeil_spitze + 2.2 * mm)
+                pfad.close()
+                c.drawPath(pfad, stroke=0, fill=1)
+
+            y = unten - self.ABSTAND
 
 
 def _bild_flowable(baustein, max_breite, max_hoehe=85 * mm):
@@ -348,18 +406,19 @@ def _baustein_flowables(baustein, breite):
 
 
 @login_required
-def briefing_pdf(request, toern_id):
-    from .views import _hat_skipper_oder_anbieter
-    toern = get_object_or_404(Toern, id=toern_id)
-    _hat_skipper_oder_anbieter(request, toern)
+def briefing_pdf(request, boot_id):
+    from boote.models import Boot
+    from .briefing_views import hat_briefing_recht
+    boot = get_object_or_404(Boot.objects.select_related('toern'), id=boot_id)
+    hat_briefing_recht(request, boot)
+    toern = boot.toern
 
     auswahl = list(
-        toern.briefing_auswahl.filter(aktiv=True)
+        boot.briefing_auswahl.filter(aktiv=True)
         .select_related('baustein')
         .order_by('reihenfolge', 'id')
     )
 
-    boot = briefing_boot(request.user, toern)
     skipper_name = f'{request.user.first_name} {request.user.last_name}'.strip() or request.user.email
 
     buffer = BytesIO()
@@ -374,7 +433,7 @@ def briefing_pdf(request, toern_id):
 
     if not auswahl:
         story.append(Paragraph(
-            'Für diesen Törn sind noch keine Briefing-Bausteine ausgewählt. '
+            'Für dieses Boot sind noch keine Briefing-Bausteine ausgewählt. '
             'Im Skipper-Dashboard unter „Briefing“ lassen sich Bausteine aus der '
             'gemeinsamen Bibliothek hinzufügen.',
             STIL['body'],
@@ -404,5 +463,5 @@ def briefing_pdf(request, toern_id):
     buffer.seek(0)
 
     response = HttpResponse(buffer, content_type='application/pdf')
-    response['Content-Disposition'] = f'inline; filename="Crew-Briefing_{toern.id}.pdf"'
+    response['Content-Disposition'] = f'inline; filename="Crew-Briefing_{boot.id}.pdf"'
     return response
