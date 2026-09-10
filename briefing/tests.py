@@ -38,6 +38,21 @@ class MarkupParserTests(TestCase):
         self.assertEqual(bloecke[0], {"typ": markup.LISTE, "punkte": ["Eins", "Zwei"]})
         self.assertEqual(bloecke[1]["zeilen"], [["A", "B"], ["1", "2"]])
 
+    def test_schritte_werden_nummeriert(self):
+        block = markup.parse("# Erst dies\n# Dann das")[0]
+        self.assertEqual(block["typ"], markup.SCHRITTE)
+        self.assertEqual(block["punkte"], ["Erst dies", "Dann das"])
+
+    def test_schritte_html_ist_nummerierte_liste(self):
+        html = markup.als_html("# Erst dies\n# Dann das")
+        self.assertIn("<ol", html)
+        self.assertIn(">1<", html)
+        self.assertIn(">2<", html)
+
+    def test_schritte_und_aufzaehlung_sind_verschieden(self):
+        typen = [b["typ"] for b in markup.parse("- Punkt\n# Schritt")]
+        self.assertEqual(typen, [markup.LISTE, markup.SCHRITTE])
+
     def test_praefix_nur_am_zeilenanfang(self):
         """Ein ! mitten im Satz darf keine Warnbox erzeugen."""
         bloecke = markup.parse("Das ist wichtig! Wirklich.")
@@ -209,3 +224,42 @@ class BildPositionTests(TestCase):
         )
         baustein.refresh_from_db()
         self.assertEqual(baustein.bild_position, "links")
+
+
+class RuecksprungTests(TestCase):
+    """Der Zurück-Pfeil soll dahin führen, wo man hergekommen ist —
+    inklusive Suche, Filter und Seite der Bibliothek."""
+
+    def setUp(self):
+        self.skipper = _user("r@example.test")
+        toern = Toern.objects.create(
+            titel="T", anbieter=self.skipper,
+            startdatum="2026-01-01T10:00:00Z", enddatum="2026-01-08T10:00:00Z",
+            revier="R", preis_pro_person=1)
+        Teilnahme.objects.create(user=self.skipper, toern=toern, rolle="skipper",
+                                 status="bestaetigt")
+        self.baustein = BriefingBaustein.objects.create(
+            titel="Leinen los", text="x", kategorie="anlegen")
+        self.client.force_login(self.skipper)
+
+    def test_liste_gibt_ihren_eigenen_zustand_als_ruecksprung_mit(self):
+        r = self.client.get("/briefing/?q=Leinen&kategorie=anlegen")
+        html = r.content.decode()
+        self.assertIn("next=", html)
+        # Suche und Filter stecken im Rücksprungziel
+        self.assertIn("q%3DLeinen", html)
+        self.assertIn("kategorie%3Danlegen", html)
+
+    def test_detailseite_verlinkt_zurueck_auf_das_ruecksprungziel(self):
+        r = self.client.get(
+            reverse("briefing_baustein_detail", args=[self.baustein.pk]),
+            {"next": "/toern/1/skipper/?tab=briefing"},
+        )
+        self.assertContains(r, "/toern/1/skipper/?tab=briefing")
+
+    def test_fremde_hosts_werden_als_ruecksprungziel_verworfen(self):
+        r = self.client.get(
+            reverse("briefing_baustein_detail", args=[self.baustein.pk]),
+            {"next": "https://boese.example.com/phish"},
+        )
+        self.assertNotContains(r, "boese.example.com")

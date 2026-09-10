@@ -13,6 +13,7 @@ normaler Fließtext nie versehentlich ausgezeichnet wird):
     >  Hinweis        eingefärbte Box — Ergänzungen, Tipps
     *  Merksatz       dunkelblauer Balken — der eine Satz, der hängenbleiben soll
     -  Aufzählung     Punkt in einer Liste
+    #  Schritt        nummerierter Ablauf — im PDF als Schrittkette mit Pfeilen
     |  Tabelle        Spalten mit | getrennt: | Kommando | Antwort |
 
 Aufeinanderfolgende Zeilen mit demselben Präfix werden zu einem Block
@@ -24,6 +25,7 @@ WARNUNG = "warnung"
 HINWEIS = "hinweis"
 MERKSATZ = "merksatz"
 LISTE = "liste"
+SCHRITTE = "schritte"
 TABELLE = "tabelle"
 ABSATZ = "absatz"
 
@@ -32,6 +34,7 @@ PRAEFIXE = {
     ">": HINWEIS,
     "*": MERKSATZ,
     "-": LISTE,
+    "#": SCHRITTE,
     "|": TABELLE,
 }
 
@@ -41,6 +44,7 @@ BLOCK_LABELS = [
     (">", "Hinweis", HINWEIS),
     ("*", "Merksatz", MERKSATZ),
     ("-", "Aufzählung", LISTE),
+    ("#", "Schritt", SCHRITTE),
     ("|", "Tabelle", TABELLE),
 ]
 
@@ -87,8 +91,8 @@ def parse(text):
         if aktueller_typ is None or not puffer:
             aktueller_typ, puffer = None, []
             return
-        if aktueller_typ == LISTE:
-            bloecke.append({"typ": LISTE, "punkte": puffer})
+        if aktueller_typ in (LISTE, SCHRITTE):
+            bloecke.append({"typ": aktueller_typ, "punkte": puffer})
         elif aktueller_typ == TABELLE:
             bloecke.append({"typ": TABELLE, "zeilen": [_tabellenzeile(z) for z in puffer]})
         else:
@@ -148,6 +152,16 @@ def als_html(text):
                 f'<li class="text-sm leading-relaxed">{escape(p)}</li>' for p in block["punkte"]
             )
             teile.append(f'<ul class="list-disc pl-5 space-y-1 mb-3">{punkte}</ul>')
+
+        elif typ == SCHRITTE:
+            schritte = "".join(
+                '<li class="flex gap-3 items-start">'
+                f'<span class="w-6 h-6 rounded-full bg-secondary text-secondary-content '
+                f'text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i}</span>'
+                f'<span class="text-sm leading-relaxed">{escape(p)}</span></li>'
+                for i, p in enumerate(block["punkte"], start=1)
+            )
+            teile.append(f'<ol class="space-y-2 mb-3">{schritte}</ol>')
 
         elif typ == TABELLE:
             zeilen = block["zeilen"]

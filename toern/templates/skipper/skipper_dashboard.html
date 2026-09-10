@@ -2188,6 +2188,11 @@ function resetDokument() {
 // ===================== BRIEFING =====================
 let briefingItems = [];
 
+// Rücksprungziel für Links in die Bibliothek: dieses Dashboard, Briefing-Tab offen
+function briefingRuecksprung() {
+    return encodeURIComponent(location.pathname + '?tab=briefing');
+}
+
 function loadBriefing() {
     document.getElementById('briefing-loading').classList.remove('hidden');
     document.getElementById('briefing-list').classList.add('hidden');
@@ -2232,7 +2237,7 @@ function buildBriefingRow(item, istErster, istLetzter) {
     // deaktiviert, damit sichtbar ist, dass hier Schluss ist.
     div.innerHTML = `
         ${item.bild_url ? `<img src="${item.bild_url}" class="w-10 h-10 rounded object-cover shrink-0">` : ''}
-        <a href="/briefing/${item.baustein_id}/" target="_blank" class="flex-1 text-sm hover:text-primary transition-colors truncate">${escapeHtml(item.titel)}</a>
+        <a href="/briefing/${item.baustein_id}/?next=${briefingRuecksprung()}" class="flex-1 text-sm hover:text-primary transition-colors truncate">${escapeHtml(item.titel)}</a>
         <button onclick="moveBriefingItem(${item.id}, -1)" class="btn btn-xs btn-ghost px-1.5"
                 ${istErster ? 'disabled' : ''} title="Innerhalb der Kategorie nach oben">▲</button>
         <button onclick="moveBriefingItem(${item.id}, 1)" class="btn btn-xs btn-ghost px-1.5"

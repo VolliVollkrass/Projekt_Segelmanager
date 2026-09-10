@@ -180,6 +180,7 @@ Auszeichnung geschieht durch ein Zeichen am Zeilenanfang:
   >  Hinweis — Ergänzung, Tipp
   *  Merksatz — ein einzelner einprägsamer Satz
   -  Aufzählungspunkt
+  #  Schritt in einem nummerierten Ablauf
   |  Tabellenzeile, Spalten mit | getrennt
 
 Zeichne sparsam aus. Im Zweifel lässt du einen Absatz als normalen Fließtext.
