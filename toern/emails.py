@@ -1,5 +1,3 @@
-import os
-
 from django.core.mail import EmailMessage, EmailMultiAlternatives
 from django.conf import settings
 from django.utils.html import escape
@@ -234,34 +232,27 @@ def _termin_text(rundmail):
     return block
 
 
-_LOGO_CACHE = None
+def _rundmail_html(body_text, rundmail, logo_url=None):
+    """Baut die HTML-Variante der Rundmail im Corporate-Design (Logo, Farben).
 
-
-def _logo_bytes():
-    """Logo einmalig einlesen und cachen (leerer Bytes-String, falls nicht vorhanden)."""
-    global _LOGO_CACHE
-    if _LOGO_CACHE is None:
-        pfad = os.path.join(settings.BASE_DIR, "static", "medien", "Logo_Meer_erleben.png")
-        try:
-            with open(pfad, "rb") as f:
-                _LOGO_CACHE = f.read()
-        except OSError:
-            _LOGO_CACHE = b""
-    return _LOGO_CACHE
-
-
-def _rundmail_html(body_text, rundmail, logo_cid=None):
-    """Baut die HTML-Variante der Rundmail im Corporate-Design (Logo, Farben)."""
+    Das Logo wird per oeffentlicher URL eingebunden (Brevo unterstuetzt keine
+    Inline-/CID-Anhaenge). Faellt auf einen Text-Schriftzug zurueck, wenn keine
+    URL vorliegt oder das Bild im Client blockiert wird (alt-Text).
+    """
     primary = "#0f2942"   # dunkles Blau
     teal = "#0D9488"      # Secondary
 
     text_html = escape(body_text).replace("\n", "<br>")
 
-    logo_html = ""
-    if logo_cid:
+    if logo_url:
         logo_html = (
-            f'<img src="cid:{logo_cid}" alt="Meer erleben" '
+            f'<img src="{escape(logo_url)}" alt="Meer erleben" '
             f'width="150" style="display:block;margin:0 auto;max-width:150px;height:auto;">'
+        )
+    else:
+        logo_html = (
+            f'<div style="font-size:22px;font-weight:700;color:{primary};letter-spacing:0.5px;">'
+            f'⚓ Meer erleben</div>'
         )
 
     info_blocks = ""
@@ -313,13 +304,17 @@ def _rundmail_html(body_text, rundmail, logo_cid=None):
 </html>"""
 
 
-def mail_rundmail(rundmail, teilnahme, ics_text=None, anhang_bytes=None, anhang_name=None):
+def mail_rundmail(rundmail, teilnahme, ics_text=None, anhang_bytes=None,
+                  anhang_name=None, logo_url=None, fail_silently=False):
     """Versendet eine personalisierte Rundmail an ein Crew-Mitglied.
 
     - Bausteine ({{vorname}} etc.) werden pro Empfänger gerendert.
     - Reply-To zeigt auf den Skipper, damit Antworten direkt bei ihm landen.
-    - HTML-Variante im Corporate-Design mit Logo; Plaintext als Fallback.
+    - HTML-Variante im Corporate-Design mit Logo (per URL); Plaintext als Fallback.
     - Optionaler .ics-Termin und eine Datei werden als Anhang mitgeschickt.
+
+    Wirft standardmäßig bei Versandfehlern (fail_silently=False), damit der
+    Aufrufer echte Fehler melden kann statt sie still zu schlucken.
     """
     from .rundmail_utils import render_platzhalter
 
@@ -349,22 +344,11 @@ def mail_rundmail(rundmail, teilnahme, ics_text=None, anhang_bytes=None, anhang_
         to=[user.email],
         reply_to=reply_to,
     )
-
-    # Logo als Inline-Bild (CID) einbetten, falls vorhanden
-    logo_cid = None
-    logo = _logo_bytes()
-    if logo:
-        try:
-            from anymail.message import attach_inline_image
-            logo_cid = attach_inline_image(mail, logo, subtype="png")
-        except Exception:
-            logo_cid = None
-
-    mail.attach_alternative(_rundmail_html(body, rundmail, logo_cid=logo_cid), "text/html")
+    mail.attach_alternative(_rundmail_html(body, rundmail, logo_url=logo_url), "text/html")
 
     if ics_text:
         mail.attach("Termin.ics", ics_text, "text/calendar")
     if anhang_bytes and anhang_name:
         mail.attach(anhang_name, anhang_bytes)
 
-    mail.send(fail_silently=True)
+    mail.send(fail_silently=fail_silently)

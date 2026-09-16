@@ -149,10 +149,13 @@ class RundmailVersandTests(RundmailTestBase):
             "empfaenger": [self.t_crew1.id],
         })
         m = mail.outbox[0]
-        # HTML-Alternative vorhanden, referenziert das Inline-Logo per cid
+        # HTML-Alternative vorhanden, referenziert das Logo per öffentlicher URL (kein CID!)
         html = next((c for c, t in m.alternatives if t == "text/html"), "")
         self.assertIn("<html", html.lower())
-        self.assertIn("cid:", html)
+        self.assertIn("Logo_Meer_erleben.png", html)
+        self.assertNotIn("cid:", html)
+        # kein Inline-Anhang (Brevo unterstützt das nicht)
+        self.assertFalse(any(not isinstance(a, tuple) for a in m.attachments))
         # Der technische Hinweis darf NICHT im Plaintext stehen
         self.assertNotIn("haengt als Kalenderdatei", m.body)
         # Saubere Umlaute im Plaintext-Termin (kein 'ae'-Ersatz)
