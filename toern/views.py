@@ -31,6 +31,9 @@ from django.views.decorators.http import require_POST
 from django.utils.timezone import now
 from django.utils import timezone
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 from django.http import JsonResponse, Http404
 from datetime import date, timedelta
 
@@ -3331,13 +3334,13 @@ def rundmail_senden(request, toern_id):
         rundmail.save()
         return redirect(redirect_url)
 
-    rundmail.status = "gesendet"
-    rundmail.gesendet_am = timezone.now()
-    rundmail.empfaenger_count = len(empfaenger)
-    rundmail.save()
-
     from .rundmail_utils import build_ics
+    from django.templatetags.static import static
     ics_text = build_ics(rundmail, organisator_email=(request.user.email or None))
+
+    # Logo als absolute, oeffentlich erreichbare URL (Brevo kann keine Inline-Anhaenge).
+    # WhiteNoise liefert /static/ vor der Login-Sperre aus -> ohne Auth abrufbar.
+    logo_url = request.build_absolute_uri(static("medien/Logo_Meer_erleben.png"))
 
     anhang_bytes = None
     anhang_name = None
@@ -3347,17 +3350,48 @@ def rundmail_senden(request, toern_id):
         rundmail.anhang.close()
         anhang_name = os.path.basename(rundmail.anhang.name)
 
+    versandt = 0
+    fehler = 0
     for t in empfaenger:
-        mail_rundmail(rundmail, t, ics_text=ics_text,
-                      anhang_bytes=anhang_bytes, anhang_name=anhang_name)
+        try:
+            mail_rundmail(rundmail, t, ics_text=ics_text, anhang_bytes=anhang_bytes,
+                          anhang_name=anhang_name, logo_url=logo_url)
+            versandt += 1
+        except Exception:
+            logger.exception("Rundmail-Versand fehlgeschlagen an %s (Toern %s)", t.user_id, toern.id)
+            fehler += 1
 
-    # Kopie an den Absender selbst (falls nicht ohnehin Empfänger)
-    if request.user.email and not any(t.user_id == request.user.id for t in empfaenger):
-        selbst = Teilnahme(toern=toern, user=request.user)
-        mail_rundmail(rundmail, selbst, ics_text=ics_text,
-                      anhang_bytes=anhang_bytes, anhang_name=anhang_name)
+    # Kopie an den Absender selbst (falls nicht ohnehin Empfänger); Fehler hier ignorieren
+    if versandt and request.user.email and not any(t.user_id == request.user.id for t in empfaenger):
+        try:
+            selbst = Teilnahme(toern=toern, user=request.user)
+            mail_rundmail(rundmail, selbst, ics_text=ics_text, anhang_bytes=anhang_bytes,
+                          anhang_name=anhang_name, logo_url=logo_url)
+        except Exception:
+            logger.exception("Rundmail-Kopie an Absender fehlgeschlagen (Toern %s)", toern.id)
 
-    messages.success(request, f"Rundmail an {len(empfaenger)} Crew-Mitglied(er) versendet.")
+    if versandt:
+        rundmail.status = "gesendet"
+        rundmail.gesendet_am = timezone.now()
+        rundmail.empfaenger_count = versandt
+        rundmail.save()
+        if fehler:
+            messages.warning(
+                request,
+                f"Rundmail an {versandt} Crew-Mitglied(er) versendet – {fehler} Versand(e) fehlgeschlagen.",
+            )
+        else:
+            messages.success(request, f"Rundmail an {versandt} Crew-Mitglied(er) versendet.")
+    else:
+        # Nichts ging raus -> als Entwurf behalten und ehrlich melden
+        rundmail.status = "entwurf"
+        rundmail.save()
+        messages.error(
+            request,
+            "Die Rundmail konnte nicht versendet werden (E-Mail-Dienst nicht erreichbar). "
+            "Sie wurde als Entwurf gespeichert – bitte später erneut versuchen.",
+        )
+
     return redirect(redirect_url)
 
 
