@@ -2593,11 +2593,13 @@ def crewlist_pdf(request, boot_id):
 
             birth_text = f"{birth_str} ({age}){cake_html}"
 
-        # Geburtsland kombinieren
-        if u.geburtsland and birth_text:
-            full_text = f"{u.geburtsland}<br/>{birth_text}"
-        elif u.geburtsland:
-            full_text = u.geburtsland
+        # Geburtsort + Geburtsland kombinieren
+        ort_land = ", ".join(filter(None, [u.geburtsort, u.geburtsland]))
+
+        if ort_land and birth_text:
+            full_text = f"{ort_land}<br/>{birth_text}"
+        elif ort_land:
+            full_text = ort_land
         else:
             full_text = birth_text
 
