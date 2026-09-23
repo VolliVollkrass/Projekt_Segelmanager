@@ -297,3 +297,100 @@ class DokumentStandardTests(DokumenteTestBase):
         )
         erwartet = sum(len(items) for _, items in DOKUMENT_DEFAULTS["uebernahme"])
         self.assertEqual(len(resp.json()["items"]), erwartet)
+
+
+class BootChecklisteResetTests(DokumenteTestBase):
+    """„Alles enthaken" für Ablegen/Anlegen im Boot-Dashboard."""
+
+    def _abhaken(self, typ, anzahl=2):
+        """Die ersten `anzahl` Einträge einer Checkliste als erledigt markieren."""
+        self.client.force_login(self.skipper)
+        items = json.loads(
+            self.client.get(reverse("boot_dokument_get", args=[self.boot.id, typ])).content
+        )["items"]
+        for item in items[:anzahl]:
+            self.client.post(reverse("boot_dokument_toggle", args=[self.boot.id, item["id"]]))
+        return items
+
+    def _erledigt_anzahl(self, typ):
+        items = json.loads(
+            self.client.get(reverse("boot_dokument_get", args=[self.boot.id, typ])).content
+        )["items"]
+        return sum(1 for i in items if i["erledigt"])
+
+    def test_reset_entfernt_alle_haken(self):
+        self._abhaken("anlegen")
+        self.assertEqual(self._erledigt_anzahl("anlegen"), 2)
+
+        resp = self.client.post(reverse("boot_dokument_reset", args=[self.boot.id, "anlegen"]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(json.loads(resp.content)["status"], "ok")
+        self.assertEqual(self._erledigt_anzahl("anlegen"), 0)
+
+    def test_reset_laesst_andere_checkliste_in_ruhe(self):
+        self._abhaken("anlegen")
+        self._abhaken("ablegen")
+
+        self.client.post(reverse("boot_dokument_reset", args=[self.boot.id, "anlegen"]))
+        self.assertEqual(self._erledigt_anzahl("anlegen"), 0)
+        self.assertEqual(self._erledigt_anzahl("ablegen"), 2)
+
+    def test_reset_laesst_anderes_boot_in_ruhe(self):
+        boot2 = Boot.objects.create(name="Zweitboot", typ="Bavaria 46", toern=self.toern)
+        skipper2 = _user("skipper2@test.de")
+        Teilnahme.objects.create(
+            toern=self.toern, user=skipper2, status="bestaetigt", rolle="skipper", boot=boot2
+        )
+        self._abhaken("anlegen")
+
+        self.client.force_login(skipper2)
+        items = json.loads(
+            self.client.get(reverse("boot_dokument_get", args=[boot2.id, "anlegen"])).content
+        )["items"]
+        self.client.post(reverse("boot_dokument_toggle", args=[boot2.id, items[0]["id"]]))
+        self.client.post(reverse("boot_dokument_reset", args=[boot2.id, "anlegen"]))
+
+        self.client.force_login(self.skipper)
+        self.assertEqual(self._erledigt_anzahl("anlegen"), 2)
+
+    def test_crew_darf_nicht_zuruecksetzen(self):
+        self._abhaken("anlegen")
+        self.client.force_login(self.crew)
+        resp = self.client.post(reverse("boot_dokument_reset", args=[self.boot.id, "anlegen"]))
+        self.assertEqual(resp.status_code, 403)
+
+        self.client.force_login(self.skipper)
+        self.assertEqual(self._erledigt_anzahl("anlegen"), 2)
+
+    def test_ungueltiger_typ_gibt_400(self):
+        self.client.force_login(self.skipper)
+        resp = self.client.post(reverse("boot_dokument_reset", args=[self.boot.id, "quatsch"]))
+        self.assertEqual(resp.status_code, 400)
+
+    def test_get_ist_nicht_erlaubt(self):
+        self.client.force_login(self.skipper)
+        resp = self.client.get(reverse("boot_dokument_reset", args=[self.boot.id, "anlegen"]))
+        self.assertEqual(resp.status_code, 405)
+
+
+class BootDashboardSkipperLinkTests(DokumenteTestBase):
+    """Direktlink ins Skipper-Dashboard im Kopf des Boot-Dashboards."""
+
+    def _html(self, user):
+        self.client.force_login(user)
+        return self.client.get(reverse("boot_dashboard", args=[self.toern.id])).content.decode()
+
+    def test_skipper_sieht_den_link(self):
+        html = self._html(self.skipper)
+        self.assertIn(reverse("skipper_dashboard", args=[self.toern.id]), html)
+        # Direkt neben dem Plätze-Badge
+        self.assertLess(html.index("Plätze"), html.index("Zum Skipper-Dashboard"))
+
+    def test_crew_sieht_den_link_nicht(self):
+        html = self._html(self.crew)
+        self.assertNotIn("Zum Skipper-Dashboard", html)
+        self.assertNotIn(reverse("skipper_dashboard", args=[self.toern.id]), html)
+
+    def test_reset_button_nur_fuer_skipper_im_html(self):
+        self.assertIn('id="bdok-reset"', self._html(self.skipper))
+        self.assertNotIn('id="bdok-reset"', self._html(self.crew))

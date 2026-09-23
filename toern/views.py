@@ -2214,6 +2214,8 @@ def boot_dashboard(request, toern_id):
         "kasse_darf_verwalten": kasse_darf_verwalten,
         # Dokumente digital abhaken — nur Skipper/Co dieses Boots
         "darf_dokumente": teilnahme.rolle in ("skipper", "coskipper"),
+        # Direktlink ins Skipper-Dashboard im Kopfbereich
+        "ist_skipper_co": teilnahme.rolle in ("skipper", "coskipper"),
         # Schadensprotokoll
         "schaeden": schaeden,
         "schaden_status_choices": Schadensmeldung.STATUS_CHOICES,
