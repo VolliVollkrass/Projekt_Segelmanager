@@ -757,6 +757,12 @@
                         Generieren
                     </button>
                     {% if einkauf_gruppen %}
+                    <button onclick="toggleMergeModus()" id="btn-merge-modus" class="btn btn-xs btn-outline gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/>
+                        </svg>
+                        Zusammenlegen
+                    </button>
                     <button onclick="oeffneAufraeumen()" class="btn btn-xs btn-outline gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
@@ -845,6 +851,16 @@
             </div>
             {% else %}
 
+            <!-- Leiste im Auswahlmodus -->
+            <div id="merge-leiste" class="hidden sticky top-2 z-20 mb-3 bg-secondary text-secondary-content rounded-xl px-4 py-2.5 flex items-center justify-between gap-2 shadow-lg">
+                <span class="text-sm font-medium"><span id="merge-anzahl">0</span> ausgewählt</span>
+                <div class="flex gap-2">
+                    <button onclick="oeffneMergeDialog()" id="btn-merge-start"
+                            class="btn btn-xs" disabled>Zusammenlegen</button>
+                    <button onclick="toggleMergeModus()" class="btn btn-xs btn-ghost">Abbrechen</button>
+                </div>
+            </div>
+
             <!-- Items gruppiert nach Kategorie -->
             <div class="space-y-4" id="einkauf-liste">
                 {% for kat, label, items in einkauf_gruppen %}
@@ -859,7 +875,9 @@
                             <div class="einkauf-item flex items-center gap-3 px-4 py-3 transition-opacity {% if item.erledigt %}opacity-40{% endif %}"
                                  id="ei-{{ item.id }}"
                                  data-shopper="{{ item.einkaufer_id|default:'' }}">
-                                <input type="checkbox" class="checkbox checkbox-sm shrink-0"
+                                <input type="checkbox" class="ek-merge-box checkbox checkbox-sm checkbox-secondary shrink-0 hidden"
+                                       value="{{ item.id }}" onchange="merkeAuswahl()">
+                                <input type="checkbox" class="ek-erledigt-box checkbox checkbox-sm shrink-0"
                                        {% if item.erledigt %}checked{% endif %}
                                        onchange="toggleEinkauf({{ item.id }}, this.checked)">
                                 <div class="flex-1 min-w-0">
@@ -878,6 +896,11 @@
                                 <span class="einkaufer-badge badge badge-xs shrink-0"
                                       data-shopper-id="{{ item.einkaufer_id }}">{{ item.einkaufer.user.first_name }}</span>
                                 {% endif %}
+                                <button onclick="bearbeiteEinkauf({{ item.id }}, '{{ item.name|escapejs }}', '{{ item.menge|escapejs }}', '{{ item.kategorie }}')"
+                                        title="Posten bearbeiten"
+                                        class="btn btn-ghost btn-xs px-1 shrink-0 text-base-content/40">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                </button>
                                 <button onclick="loescheEinkauf({{ item.id }})"
                                         class="btn btn-ghost btn-xs text-error px-1 shrink-0">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -929,6 +952,76 @@
         </div>
 
     </div>
+
+    <!-- ═══ MODAL: Posten bearbeiten ═══ -->
+    <dialog id="ekEditModal" class="modal">
+        <div class="modal-box max-w-md">
+            <h3 class="font-bold text-lg mb-4">Posten bearbeiten</h3>
+            <input type="hidden" id="ek-edit-id">
+            <div class="space-y-3">
+                <label class="block">
+                    <span class="text-xs text-base-content/50">Artikel</span>
+                    <input type="text" id="ek-edit-name" class="input input-sm input-bordered w-full mt-1">
+                </label>
+                <label class="block">
+                    <span class="text-xs text-base-content/50">Menge</span>
+                    <input type="text" id="ek-edit-menge" class="input input-sm input-bordered w-full mt-1"
+                           placeholder="z.B. 2 kg">
+                </label>
+                <label class="block">
+                    <span class="text-xs text-base-content/50">Kategorie</span>
+                    <select id="ek-edit-kategorie" class="select select-sm select-bordered w-full mt-1">
+                        <option value="obst_gemuese">Obst &amp; Gemüse</option>
+                        <option value="fleisch_fisch">Fleisch &amp; Fisch</option>
+                        <option value="milch_kase">Milch, Käse &amp; Eier</option>
+                        <option value="brot">Brot &amp; Backwaren</option>
+                        <option value="nudeln_reis">Nudeln, Reis &amp; Hülsenfrüchte</option>
+                        <option value="konserven">Konserven &amp; Saucen</option>
+                        <option value="gewurze_ol">Gewürze, Öle &amp; Essig</option>
+                        <option value="getranke">Getränke</option>
+                        <option value="tiefkuhl">Tiefkühlprodukte</option>
+                        <option value="haushalt">Haushalt &amp; Hygiene</option>
+                        <option value="sonstiges">Sonstiges</option>
+                    </select>
+                </label>
+            </div>
+            <div class="modal-action">
+                <button class="btn btn-sm" onclick="ekEditModal.close()">Abbrechen</button>
+                <button onclick="speichereEinkauf()" class="btn btn-sm btn-primary">Speichern</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>schließen</button></form>
+    </dialog>
+
+    <!-- ═══ MODAL: Posten zusammenlegen ═══ -->
+    <dialog id="ekMergeModal" class="modal">
+        <div class="modal-box max-w-md">
+            <h3 class="font-bold text-lg mb-1">Posten zusammenlegen</h3>
+            <p class="text-xs text-base-content/50 mb-4">
+                Aus den ausgewählten Zeilen wird eine. Name und Menge kannst du anpassen —
+                die vorgeschlagene Menge ist die Summe, soweit sie sich rechnen lässt.
+            </p>
+            <div id="merge-zeilen" class="space-y-1 mb-4 text-xs text-base-content/50"></div>
+            <div class="space-y-3">
+                <label class="block">
+                    <span class="text-xs text-base-content/50">Neuer Name</span>
+                    <input type="text" id="merge-name" class="input input-sm input-bordered w-full mt-1">
+                </label>
+                <label class="block">
+                    <span class="text-xs text-base-content/50">Menge</span>
+                    <input type="text" id="merge-menge" class="input input-sm input-bordered w-full mt-1">
+                </label>
+            </div>
+            <p class="text-[11px] text-base-content/40 mt-3">
+                Der vorherige Stand wird gesichert — im Aufräumen-Dialog lässt sich das zurücknehmen.
+            </p>
+            <div class="modal-action">
+                <button class="btn btn-sm" onclick="ekMergeModal.close()">Abbrechen</button>
+                <button onclick="fuehreMergeAus()" class="btn btn-sm btn-primary">Zusammenlegen</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>schließen</button></form>
+    </dialog>
 
     <!-- ═══ MODAL: Einkaufsliste aufräumen ═══ -->
     <dialog id="aufraeumenModal" class="modal">
@@ -1990,6 +2083,106 @@ async function reaktiviereEinkauf(id) {
         method: 'POST', headers: {'X-CSRFToken': CSRF},
     });
     location.href = "?tab=bordkueche";
+}
+
+// ─── Posten von Hand bearbeiten ───
+function bearbeiteEinkauf(id, name, menge, kategorie) {
+    document.getElementById('ek-edit-id').value = id;
+    document.getElementById('ek-edit-name').value = name;
+    document.getElementById('ek-edit-menge').value = menge;
+    document.getElementById('ek-edit-kategorie').value = kategorie;
+    document.getElementById('ekEditModal').showModal();
+}
+
+async function speichereEinkauf() {
+    const id = document.getElementById('ek-edit-id').value;
+    const name = document.getElementById('ek-edit-name').value.trim();
+    if (!name) { alert('Der Name darf nicht leer sein.'); return; }
+
+    const r = await fetch(`/toern/einkaufsliste/${id}/update/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: name,
+            menge: document.getElementById('ek-edit-menge').value.trim(),
+            kategorie: document.getElementById('ek-edit-kategorie').value,
+        }),
+    });
+    const d = await r.json();
+    if (d.error) { alert(d.error); return; }
+    document.getElementById('ekEditModal').close();
+    aufListeNeuLaden();
+}
+
+// ─── Posten von Hand zusammenlegen ───
+let mergeModusAktiv = false;
+
+function toggleMergeModus() {
+    mergeModusAktiv = !mergeModusAktiv;
+    document.querySelectorAll('.ek-merge-box').forEach(b => {
+        b.classList.toggle('hidden', !mergeModusAktiv);
+        b.checked = false;
+    });
+    document.querySelectorAll('.ek-erledigt-box').forEach(b => {
+        b.classList.toggle('hidden', mergeModusAktiv);
+    });
+    document.getElementById('merge-leiste').classList.toggle('hidden', !mergeModusAktiv);
+    document.getElementById('btn-merge-modus').classList.toggle('btn-secondary', mergeModusAktiv);
+    merkeAuswahl();
+}
+
+function mergeAuswahl() {
+    return [...document.querySelectorAll('.ek-merge-box:checked')];
+}
+
+function merkeAuswahl() {
+    const n = mergeAuswahl().length;
+    document.getElementById('merge-anzahl').textContent = n;
+    document.getElementById('btn-merge-start').disabled = n < 2;
+}
+
+function oeffneMergeDialog() {
+    const gewaehlt = mergeAuswahl().map(b => {
+        const row = b.closest('.einkauf-item');
+        const spans = row.querySelectorAll('.flex-1 span');
+        return {
+            id: +b.value,
+            name: (spans[0]?.textContent || '').trim(),
+            menge: (spans[1]?.textContent || '').trim(),
+        };
+    });
+    if (gewaehlt.length < 2) return;
+
+    document.getElementById('merge-zeilen').innerHTML = gewaehlt.map(g =>
+        `<div class="flex justify-between gap-2">
+            <span>${escHtml(g.name)}</span><span>${escHtml(g.menge || '—')}</span>
+        </div>`).join('');
+
+    // Kürzester Name als Vorschlag — meist der sauberste
+    const name = gewaehlt.map(g => g.name).sort((a, b) => a.length - b.length)[0];
+    document.getElementById('merge-name').value = name;
+    document.getElementById('merge-menge').value = '';
+    document.getElementById('merge-menge').placeholder = 'leer = automatisch summieren';
+    document.getElementById('ekMergeModal').showModal();
+}
+
+async function fuehreMergeAus() {
+    const ids = mergeAuswahl().map(b => +b.value);
+    const menge = document.getElementById('merge-menge').value.trim();
+    const r = await fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/einkaufsliste/merge/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            ids: ids,
+            name: document.getElementById('merge-name').value.trim(),
+            // leer lassen heißt: Server summiert selbst
+            ...(menge ? {menge: menge} : {}),
+        }),
+    });
+    const d = await r.json();
+    if (d.error) { alert(d.error); return; }
+    document.getElementById('ekMergeModal').close();
+    aufListeNeuLaden();
 }
 
 // ─── Einkaufsliste aufräumen (Dubletten) ───

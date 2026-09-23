@@ -266,8 +266,14 @@ class SummiereMengenTests(TestCase):
     def test_brueche_werden_summiert(self):
         self.assertEqual(summiere_mengen(["½ Bund", "½ Bund"]), "1 Bund")
 
-    def test_nicht_parsebares_bleibt_erhalten(self):
-        self.assertEqual(summiere_mengen(["nach Belieben", "200 ml"]), "200 ml + nach Belieben")
+    def test_kochmenge_faellt_neben_einer_kaufmenge_weg(self):
+        """Geändert: „nach Belieben" stand früher als Anhängsel hinter der
+        Kaufmenge. Auf einem Einkaufszettel hilft das niemandem — die 200 ml
+        sagen bereits, was zu kaufen ist."""
+        self.assertEqual(summiere_mengen(["nach Belieben", "200 ml"]), "200 ml")
+
+    def test_nicht_parsebares_bleibt_erhalten_wenn_es_alles_ist(self):
+        self.assertEqual(summiere_mengen(["nach Belieben"]), "nach Belieben")
 
     def test_verschiedene_einheiten_getrennt(self):
         self.assertEqual(summiere_mengen(["2 EL", "200 ml"]), "2 EL + 200 ml")

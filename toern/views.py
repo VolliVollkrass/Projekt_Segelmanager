@@ -4881,6 +4881,48 @@ def einkaufsliste_add(request, toern_id, boot_id):
 
 @login_required
 @require_POST
+def einkaufsliste_update(request, eintrag_id):
+    """Einen Posten von Hand ändern — Name, Menge, Kategorie.
+
+    Die Automatik trifft nicht immer die richtige Entscheidung; das hier ist
+    der Weg, sie zu überstimmen. Ein von Hand geänderter Posten gilt danach
+    als manuell und überlebt damit das nächste „Generieren".
+    """
+    eintrag = get_object_or_404(EinkaufslistenEintrag, id=eintrag_id)
+    if not Teilnahme.objects.filter(user=request.user, toern=eintrag.toern).exists() \
+            and request.user != eintrag.toern.anbieter:
+        raise PermissionDenied
+
+    data = json.loads(request.body or '{}')
+
+    name = (data.get('name') or '').strip()
+    if 'name' in data and not name:
+        return JsonResponse({'error': 'Der Name darf nicht leer sein.'}, status=400)
+    if name:
+        eintrag.name = name[:200]
+
+    if 'menge' in data:
+        eintrag.menge = (data.get('menge') or '').strip()[:100]
+
+    kategorie = data.get('kategorie')
+    if kategorie in dict(EinkaufslistenEintrag.KATEGORIE_CHOICES):
+        eintrag.kategorie = kategorie
+
+    eintrag.quelle = 'manuell'
+    eintrag.save()
+
+    return JsonResponse({
+        'ok': True,
+        'id': eintrag.id,
+        'name': eintrag.name,
+        'menge': eintrag.menge,
+        'kategorie': eintrag.kategorie,
+        'kategorie_label': EINKAUF_KATEGORIE_LABEL.get(eintrag.kategorie, 'Sonstiges'),
+    })
+
+
+@login_required
+@require_POST
 def einkaufsliste_delete(request, eintrag_id):
     eintrag = get_object_or_404(EinkaufslistenEintrag, id=eintrag_id)
     if not Teilnahme.objects.filter(user=request.user, toern=eintrag.toern).exists() \
