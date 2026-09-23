@@ -21,6 +21,7 @@ from .briefing_views import (
 )
 from .briefing_pdf import briefing_pdf
 from .einkauf_export import einkaufsliste_pdf, einkaufsliste_xlsx
+from .dokumente_zip import boot_dokumente_zip, toern_dokumente_zip
 
 urlpatterns = [
     path('detail/<int:pk>/', toern_detail, name='toern_detail'),  # Detailseite
@@ -67,6 +68,8 @@ urlpatterns = [
     path("boot/<int:boot_id>/mayday/pdf/", mayday_plakat_pdf, name="mayday_plakat_pdf"),
     path("boot/<int:boot_id>/notrollen/pdf/", notrollen_plakat_pdf, name="notrollen_plakat_pdf"),
     path("boot/<int:boot_id>/checkliste/<str:typ>/pdf/", dokument_checkliste_pdf, name="dokument_checkliste_pdf"),
+    path("boot/<int:boot_id>/dokumente.zip", boot_dokumente_zip, name="boot_dokumente_zip"),
+    path("<int:toern_id>/dokumente.zip", toern_dokumente_zip, name="toern_dokumente_zip"),
     # Schadensprotokoll
     path("boot/<int:boot_id>/schaden/neu/", schaden_neu, name="schaden_neu"),
     path("boot/<int:boot_id>/schaden/pdf/", schaden_gesamt_pdf, name="schaden_gesamt_pdf"),

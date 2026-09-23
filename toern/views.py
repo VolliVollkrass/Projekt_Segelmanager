@@ -2457,7 +2457,7 @@ def reduce_gegenstand(request, gegenstand_id):
     return JsonResponse({"status": "ok"})
 
 
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, Image, KeepTogether, PageBreak
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import landscape, A4, portrait
 from django.http import HttpResponse
@@ -2466,10 +2466,18 @@ from reportlab.platypus import Paragraph
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import mm
 
+@login_required
 def crewlist_pdf(request, boot_id):
+    """Crewliste eines Bootes für die Charterbasis.
 
-    boot = Boot.objects.select_related("toern").get(id=boot_id)
+    Enthält Pass-/Ausweisnummern, Geburtsdaten und Anschriften der Crew —
+    deshalb nur für Skipper/Co-Skipper des Törns und den Anbieter.
+    """
+    boot = get_object_or_404(Boot.objects.select_related("toern"), id=boot_id)
     toern = boot.toern
+
+    if not _ist_skipper_oder_anbieter(request.user, toern):
+        raise PermissionDenied
 
     teilnahmen = Teilnahme.objects.filter(
         boot=boot,
@@ -2667,6 +2675,67 @@ def crewlist_pdf(request, boot_id):
     return response
 
 
+def hat_geburtstag_im_toern(toern, geburtsdatum):
+    """Fällt dieser Geburtstag in den Törn-Zeitraum?"""
+    if not geburtsdatum:
+        return False
+    start_d = toern.startdatum.date()
+    end_d = toern.enddatum.date()
+    try:
+        bday = geburtsdatum.replace(year=start_d.year)
+    except ValueError:  # 29.02. in einem Nicht-Schaltjahr
+        return False
+    return start_d <= bday <= end_d
+
+
+def _deck_name(teilnahme):
+    u = teilnahme.user
+    return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+def _deck_boot(teilnahme):
+    return teilnahme.boot.name if teilnahme.boot else "ohne Boot"
+
+
+def deckblatt_besonderheiten(teilnahmen):
+    """Wer hat Allergien oder Unverträglichkeiten? (Name, Boot, Text)"""
+    ergebnis = []
+    for t in teilnahmen:
+        hinweise = []
+        if t.lebensmittelunvertraeglichkeiten:
+            hinweise.append(f"Unverträglichkeit: {t.lebensmittelunvertraeglichkeiten}")
+        if t.allergien:
+            hinweise.append(f"Allergie: {t.allergien}")
+        if hinweise:
+            ergebnis.append((_deck_name(t), _deck_boot(t), " &nbsp;·&nbsp; ".join(hinweise)))
+    return ergebnis
+
+
+def deckblatt_geburtstage(toern, teilnahmen):
+    """Geburtstage, die in den Törn fallen — chronologisch."""
+    ergebnis = [
+        (_deck_name(t), _deck_boot(t), t.user.geburtsdatum.replace(year=toern.startdatum.year))
+        for t in teilnahmen
+        if hat_geburtstag_im_toern(toern, t.user.geburtsdatum)
+    ]
+    ergebnis.sort(key=lambda g: g[2])
+    return ergebnis
+
+
+def deckblatt_offene_angaben(teilnahmen):
+    """Was fehlt noch — damit der Skipper weiß, wo er nachhaken muss."""
+    offen = []
+    for bedingung, text in [
+        (lambda t: not t.notfallkontakt_name, "Notfallkontakt"),
+        (lambda t: not t.user.telefonnummer, "Telefonnummer"),
+        (lambda t: not t.essgewohnheiten, "Essgewohnheiten"),
+    ]:
+        anzahl = sum(1 for t in teilnahmen if bedingung(t))
+        if anzahl:
+            offen.append((text, anzahl))
+    return offen
+
+
 @login_required
 def teilnehmerliste_pdf(request, toern_id):
     toern = get_object_or_404(Toern, id=toern_id)
@@ -2730,15 +2799,7 @@ def teilnehmerliste_pdf(request, toern_id):
     cake_path = os.path.join(settings.BASE_DIR, "static/medien/icons/cake.png")
 
     def has_birthday_in_toern(birthdate):
-        if not birthdate:
-            return False
-        start_d = toern.startdatum.date()
-        end_d = toern.enddatum.date()
-        try:
-            bday = birthdate.replace(year=start_d.year)
-        except ValueError:
-            return False
-        return start_d <= bday <= end_d
+        return hat_geburtstag_im_toern(toern, birthdate)
 
     elements = []
 
@@ -2766,18 +2827,146 @@ def teilnehmerliste_pdf(request, toern_id):
     elements.append(header_tbl)
     elements.append(Spacer(1, 4 * mm))
 
-    # === ÜBERSICHT ESSGEWOHNHEITEN ===
+    # =========================================================
+    # DECKBLATT
+    # Alles, was für den ganzen Törn gilt — danach je ein Boot pro Seite.
+    # =========================================================
     ess_labels = {"alles": "Kein Fleischverzicht", "vegetarisch": "Vegetarisch", "vegan": "Vegan", "": "Keine Angabe"}
-    ess_parts = [
-        f"{ess_labels[k]}: <b>{v}</b>"
-        for k, v in ess_counts.items() if v > 0
+
+    PRIMARY = colors.HexColor("#1e3a5f")
+    SECONDARY = colors.HexColor("#0D9488")
+    GRAU = colors.HexColor("#9CA3AF")
+    GRAU_HELL = colors.HexColor("#E5E7EB")
+
+    deck_h = ParagraphStyle("deck_h", fontSize=9, leading=12, fontName="Helvetica-Bold",
+                            textColor=SECONDARY, spaceAfter=2)
+    deck_zelle = ParagraphStyle("deck_zelle", fontSize=8.5, leading=11)
+    deck_kopf = ParagraphStyle("deck_kopf", fontSize=8, leading=10,
+                               fontName="Helvetica-Bold", textColor=colors.white)
+    deck_klein = ParagraphStyle("deck_klein", fontSize=8, leading=11, textColor=colors.HexColor("#555555"))
+
+    def deck_tabelle(daten, spalten, kopfzeile=True):
+        tbl = Table(daten, colWidths=spalten, repeatRows=1 if kopfzeile else 0)
+        stil = [
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3.5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("LINEBELOW", (0, 0), (-1, -2), 0.4, GRAU_HELL),
+        ]
+        if kopfzeile:
+            stil.append(("BACKGROUND", (0, 0), (-1, 0), PRIMARY))
+        tbl.setStyle(TableStyle(stil))
+        return tbl
+
+    # --- Eckdaten des Törns ---
+    anbieter_name = f"{toern.anbieter.first_name} {toern.anbieter.last_name}".strip() or toern.anbieter.email
+    eck_daten = [
+        ("Revier", toern.revier or "—"),
+        ("Zeitraum", f"{toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')} "
+                     f"({(toern.enddatum.date() - toern.startdatum.date()).days + 1} Tage)"),
+        ("Veranstalter", anbieter_name),
+        ("Boote", str(len(boots_order))),
+        ("Teilnehmer", f"{len(teilnahmen)} gesamt"),
     ]
+    elements.append(Paragraph("Törn-Eckdaten", deck_h))
+    elements.append(deck_tabelle(
+        [[Paragraph(f"<b>{k}</b>", deck_zelle), Paragraph(v, deck_zelle)] for k, v in eck_daten],
+        [35 * mm, 145 * mm], kopfzeile=False,
+    ))
+    elements.append(Spacer(1, 5 * mm))
+
+    # --- Boote mit Skipper und Belegung ---
+    rollen_label = {"skipper": "Skipper", "coskipper": "Co-Skipper"}
+    boot_rows = [[
+        Paragraph("Boot", deck_kopf), Paragraph("Typ", deck_kopf),
+        Paragraph("Hafen", deck_kopf), Paragraph("Skipper / Co-Skipper", deck_kopf),
+        Paragraph("Crew", deck_kopf),
+    ]]
+    for b in boots_order:
+        crew = gruppen[b.id]["crew"]
+        fuehrung = [
+            f"{t.user.first_name} {t.user.last_name}".strip() + f" ({rollen_label[t.rolle]})"
+            for t in crew if t.rolle in rollen_label
+        ]
+        betten = b.anzahl_betten_boot
+        boot_rows.append([
+            Paragraph(f"<b>{b.name}</b>", deck_zelle),
+            Paragraph(b.typ or "—", deck_zelle),
+            Paragraph(b.hafen or "—", deck_zelle),
+            Paragraph("<br/>".join(fuehrung) or "<i>noch offen</i>", deck_zelle),
+            Paragraph(f"{len(crew)}{f' / {betten}' if betten else ''}", deck_zelle),
+        ])
+    if ohne_boot:
+        boot_rows.append([
+            Paragraph("<i>ohne Boot</i>", deck_zelle), Paragraph("—", deck_zelle),
+            Paragraph("—", deck_zelle), Paragraph("—", deck_zelle),
+            Paragraph(str(len(ohne_boot)), deck_zelle),
+        ])
+
+    if len(boot_rows) > 1:
+        elements.append(Paragraph("Boote", deck_h))
+        elements.append(deck_tabelle(boot_rows, [38 * mm, 38 * mm, 33 * mm, 55 * mm, 16 * mm]))
+        elements.append(Spacer(1, 5 * mm))
+
+    # --- Verpflegung: Zahlen und wer besondere Anforderungen hat ---
+    ess_parts = [f"{ess_labels[k]}: <b>{v}</b>" for k, v in ess_counts.items() if v > 0]
+    elements.append(Paragraph("Verpflegung", deck_h))
     elements.append(Paragraph(
-        "Essgewohnheiten: &nbsp;" + " &nbsp;·&nbsp; ".join(ess_parts),
-        ParagraphStyle("ess", fontSize=8, leading=10, backColor=colors.HexColor("#F3F4F6"),
+        " &nbsp;·&nbsp; ".join(ess_parts),
+        ParagraphStyle("ess", fontSize=8.5, leading=11, backColor=colors.HexColor("#F3F4F6"),
                        borderPadding=(4, 6, 4, 6))
     ))
-    elements.append(Spacer(1, 6 * mm))
+
+    besonderheiten = deckblatt_besonderheiten(teilnahmen)
+
+    if besonderheiten:
+        elements.append(Spacer(1, 3 * mm))
+        rows = [[
+            Paragraph("Name", deck_kopf), Paragraph("Boot", deck_kopf),
+            Paragraph("Allergien &amp; Unverträglichkeiten", deck_kopf),
+        ]]
+        rows += [
+            [Paragraph(name, deck_zelle), Paragraph(boot, deck_zelle), Paragraph(text, deck_zelle)]
+            for name, boot, text in besonderheiten
+        ]
+        elements.append(deck_tabelle(rows, [45 * mm, 40 * mm, 95 * mm]))
+    elements.append(Spacer(1, 5 * mm))
+
+    # --- Geburtstage während des Törns ---
+    geburtstage = deckblatt_geburtstage(toern, teilnahmen)
+    if geburtstage:
+        elements.append(Paragraph("Geburtstage an Bord", deck_h))
+        elements.append(deck_tabelle(
+            [[Paragraph(f"<b>{d.strftime('%d.%m.')}</b>", deck_zelle),
+              Paragraph(name, deck_zelle),
+              Paragraph(boot, deck_zelle)]
+             for name, boot, d in geburtstage],
+            [20 * mm, 90 * mm, 70 * mm], kopfzeile=False,
+        ))
+        elements.append(Spacer(1, 5 * mm))
+
+    # --- Fehlende Angaben, damit man weiß, wo man nachhaken muss ---
+    fehlend = [
+        f"{text} fehlt bei <b>{anzahl}</b>"
+        for text, anzahl in deckblatt_offene_angaben(teilnahmen)
+    ]
+    if fehlend:
+        elements.append(Paragraph(
+            "Offene Angaben: &nbsp;" + " &nbsp;·&nbsp; ".join(fehlend),
+            ParagraphStyle("fehlend", fontSize=8, leading=11, textColor=colors.HexColor("#B45309"),
+                           backColor=colors.HexColor("#FEF3C7"), borderPadding=(4, 6, 4, 6))
+        ))
+        elements.append(Spacer(1, 4 * mm))
+
+    elements.append(Paragraph(
+        f"Stand: {timezone.localtime().strftime('%d.%m.%Y %H:%M')} Uhr &nbsp;·&nbsp; "
+        f"Auf den folgenden Seiten steht je ein Boot mit seiner Crew.",
+        deck_klein
+    ))
+
+    # Danach beginnt jedes Boot auf einer eigenen Seite.
+    elements.append(PageBreak())
 
     # === PRO BOOT ===
     def crew_block(gruppe_label, crew_liste):
@@ -2844,12 +3033,19 @@ def teilnehmerliste_pdf(request, toern_id):
         block.append(Spacer(1, 6 * mm))
         return block
 
-    for g in gruppen.values():
-        if g["crew"]:
-            elements += crew_block(f"Boot: {g['boot'].name}", g["crew"])
-
+    # Jede Gruppe auf eine eigene Seite — die Crew eines Bootes soll beim
+    # Verteilen an Bord nicht über zwei Blätter laufen.
+    bloecke = [
+        crew_block(f"Boot: {g['boot'].name}", g["crew"])
+        for g in gruppen.values() if g["crew"]
+    ]
     if ohne_boot:
-        elements += crew_block("Ohne Boot-Zuteilung", ohne_boot)
+        bloecke.append(crew_block("Ohne Boot-Zuteilung", ohne_boot))
+
+    for i, block in enumerate(bloecke):
+        elements += block
+        if i < len(bloecke) - 1:
+            elements.append(PageBreak())
 
     doc.build(elements)
     return response
