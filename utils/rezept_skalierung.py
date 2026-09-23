@@ -1,6 +1,12 @@
-"""Skalierung freier Mengenangaben aus Rezepten ("250g", "ca. 1 kg", "½ Bund", "1/2 TL", "2-3 EL").
+"""Freie Mengenangaben aus Rezepten ("250g", "ca. 1 kg", "½ Bund", "1/2 TL", "2-3 EL").
 
-Wird vom Einzel-Rezept-PDF (rezepte/views.py) und vom Kochplan-PDF (toern/views.py) genutzt.
+`skaliere_menge` rechnet eine Angabe auf die Crew-Größe hoch — genutzt vom
+Einzel-Rezept-PDF (rezepte/views.py) und vom Kochplan-PDF (toern/views.py).
+
+`summiere_mengen` fasst die Angaben mehrerer Rezepte zu EINER Einkaufsmenge
+zusammen und wird ausschließlich für die Einkaufsliste verwendet. Nur dort
+gilt die Kochmengen-Regel weiter unten: Sie darf nicht in die Rezeptanzeige
+durchschlagen, wo „eine Prise" eine sinnvolle Angabe ist.
 """
 import re
 
@@ -53,17 +59,53 @@ def parse_menge(menge):
     return None
 
 
+# Angaben, die beim Kochen zählen, aber nichts über den Einkauf sagen.
+# Neben "1 Packung Salz" ist "5 Prisen" reine Verwirrung — die Packung deckt
+# das ab. BEWUSST NICHT dabei: EL, TL, Scheiben, Stück. Die klingen zwar auch
+# nach Kochmenge, summieren sich aber zu echten Mengen (40 Scheiben Gurke sind
+# mehr als 2 Gurken) — sie zu schlucken hieße, zu wenig einzukaufen.
+_KOCHMENGEN_EINHEITEN = {'prise', 'prisen', 'messerspitze', 'msp', 'spritzer', 'schuss'}
+_KOCHMENGEN_TEXTE = {
+    'etwas', 'nach bedarf', 'nach belieben', 'nach geschmack', 'wenig', 'bei bedarf',
+}
+
+
+def ist_kochmenge(menge):
+    """Sagt diese Angabe etwas über den Einkauf aus — oder nur übers Würzen?
+
+    >>> ist_kochmenge("5 Prisen")
+    True
+    >>> ist_kochmenge("1 Packung")
+    False
+    """
+    if not menge:
+        return False
+    text = menge.strip().lower()
+    if text in _KOCHMENGEN_TEXTE:
+        return True
+    parsed = parse_menge(menge)
+    if parsed:
+        return parsed[1].strip().lower() in _KOCHMENGEN_EINHEITEN
+    return False
+
+
 def summiere_mengen(menge_list):
     """Fasst Mengenangaben derselben Zutat zusammen (für die Einkaufsliste).
 
-    Parsebare Angaben werden pro Einheit summiert ("250 g" + "ca. 1,5 kg×parse" …),
+    Parsebare Angaben werden pro Einheit summiert ("250 g" + "ca. 1,5 kg" …),
     nicht parsebare ("nach Belieben") bleiben als Text erhalten.
+
+    Reine Kochmengen ("5 Prisen", "etwas") fallen weg, SOBALD eine echte
+    Kaufmenge dabei ist: "1 Packung + 5 Prisen" wird zu "1 Packung". Sind sie
+    die einzige Angabe, bleiben sie stehen — sonst stünde der Posten ohne
+    Menge da und niemand wüsste, wie viel zu kaufen ist.
     """
+    kauf = [m for m in menge_list if m and not ist_kochmenge(m)]
+    relevant = kauf if kauf else [m for m in menge_list if m]
+
     totals = {}   # einheit -> [summe, ist_ca]
     leftovers = []
-    for raw in menge_list:
-        if not raw:
-            continue
+    for raw in relevant:
         parsed = parse_menge(raw)
         if parsed:
             zahl, einheit, ist_ca = parsed

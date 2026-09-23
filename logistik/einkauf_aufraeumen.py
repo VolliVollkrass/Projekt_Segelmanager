@@ -9,6 +9,7 @@ Der Snapshot ist kein Komfort, sondern Bedingung: Zusammenführen löscht Zeilen
 und eine Einkaufsliste, aus der auf See etwas verschwindet, fällt erst im Hafen
 auf. Deshalb wird nie zusammengeführt, ohne vorher den Zustand zu sichern.
 """
+import json
 import uuid
 
 from django.contrib.auth.decorators import login_required
@@ -21,6 +22,9 @@ from django.views.decorators.http import require_POST
 
 from boote.models import Boot
 from toern.models import Teilnahme, Toern
+
+from utils.produktnamen import anzeigename, varianten_hinweis
+from utils.rezept_skalierung import summiere_mengen
 
 from .dubletten import fuehre_zusammen, plane_zusammenfuehrung
 from .models import EinkaufslistenEintrag, EinkaufslistenSnapshot
@@ -113,6 +117,74 @@ def einkaufsliste_aufraeumen(request, toern_id, boot_id):
         'entfernt': entfernt,
         'snapshot_id': snapshot.id,
         'zeilen': _aktive(boot, toern).count(),
+    })
+
+
+@login_required
+@require_POST
+def einkaufsliste_merge(request, toern_id, boot_id):
+    """Ausgewählte Posten von Hand zu einem zusammenlegen.
+
+    Die Automatik fasst nur zusammen, was sie sicher erkennt. Alles andere —
+    Karotten und Möhren, Toast und Toastbrot — entscheidet hier ein Mensch:
+    Er wählt die Zeilen aus, bestimmt Name und Menge und drückt zusammen.
+    Auch das wird vorher gesichert und lässt sich zurücknehmen.
+    """
+    toern, boot = _hole(request, toern_id, boot_id)
+    data = json.loads(request.body or '{}')
+
+    ids = data.get('ids') or []
+    if len(ids) < 2:
+        return JsonResponse({'error': 'Bitte mindestens zwei Posten auswählen.'}, status=400)
+
+    with transaction.atomic():
+        eintraege = list(_aktive(boot, toern).filter(id__in=ids).select_for_update())
+        if len(eintraege) < 2:
+            return JsonResponse({'error': 'Die Auswahl ist nicht mehr aktuell.'}, status=400)
+
+        snapshot = EinkaufslistenSnapshot.objects.create(
+            boot=boot, toern=toern, erstellt_von=request.user,
+            anlass='merge', daten=_snapshot_daten(boot, toern),
+        )
+
+        name = (data.get('name') or '').strip() or anzeigename([e.name for e in eintraege])
+        menge = data.get('menge')
+        if menge is None:
+            menge = summiere_mengen([e.menge for e in eintraege])
+
+        behalten = next((e for e in eintraege if e.name == name), eintraege[0])
+        rest = [e for e in eintraege if e.id != behalten.id]
+
+        # Rezept-Hinweise und verworfene Schreibweisen übernehmen, damit
+        # nachvollziehbar bleibt, woraus der Posten entstanden ist.
+        infos = []
+        for e in eintraege:
+            for stueck in (e.rezept_info or '').split(', '):
+                if stueck and stueck not in infos:
+                    infos.append(stueck)
+        hinweis = varianten_hinweis([e.name for e in eintraege], name)
+        text = ', '.join(infos)
+        if hinweis:
+            text = f"{text} · {hinweis}" if text else hinweis
+
+        behalten.name = name[:200]
+        behalten.menge = (menge or '').strip()[:100]
+        behalten.rezept_info = text[:500]
+        behalten.quelle = 'manuell'
+        behalten.erledigt = any(e.erledigt for e in eintraege)
+        if not behalten.einkaufer_id:
+            behalten.einkaufer_id = next((e.einkaufer_id for e in eintraege if e.einkaufer_id), None)
+        behalten.save()
+
+        for e in rest:
+            e.delete()
+
+    return JsonResponse({
+        'ok': True,
+        'name': behalten.name,
+        'menge': behalten.menge,
+        'entfernt': len(rest),
+        'snapshot_id': snapshot.id,
     })
 
 

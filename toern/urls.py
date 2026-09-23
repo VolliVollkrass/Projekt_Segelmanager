@@ -24,7 +24,7 @@ from .einkauf_export import einkaufsliste_pdf, einkaufsliste_xlsx
 from .dokumente_zip import boot_dokumente_zip, toern_dokumente_zip
 from logistik.einkauf_aufraeumen import (
     einkaufsliste_aufraeumen, einkaufsliste_aufraeumen_undo,
-    einkaufsliste_aufraeumen_vorschau,
+    einkaufsliste_aufraeumen_vorschau, einkaufsliste_merge,
 )
 
 urlpatterns = [
@@ -160,7 +160,9 @@ urlpatterns = [
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufraeumen/vorschau/", einkaufsliste_aufraeumen_vorschau, name="einkaufsliste_aufraeumen_vorschau"),
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufraeumen/",          einkaufsliste_aufraeumen,          name="einkaufsliste_aufraeumen"),
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufraeumen/undo/",     einkaufsliste_aufraeumen_undo,     name="einkaufsliste_aufraeumen_undo"),
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/merge/",              einkaufsliste_merge,               name="einkaufsliste_merge"),
     path("einkaufsliste/<int:eintrag_id>/toggle/",                       einkaufsliste_toggle,     name="einkaufsliste_toggle"),
+    path("einkaufsliste/<int:eintrag_id>/update/",                       einkaufsliste_update,     name="einkaufsliste_update"),
     path("einkaufsliste/<int:eintrag_id>/delete/",                       einkaufsliste_delete,     name="einkaufsliste_delete"),
     path("einkaufsliste/<int:eintrag_id>/reaktivieren/",                 einkaufsliste_reaktivieren, name="einkaufsliste_reaktivieren"),
     path("<int:toern_id>/einkaufsvorlage/",                              einkaufsvorlage_get,      name="einkaufsvorlage_get"),
