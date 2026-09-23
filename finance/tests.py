@@ -211,6 +211,56 @@ class TopfBelegAbrechnungTests(TestCase):
         self.assertIn("spreadsheetml", resp["Content-Type"])
         self.assertGreater(len(resp.getvalue()), 500)
 
+    def _xlsx_sheet(self):
+        from io import BytesIO
+        from openpyxl import load_workbook
+
+        self.client.force_login(self.skipper_user)
+        resp = self.client.get(reverse("topf_abrechnung_xlsx", args=[self.toern.id]))
+        return load_workbook(BytesIO(resp.getvalue())).active
+
+    def _zeile_mit(self, ws, text, spalte):
+        """Zeilennummer der ersten Zelle in `spalte`, die `text` enthält."""
+        for row in ws.iter_rows(min_col=spalte, max_col=spalte):
+            if row[0].value == text:
+                return row[0].row
+        self.fail(f"Zeile mit {text!r} nicht gefunden")
+
+    def test_xlsx_kopfzeile_ist_formatiert(self):
+        """Regression: ws.append([]) erhöht max_row nicht — die Formatierung
+        landete dadurch auf einer leeren Zeile über den Überschriften."""
+        self._make_ausgabe(kategorie="hafen", beschreibung="Liegeplatz", betrag=Decimal("120.00"))
+        ws = self._xlsx_sheet()
+
+        kopf = self._zeile_mit(ws, "Datum", 2)
+        for spalte in range(2, 8):
+            zelle = ws.cell(row=kopf, column=spalte)
+            self.assertEqual(zelle.fill.fgColor.rgb, "001E3A5F", f"Spalte {spalte} ohne Kopf-Füllung")
+            self.assertTrue(zelle.font.bold, f"Spalte {spalte} nicht fett")
+        # Die Zeile darüber darf die Formatierung NICHT tragen
+        self.assertNotEqual(ws.cell(row=kopf - 1, column=2).fill.fgColor.rgb, "001E3A5F")
+
+    def test_xlsx_summenzeilen_sind_formatiert(self):
+        self._make_ausgabe(kategorie="hafen", beschreibung="Liegeplatz", betrag=Decimal("120.00"))
+        ws = self._xlsx_sheet()
+
+        gesamt = self._zeile_mit(ws, "Gesamt ausgegeben", 4)
+        betrag = ws.cell(row=gesamt, column=5)
+        self.assertTrue(betrag.font.bold, "Gesamtbetrag nicht fett")
+        self.assertIn("€", betrag.number_format)
+        self.assertEqual(betrag.value, 120.0)
+
+    def test_xlsx_diagramm_zeigt_auf_die_summenzeilen(self):
+        self._make_ausgabe(kategorie="hafen", beschreibung="Liegeplatz", betrag=Decimal("120.00"))
+        ws = self._xlsx_sheet()
+
+        self.assertTrue(ws._charts, "Kein Diagramm im Export")
+        serie = ws._charts[0].series[0]
+        # Kategorie-Summenzeile: Label in Spalte D, Betrag in Spalte E
+        kat_zeile = self._zeile_mit(ws, "Hafen, Liegeplatz & Abgaben", 4)
+        self.assertIn(f"$E${kat_zeile}", str(serie.val.numRef.f))
+        self.assertIn(f"$D${kat_zeile}", str(serie.cat.numRef.f if serie.cat.numRef else serie.cat.strRef.f))
+
     def test_export_fremder_verboten(self):
         self.client.force_login(self.fremder)
         self.assertEqual(self.client.get(reverse("topf_belege_pdf", args=[self.toern.id])).status_code, 403)

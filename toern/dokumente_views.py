@@ -198,6 +198,29 @@ def boot_dokument_toggle(request, boot_id, eintrag_id):
     return JsonResponse({'status': 'ok', **_abhak_json(status)})
 
 
+@login_required
+@require_POST
+def boot_dokument_reset(request, boot_id, typ):
+    """Alle Häkchen einer Checkliste dieses Boots zurücksetzen (nur Skipper/Co).
+
+    Gedacht für Ablegen/Anlegen: Die Liste wird bei jedem Manöver neu
+    durchgegangen, deshalb muss sie sich in einem Rutsch leeren lassen. Die
+    Status-Zeilen werden gelöscht statt auf erledigt=False gesetzt — das ist
+    derselbe Zustand wie „noch nie abgehakt" und nimmt auch erledigt_von/-am mit.
+    """
+    boot = get_object_or_404(Boot, id=boot_id)
+    _boot_dokument_recht(request, boot)
+
+    if typ not in DOKUMENT_TYPEN_KEYS:
+        return JsonResponse({'error': 'Ungültiger Typ'}, status=400)
+
+    vorlage = get_or_create_dokument_vorlage(boot.toern, typ, user=request.user)
+    anzahl, _ = DokumentAbhakstatus.objects.filter(
+        boot=boot, eintrag__vorlage=vorlage
+    ).delete()
+    return JsonResponse({'status': 'ok', 'zurueckgesetzt': anzahl})
+
+
 # =========================
 # PERSÖNLICHE CHECKLISTEN-STANDARDS
 # =========================

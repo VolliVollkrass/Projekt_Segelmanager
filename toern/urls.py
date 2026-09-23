@@ -6,7 +6,7 @@ from .dokumente_views import (
     dokument_item_delete, dokument_reset,
     dok_standard_list, dok_standard_speichern, dok_standard_laden,
     dok_standard_loeschen, dok_standard_default,
-    boot_dokument_get, boot_dokument_toggle,
+    boot_dokument_get, boot_dokument_toggle, boot_dokument_reset,
 )
 from .schaden_views import (
     schaden_neu, schaden_bearbeiten, schaden_loeschen,
@@ -77,6 +77,7 @@ urlpatterns = [
     path("schaden/bild/<int:bild_id>/loeschen/", schaden_bild_loeschen, name="schaden_bild_loeschen"),
     path("boot/<int:boot_id>/checkliste/<str:typ>/abhaken/", boot_dokument_get, name="boot_dokument_get"),
     path("boot/<int:boot_id>/checkliste/item/<int:eintrag_id>/toggle/", boot_dokument_toggle, name="boot_dokument_toggle"),
+    path("boot/<int:boot_id>/checkliste/<str:typ>/reset/", boot_dokument_reset, name="boot_dokument_reset"),
     path("<int:toern_id>/dokument/item/add/", dokument_item_add, name="dokument_item_add"),
     path("<int:toern_id>/dokument/item/<int:item_id>/update/", dokument_item_update, name="dokument_item_update"),
     path("<int:toern_id>/dokument/item/<int:item_id>/delete/", dokument_item_delete, name="dokument_item_delete"),

@@ -510,8 +510,11 @@ def topf_abrechnung_xlsx(request, toern_id):
     # Datenspalten: B=Datum C=Kategorie D=Beschreibung E=Betrag F=Erfasst G=Belege
     COL_KAT, COL_BESCHR, COL_BETRAG = 3, 4, 5
     spalten = ["Datum", "Kategorie", "Beschreibung", "Betrag", "Erfasst von", "Belege (siehe PDF)"]
-    header_row = ws.max_row + 1
     ws.append([None] + spalten)
+    # Zeilennummer NACH dem append lesen: ein leeres ws.append([]) schiebt zwar
+    # den Schreib-Cursor weiter, erhöht aber max_row nicht (es entstehen keine
+    # Zellen). Vorher gerechnet landete die Formatierung auf einer leeren Zeile.
+    header_row = ws.max_row
     for col in range(2, 2 + len(spalten)):
         c = ws.cell(row=header_row, column=col)
         c.font = header_font
@@ -520,8 +523,8 @@ def topf_abrechnung_xlsx(request, toern_id):
 
     for g in gruppen:
         # Kategorie-Zeile
-        r = ws.max_row + 1
         ws.append([None, g["label"], "", "", g["summe"], "", ""])
+        r = ws.max_row
         for col in range(2, 8):
             ws.cell(row=r, column=col).fill = cat_fill
             ws.cell(row=r, column=col).font = cat_font
@@ -532,7 +535,6 @@ def topf_abrechnung_xlsx(request, toern_id):
             a = eintrag["ausgabe"]
             erfasser = f"{a.erstellt_von.first_name} {a.erstellt_von.last_name}".strip() if a.erstellt_von else ""
             belege_ref = ", ".join(bl["nummer"] for bl in eintrag["belege"]) or "— kein Beleg —"
-            rr = ws.max_row + 1
             ws.append([
                 None,
                 a.created_at.strftime("%d.%m.%Y"),
@@ -542,6 +544,7 @@ def topf_abrechnung_xlsx(request, toern_id):
                 erfasser,
                 belege_ref,
             ])
+            rr = ws.max_row
             ws.cell(row=rr, column=COL_BETRAG).number_format = euro
             ws.cell(row=rr, column=COL_BETRAG).alignment = Alignment(horizontal="right")
             for col in range(2, 8):
@@ -550,8 +553,8 @@ def topf_abrechnung_xlsx(request, toern_id):
     # Summenblock
     ws.append([])
     def summenzeile(label, wert, fett=True):
-        r = ws.max_row + 1
         ws.append([None, "", "", label, float(wert), "", ""])
+        r = ws.max_row
         ws.cell(row=r, column=COL_BESCHR).font = bold if fett else Font()
         c = ws.cell(row=r, column=COL_BETRAG)
         c.number_format = euro
@@ -559,10 +562,10 @@ def topf_abrechnung_xlsx(request, toern_id):
         c.alignment = Alignment(horizontal="right")
         return r
 
-    kat_summen_start = ws.max_row + 1
-    for g in gruppen:
-        summenzeile(g["label"], g["summe"], fett=False)
-    kat_summen_ende = ws.max_row
+    # Zeilen der Kategorie-Summen merken — das Tortendiagramm referenziert sie
+    # später. Die Nummern kommen aus summenzeile selbst, damit sie auch dann
+    # stimmen, wenn davor eine Leerzeile eingefügt wurde.
+    kat_summen_zeilen = [summenzeile(g["label"], g["summe"], fett=False) for g in gruppen]
     ws.append([])
     summenzeile("Gesamt ausgegeben", gesamt)
     summenzeile("Budget", toern.skipper_budget)
@@ -576,8 +579,10 @@ def topf_abrechnung_xlsx(request, toern_id):
         chart.title = "Kostenaufteilung"
         chart.height = 8
         chart.width = 12
-        labels = Reference(ws, min_col=COL_BESCHR, min_row=kat_summen_start, max_row=kat_summen_ende)
-        data = Reference(ws, min_col=COL_BETRAG, min_row=kat_summen_start, max_row=kat_summen_ende)
+        labels = Reference(ws, min_col=COL_BESCHR,
+                           min_row=kat_summen_zeilen[0], max_row=kat_summen_zeilen[-1])
+        data = Reference(ws, min_col=COL_BETRAG,
+                         min_row=kat_summen_zeilen[0], max_row=kat_summen_zeilen[-1])
         chart.add_data(data, titles_from_data=False)
         chart.set_categories(labels)
         chart.dataLabels = DataLabelList()
