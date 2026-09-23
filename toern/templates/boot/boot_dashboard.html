@@ -757,6 +757,12 @@
                         Generieren
                     </button>
                     {% if einkauf_gruppen %}
+                    <button onclick="oeffneAufraeumen()" class="btn btn-xs btn-outline gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                        </svg>
+                        Aufräumen
+                    </button>
                     <button onclick="zeigeAufteilen()" class="btn btn-xs btn-outline btn-secondary gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -923,6 +929,52 @@
         </div>
 
     </div>
+
+    <!-- ═══ MODAL: Einkaufsliste aufräumen ═══ -->
+    <dialog id="aufraeumenModal" class="modal">
+        <div class="modal-box max-w-xl">
+            <h3 class="font-bold text-lg mb-1">Einkaufsliste aufräumen</h3>
+            <p class="text-xs text-base-content/50 mb-4">
+                Derselbe Artikel steht manchmal mehrfach auf der Liste — aus Rezepten,
+                dem Grundeinkauf und von Hand. Hier siehst du erst, was zusammengelegt
+                würde. Nichts wird geändert, bevor du bestätigst.
+            </p>
+
+            <div id="auf-loading" class="flex justify-center py-8">
+                <span class="loading loading-spinner loading-md"></span>
+            </div>
+
+            <div id="auf-inhalt" class="hidden">
+                <div id="auf-summe" class="alert py-2 text-sm mb-3"></div>
+                <div id="auf-gruppen" class="space-y-2 max-h-80 overflow-y-auto"></div>
+            </div>
+
+            <div id="auf-fertig" class="hidden">
+                <div class="alert alert-success py-2 text-sm mb-3">
+                    <span id="auf-fertig-text"></span>
+                </div>
+                <p class="text-xs text-base-content/50">
+                    Nichts geht verloren: Vor dem Zusammenlegen wurde der vorherige Stand
+                    gesichert. „Rückgängig machen" stellt ihn vollständig wieder her.
+                </p>
+            </div>
+
+            <div class="modal-action justify-between">
+                <button onclick="aufraeumenUndo()" id="auf-undo-btn"
+                        class="btn btn-sm btn-ghost text-error hidden">
+                    Rückgängig machen
+                </button>
+                <div class="flex gap-2 ml-auto">
+                    <button class="btn btn-sm" onclick="aufraeumenModal.close()">Schließen</button>
+                    <button onclick="aufraeumenAnwenden()" id="auf-anwenden-btn"
+                            class="btn btn-sm btn-primary hidden">
+                        Zusammenführen
+                    </button>
+                </div>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>schließen</button></form>
+    </dialog>
 
     <!-- ═══ MODAL: Grundeinkauf bearbeiten ═══ -->
     {% if darf_grundeinkauf %}
@@ -1938,6 +1990,108 @@ async function reaktiviereEinkauf(id) {
         method: 'POST', headers: {'X-CSRFToken': CSRF},
     });
     location.href = "?tab=bordkueche";
+}
+
+// ─── Einkaufsliste aufräumen (Dubletten) ───
+let aufSnapshotVorhanden = false;
+
+async function oeffneAufraeumen() {
+    document.getElementById('aufraeumenModal').showModal();
+    document.getElementById('auf-loading').classList.remove('hidden');
+    document.getElementById('auf-inhalt').classList.add('hidden');
+    document.getElementById('auf-fertig').classList.add('hidden');
+    document.getElementById('auf-anwenden-btn').classList.add('hidden');
+    document.getElementById('auf-undo-btn').classList.add('hidden');
+
+    const r = await fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/einkaufsliste/aufraeumen/vorschau/`);
+    const d = await r.json();
+    document.getElementById('auf-loading').classList.add('hidden');
+
+    aufSnapshotVorhanden = !!d.snapshot;
+    if (aufSnapshotVorhanden) {
+        const btn = document.getElementById('auf-undo-btn');
+        btn.classList.remove('hidden');
+        btn.title = `Stand vom ${d.snapshot.erstellt_am} mit ${d.snapshot.posten} Posten`;
+    }
+
+    const summe = document.getElementById('auf-summe');
+    const liste = document.getElementById('auf-gruppen');
+    document.getElementById('auf-inhalt').classList.remove('hidden');
+
+    if (!d.gruppen.length) {
+        summe.className = 'alert py-2 text-sm mb-3';
+        summe.textContent = 'Keine Dubletten gefunden — die Liste ist sauber.';
+        liste.innerHTML = '';
+        return;
+    }
+
+    summe.className = 'alert alert-info py-2 text-sm mb-3';
+    summe.textContent = `${d.gruppen.length} Produkte stehen mehrfach auf der Liste. `
+        + `${d.zeilen_vorher} Zeilen werden zu ${d.zeilen_nachher}.`;
+
+    liste.innerHTML = d.gruppen.map(g => `
+        <div class="border border-base-300 rounded-xl px-3 py-2">
+            <div class="flex items-baseline justify-between gap-2">
+                <span class="text-sm font-semibold">${escHtml(g.name)}</span>
+                <span class="text-xs text-secondary font-medium">${escHtml(g.menge)}</span>
+            </div>
+            <div class="mt-1 space-y-0.5">
+                ${g.zeilen.map(z => `
+                    <div class="text-[11px] text-base-content/40 flex justify-between gap-2">
+                        <span>${escHtml(z.name)}</span>
+                        <span>${escHtml(z.menge || '—')}</span>
+                    </div>`).join('')}
+            </div>
+        </div>`).join('');
+
+    document.getElementById('auf-anwenden-btn').classList.remove('hidden');
+}
+
+function escHtml(t) {
+    const d = document.createElement('div');
+    d.textContent = t == null ? '' : t;
+    return d.innerHTML;
+}
+
+async function aufraeumenAnwenden() {
+    const btn = document.getElementById('auf-anwenden-btn');
+    btn.disabled = true;
+    const r = await fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/einkaufsliste/aufraeumen/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+    const d = await r.json();
+    btn.disabled = false;
+    if (!d.ok) return;
+
+    document.getElementById('auf-inhalt').classList.add('hidden');
+    btn.classList.add('hidden');
+    document.getElementById('auf-fertig').classList.remove('hidden');
+    document.getElementById('auf-fertig-text').textContent =
+        `${d.zusammengefuehrt} Produkte zusammengeführt, ${d.entfernt} Zeilen weniger. `
+        + `Die Liste hat jetzt ${d.zeilen} Posten.`;
+    document.getElementById('auf-undo-btn').classList.remove('hidden');
+    aufListeNeuLaden();
+}
+
+async function aufraeumenUndo() {
+    if (!confirm('Den Stand vor dem Aufräumen wiederherstellen?')) return;
+    const btn = document.getElementById('auf-undo-btn');
+    btn.disabled = true;
+    const r = await fetch(`/toern/${TOERN_ID}/boot/${BOOT_ID}/einkaufsliste/aufraeumen/undo/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+    const d = await r.json();
+    btn.disabled = false;
+    if (d.error) { alert(d.error); return; }
+    aufListeNeuLaden();
+}
+
+// Die Liste steht serverseitig gerendert auf der Seite — nach dem Eingriff
+// neu laden, damit Kategorien, Mengen und Zähler wieder stimmen.
+function aufListeNeuLaden() {
+    const url = new URL(location.href);
+    url.searchParams.set('tab', 'bordkueche');
+    location.href = url.toString();
 }
 
 // ─── Grundeinkauf-Vorlage ───

@@ -15,6 +15,7 @@ from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE, SKIPPER_LISTE
 from utils.rezept_skalierung import skaliere_menge, summiere_mengen
+from utils.produktnamen import anzeigename, normalisiere_produktname, ohne_zusatz, varianten_hinweis
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, PacklisteStandard, PacklisteStandardEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage, Schadensmeldung, Rundmail
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen, mail_rundmail
 from .crew_utils import fehlende_crew_felder
@@ -4749,52 +4750,79 @@ def einkaufsliste_generieren(request, toern_id, boot_id):
 
     # Bereits Gekauftes (Archiv) nicht ungefragt erneut auf die Liste setzen
     archiv_namen = {
-        n.lower().strip()
+        normalisiere_produktname(n)
         for n in EinkaufslistenEintrag.objects.filter(
             boot=boot, toern=toern, archiviert=True
         ).values_list('name', flat=True)
     }
 
-    # Zutaten aus Rezepten sammeln + skalieren
-    raw = defaultdict(lambda: {'mengen': [], 'rezepte': [], 'name': ''})
+    # Rezeptzutaten UND Grundeinkauf laufen in denselben Topf: früher wurde der
+    # Grundeinkauf einfach angehängt, wodurch „Salami" aus dem Rezept und
+    # „Salami" aus der Vorlage zwei Zeilen ergaben. Der Schlüssel ist der
+    # normalisierte Produktname, damit auch „Kartoffeln (klein gewürfelt)"
+    # bei „Kartoffeln" landet.
+    raw = {}
+
+    def sammle(name, menge, kategorie, quelle, rezept=None):
+        key = normalisiere_produktname(name)
+        if not key:
+            return
+        eintrag = raw.setdefault(key, {
+            'namen': [], 'mengen': [], 'rezepte': [], 'kategorie': kategorie, 'quelle': quelle,
+        })
+        eintrag['namen'].append(name)
+        eintrag['mengen'].append(menge)
+        if rezept and rezept not in eintrag['rezepte']:
+            eintrag['rezepte'].append(rezept)
+        # Grundeinkauf trägt eine vom Skipper gepflegte Kategorie — die schlägt
+        # die automatische Erkennung aus dem Namen.
+        if quelle == 'standard':
+            eintrag['kategorie'] = kategorie
+            eintrag['quelle'] = 'standard' if eintrag['quelle'] != 'rezept' else 'rezept'
+
     for mz in Mahlzeit.objects.filter(boot=boot, toern=toern).select_related('rezept').prefetch_related('rezept__zutaten'):
         if not mz.rezept:
             continue
         factor = crew_anzahl / (mz.rezept.portionen or 1)
         for z in mz.rezept.zutaten.all():
-            key = z.name.lower().strip()
-            raw[key]['name'] = raw[key]['name'] or z.name
-            raw[key]['mengen'].append(skaliere_menge(z.menge, factor))
-            if mz.rezept.name not in raw[key]['rezepte']:
-                raw[key]['rezepte'].append(mz.rezept.name)
-
-    uebersprungen = 0
-    to_create = []
-    for key, data in raw.items():
-        if key in archiv_namen:
-            uebersprungen += 1
-            continue
-        to_create.append(EinkaufslistenEintrag(
-            boot=boot, toern=toern,
-            name=data['name'],
-            menge=_merge_mengen(data['mengen']),
-            kategorie=_detect_kategorie(data['name']),
-            quelle='rezept',
-            rezept_info=', '.join(data['rezepte']),
-        ))
+            sammle(z.name, skaliere_menge(z.menge, factor),
+                   _detect_kategorie(ohne_zusatz(z.name)), 'rezept', mz.rezept.name)
 
     # Grundeinkauf aus der bearbeitbaren Törn-Vorlage
     vorlage = _get_or_create_einkaufsvorlage(toern, user=request.user)
     for e in vorlage.eintraege.all():
-        if e.name.lower().strip() in archiv_namen:
+        sammle(e.name, _menge_aus_template(e.menge_template, crew_anzahl),
+               e.kategorie, 'standard')
+
+    # Manuell erfasste Posten bleiben unangetastet — sie überleben das
+    # Generieren. Steht der Artikel schon von Hand auf der Liste, wird er nicht
+    # ein zweites Mal angelegt; die selbst eingetragene Menge bleibt damit so,
+    # wie der Mensch sie wollte.
+    manuelle_schluessel = {
+        normalisiere_produktname(n)
+        for n in EinkaufslistenEintrag.objects.filter(
+            boot=boot, toern=toern, archiviert=False, quelle='manuell'
+        ).values_list('name', flat=True)
+    }
+
+    uebersprungen = 0
+    to_create = []
+    for key, data in raw.items():
+        if key in archiv_namen or key in manuelle_schluessel:
             uebersprungen += 1
             continue
+        name = anzeigename(data['namen'])
+        hinweis = varianten_hinweis(data['namen'], name)
+        rezept_info = ', '.join(data['rezepte'])
+        if hinweis:
+            rezept_info = f"{rezept_info} · {hinweis}" if rezept_info else hinweis
         to_create.append(EinkaufslistenEintrag(
             boot=boot, toern=toern,
-            name=e.name,
-            menge=_menge_aus_template(e.menge_template, crew_anzahl),
-            kategorie=e.kategorie,
-            quelle='standard',
+            name=name,
+            menge=_merge_mengen(data['mengen']),
+            kategorie=data['kategorie'],
+            quelle=data['quelle'],
+            rezept_info=rezept_info[:500],
         ))
 
     EinkaufslistenEintrag.objects.bulk_create(to_create)

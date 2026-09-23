@@ -217,6 +217,29 @@ class EinkaufsStandardEintrag(models.Model):
         ordering = ['id']
 
 
+# Sicherungskopie der Einkaufsliste vor dem Zusammenführen von Dubletten.
+# Ohne sie wäre „Aufräumen" ein Vorgang, der Zeilen löscht, ohne dass man ihn
+# zurückholen kann — auf einem Törn ein untragbares Risiko.
+class EinkaufslistenSnapshot(models.Model):
+    boot = models.ForeignKey(Boot, on_delete=models.CASCADE, related_name='einkaufs_snapshots')
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name='einkaufs_snapshots')
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+    erstellt_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+'
+    )
+    anlass = models.CharField(max_length=50, default='aufraeumen')
+    # Vollständige Kopie der aktiven Einträge zum Zeitpunkt des Eingriffs
+    daten = models.JSONField(default=list)
+    zurueckgespielt_am = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-erstellt_am']
+
+    def __str__(self):
+        return f"Snapshot {self.boot} – {self.erstellt_am:%d.%m.%Y %H:%M} ({len(self.daten)} Posten)"
+
+
 # Persönliche Packliste
 class PersönlicherGegenstand(models.Model):
     participation = models.ForeignKey(Teilnahme, on_delete=models.CASCADE, related_name="persoenliche_packliste")
