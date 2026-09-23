@@ -22,6 +22,10 @@ from .briefing_views import (
 from .briefing_pdf import briefing_pdf
 from .einkauf_export import einkaufsliste_pdf, einkaufsliste_xlsx
 from .dokumente_zip import boot_dokumente_zip, toern_dokumente_zip
+from logistik.einkauf_aufraeumen import (
+    einkaufsliste_aufraeumen, einkaufsliste_aufraeumen_undo,
+    einkaufsliste_aufraeumen_vorschau,
+)
 
 urlpatterns = [
     path('detail/<int:pk>/', toern_detail, name='toern_detail'),  # Detailseite
@@ -153,6 +157,9 @@ urlpatterns = [
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/status/",     einkaufsliste_status,     name="einkaufsliste_status"),
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/pdf/",        einkaufsliste_pdf,        name="einkaufsliste_pdf"),
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/xlsx/",       einkaufsliste_xlsx,       name="einkaufsliste_xlsx"),
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufraeumen/vorschau/", einkaufsliste_aufraeumen_vorschau, name="einkaufsliste_aufraeumen_vorschau"),
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufraeumen/",          einkaufsliste_aufraeumen,          name="einkaufsliste_aufraeumen"),
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufraeumen/undo/",     einkaufsliste_aufraeumen_undo,     name="einkaufsliste_aufraeumen_undo"),
     path("einkaufsliste/<int:eintrag_id>/toggle/",                       einkaufsliste_toggle,     name="einkaufsliste_toggle"),
     path("einkaufsliste/<int:eintrag_id>/delete/",                       einkaufsliste_delete,     name="einkaufsliste_delete"),
     path("einkaufsliste/<int:eintrag_id>/reaktivieren/",                 einkaufsliste_reaktivieren, name="einkaufsliste_reaktivieren"),
