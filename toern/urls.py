@@ -26,6 +26,7 @@ from logistik.einkauf_aufraeumen import (
     einkaufsliste_aufraeumen, einkaufsliste_aufraeumen_undo,
     einkaufsliste_aufraeumen_vorschau,
 )
+from logistik.bordvorrat_views import bordvorrat_add, bordvorrat_delete, bordvorrat_get
 
 urlpatterns = [
     path('detail/<int:pk>/', toern_detail, name='toern_detail'),  # Detailseite
@@ -160,6 +161,9 @@ urlpatterns = [
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufraeumen/vorschau/", einkaufsliste_aufraeumen_vorschau, name="einkaufsliste_aufraeumen_vorschau"),
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufraeumen/",          einkaufsliste_aufraeumen,          name="einkaufsliste_aufraeumen"),
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufraeumen/undo/",     einkaufsliste_aufraeumen_undo,     name="einkaufsliste_aufraeumen_undo"),
+    path("<int:toern_id>/bordvorrat/",                       bordvorrat_get,    name="bordvorrat_get"),
+    path("<int:toern_id>/bordvorrat/add/",                   bordvorrat_add,    name="bordvorrat_add"),
+    path("<int:toern_id>/bordvorrat/<int:item_id>/delete/",  bordvorrat_delete, name="bordvorrat_delete"),
     path("einkaufsliste/<int:eintrag_id>/toggle/",                       einkaufsliste_toggle,     name="einkaufsliste_toggle"),
     path("einkaufsliste/<int:eintrag_id>/delete/",                       einkaufsliste_delete,     name="einkaufsliste_delete"),
     path("einkaufsliste/<int:eintrag_id>/reaktivieren/",                 einkaufsliste_reaktivieren, name="einkaufsliste_reaktivieren"),

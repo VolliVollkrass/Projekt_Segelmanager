@@ -217,6 +217,31 @@ class EinkaufsStandardEintrag(models.Model):
         ordering = ['id']
 
 
+# Bordvorrat: Dinge, die an Bord sowieso vorhanden sind oder „nach Bedarf"
+# verwendet werden — Salz, Pfeffer, Öl, Essig. Sie kommen aus Rezepten immer
+# wieder auf den Einkaufszettel, obwohl niemand sie kaufen will. Beim
+# Generieren werden sie übersprungen.
+class Bordvorrat(models.Model):
+    toern = models.OneToOneField(Toern, on_delete=models.CASCADE, related_name='bordvorrat')
+
+    def __str__(self):
+        return f"Bordvorrat – {self.toern}"
+
+
+class BordvorratEintrag(models.Model):
+    vorrat = models.ForeignKey(Bordvorrat, on_delete=models.CASCADE, related_name='eintraege')
+    name = models.CharField(max_length=200)
+    # Wofür der Posten steht — rein informativ, z.B. „ist in der Pantry"
+    notiz = models.CharField(max_length=200, blank=True)
+    erstellt_am = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 # Sicherungskopie der Einkaufsliste vor dem Zusammenführen von Dubletten.
 # Ohne sie wäre „Aufräumen" ein Vorgang, der Zeilen löscht, ohne dass man ihn
 # zurückholen kann — auf einem Törn ein untragbares Risiko.

@@ -757,6 +757,14 @@
                         Generieren
                     </button>
                     {% if einkauf_gruppen %}
+                    {% if darf_grundeinkauf %}
+                    <button onclick="oeffneBordvorrat()" class="btn btn-xs btn-ghost gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                        Bordvorrat
+                    </button>
+                    {% endif %}
                     <button onclick="oeffneAufraeumen()" class="btn btn-xs btn-outline gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
@@ -878,6 +886,13 @@
                                 <span class="einkaufer-badge badge badge-xs shrink-0"
                                       data-shopper-id="{{ item.einkaufer_id }}">{{ item.einkaufer.user.first_name }}</span>
                                 {% endif %}
+                                {% if darf_grundeinkauf %}
+                                <button onclick="aufBordvorrat('{{ item.name|escapejs }}')"
+                                        title="Haben wir an Bord — nicht mehr einkaufen"
+                                        class="btn btn-ghost btn-xs px-1 shrink-0 text-base-content/40">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                                </button>
+                                {% endif %}
                                 <button onclick="loescheEinkauf({{ item.id }})"
                                         class="btn btn-ghost btn-xs text-error px-1 shrink-0">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
@@ -929,6 +944,52 @@
         </div>
 
     </div>
+
+    <!-- ═══ MODAL: Bordvorrat ═══ -->
+    {% if darf_grundeinkauf %}
+    <dialog id="bordvorratModal" class="modal">
+        <div class="modal-box max-w-lg">
+            <h3 class="font-bold text-lg mb-1">Bordvorrat</h3>
+            <p class="text-xs text-base-content/50 mb-4">
+                Was hier steht, landet beim Generieren nicht mehr auf der Einkaufsliste.
+                Gedacht für Dinge, die an Bord sowieso da sind — Salz, Öl, Essig —
+                und die Rezepte trotzdem als Zutat aufführen.
+            </p>
+
+            <div id="bv-loading" class="flex justify-center py-6">
+                <span class="loading loading-spinner loading-md"></span>
+            </div>
+
+            <div id="bv-inhalt" class="hidden">
+                <div id="bv-liste" class="space-y-1.5 max-h-56 overflow-y-auto mb-3"></div>
+
+                <div id="bv-vorschlaege-block" class="mb-3 hidden">
+                    <p class="text-xs text-base-content/40 mb-1.5">Häufig an Bord — zum Übernehmen antippen:</p>
+                    <div id="bv-vorschlaege" class="flex flex-wrap gap-1.5"></div>
+                </div>
+
+                <div class="flex gap-2 pt-3 border-t border-base-200">
+                    <input type="text" id="bv-neu" placeholder="z.B. Olivenöl"
+                           class="input input-sm input-bordered flex-1"
+                           onkeydown="if(event.key==='Enter'){addBordvorrat(document.getElementById('bv-neu').value)}">
+                    <button onclick="addBordvorrat(document.getElementById('bv-neu').value)"
+                            class="btn btn-sm btn-primary px-3">+</button>
+                </div>
+                <label class="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                    <input type="checkbox" id="bv-entfernen" class="checkbox checkbox-xs">
+                    <span class="text-xs text-base-content/60">
+                        Posten auch von der aktuellen Einkaufsliste nehmen
+                    </span>
+                </label>
+            </div>
+
+            <div class="modal-action">
+                <button class="btn btn-sm" onclick="bordvorratModal.close()">Fertig</button>
+            </div>
+        </div>
+        <form method="dialog" class="modal-backdrop"><button>schließen</button></form>
+    </dialog>
+    {% endif %}
 
     <!-- ═══ MODAL: Einkaufsliste aufräumen ═══ -->
     <dialog id="aufraeumenModal" class="modal">
@@ -1990,6 +2051,82 @@ async function reaktiviereEinkauf(id) {
         method: 'POST', headers: {'X-CSRFToken': CSRF},
     });
     location.href = "?tab=bordkueche";
+}
+
+// ─── Bordvorrat ───
+async function oeffneBordvorrat() {
+    document.getElementById('bordvorratModal').showModal();
+    await ladeBordvorrat();
+}
+
+async function ladeBordvorrat() {
+    document.getElementById('bv-loading').classList.remove('hidden');
+    document.getElementById('bv-inhalt').classList.add('hidden');
+
+    const r = await fetch(`/toern/${TOERN_ID}/bordvorrat/`);
+    const d = await r.json();
+
+    const liste = document.getElementById('bv-liste');
+    liste.innerHTML = d.items.length ? d.items.map(i => `
+        <div class="flex items-center gap-2 bg-base-200 rounded-lg px-3 py-1.5">
+            <span class="flex-1 text-sm">${escHtml(i.name)}</span>
+            <button onclick="loescheBordvorrat(${i.id})"
+                    title="Wieder einkaufen"
+                    class="btn btn-ghost btn-xs text-error px-1">✕</button>
+        </div>`).join('')
+        : '<p class="text-sm text-base-content/40">Noch nichts eingetragen.</p>';
+
+    const block = document.getElementById('bv-vorschlaege-block');
+    const chips = document.getElementById('bv-vorschlaege');
+    if (d.vorschlaege.length) {
+        block.classList.remove('hidden');
+        chips.innerHTML = d.vorschlaege.map(v =>
+            `<button onclick="addBordvorrat('${v.replace(/'/g, "\\'")}')"
+                     class="btn btn-xs btn-outline">+ ${escHtml(v)}</button>`).join('');
+    } else {
+        block.classList.add('hidden');
+    }
+
+    document.getElementById('bv-loading').classList.add('hidden');
+    document.getElementById('bv-inhalt').classList.remove('hidden');
+}
+
+async function addBordvorrat(name) {
+    name = (name || '').trim();
+    if (!name) return;
+    const entfernen = document.getElementById('bv-entfernen')?.checked || false;
+    const r = await fetch(`/toern/${TOERN_ID}/bordvorrat/add/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, von_liste_entfernen: entfernen}),
+    });
+    const d = await r.json();
+    if (d.error) { alert(d.error); return; }
+
+    document.getElementById('bv-neu').value = '';
+    await ladeBordvorrat();
+    if (d.entfernt) aufListeNeuLaden();
+}
+
+async function loescheBordvorrat(id) {
+    await fetch(`/toern/${TOERN_ID}/bordvorrat/${id}/delete/`, {
+        method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+    await ladeBordvorrat();
+}
+
+// Direktweg aus der Liste: „haben wir an Bord" — Posten wandert in den
+// Bordvorrat und verschwindet von der Liste.
+async function aufBordvorrat(name) {
+    if (!confirm(`„${name}" haben wir an Bord?\n\nDer Posten verschwindet von der Einkaufsliste und kommt beim Generieren nicht wieder.`)) return;
+    const r = await fetch(`/toern/${TOERN_ID}/bordvorrat/add/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+        body: JSON.stringify({name: name, von_liste_entfernen: true}),
+    });
+    const d = await r.json();
+    if (d.error) { alert(d.error); return; }
+    aufListeNeuLaden();
 }
 
 // ─── Einkaufsliste aufräumen (Dubletten) ───

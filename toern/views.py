@@ -4805,9 +4805,18 @@ def einkaufsliste_generieren(request, toern_id, boot_id):
         ).values_list('name', flat=True)
     }
 
+    # Bordvorrat: Salz, Öl, Essig & Co. stehen an Bord und gehören nicht auf
+    # den Zettel — sie werden hier still übersprungen.
+    from logistik.bordvorrat_views import bordvorrat_schluessel
+    vorrat_schluessel = bordvorrat_schluessel(toern)
+
     uebersprungen = 0
+    vom_vorrat = 0
     to_create = []
     for key, data in raw.items():
+        if key in vorrat_schluessel:
+            vom_vorrat += 1
+            continue
         if key in archiv_namen or key in manuelle_schluessel:
             uebersprungen += 1
             continue
@@ -4826,7 +4835,12 @@ def einkaufsliste_generieren(request, toern_id, boot_id):
         ))
 
     EinkaufslistenEintrag.objects.bulk_create(to_create)
-    return JsonResponse({'ok': True, 'count': len(to_create), 'uebersprungen': uebersprungen})
+    return JsonResponse({
+        'ok': True,
+        'count': len(to_create),
+        'uebersprungen': uebersprungen,
+        'vom_bordvorrat': vom_vorrat,
+    })
 
 
 @login_required
