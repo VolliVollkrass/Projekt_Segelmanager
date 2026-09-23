@@ -20,6 +20,7 @@ from .briefing_views import (
     briefing_standard_loeschen, briefing_standard_default,
 )
 from .briefing_pdf import briefing_pdf
+from .einkauf_export import einkaufsliste_pdf, einkaufsliste_xlsx
 
 urlpatterns = [
     path('detail/<int:pk>/', toern_detail, name='toern_detail'),  # Detailseite
@@ -146,6 +147,8 @@ urlpatterns = [
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/add/",        einkaufsliste_add,        name="einkaufsliste_add"),
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/aufteilen/",  einkaufsliste_aufteilen,  name="einkaufsliste_aufteilen"),
     path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/status/",     einkaufsliste_status,     name="einkaufsliste_status"),
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/pdf/",        einkaufsliste_pdf,        name="einkaufsliste_pdf"),
+    path("<int:toern_id>/boot/<int:boot_id>/einkaufsliste/xlsx/",       einkaufsliste_xlsx,       name="einkaufsliste_xlsx"),
     path("einkaufsliste/<int:eintrag_id>/toggle/",                       einkaufsliste_toggle,     name="einkaufsliste_toggle"),
     path("einkaufsliste/<int:eintrag_id>/delete/",                       einkaufsliste_delete,     name="einkaufsliste_delete"),
     path("einkaufsliste/<int:eintrag_id>/reaktivieren/",                 einkaufsliste_reaktivieren, name="einkaufsliste_reaktivieren"),

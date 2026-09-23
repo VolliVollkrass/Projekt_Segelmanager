@@ -271,3 +271,106 @@ class SummiereMengenTests(TestCase):
 
     def test_verschiedene_einheiten_getrennt(self):
         self.assertEqual(summiere_mengen(["2 EL", "200 ml"]), "2 EL + 200 ml")
+
+
+class EinkaufslisteExportTests(TestCase):
+    """PDF- und Excel-Export der aktiven Einkaufsliste."""
+
+    def setUp(self):
+        self.anbieter = _user("export-anbieter@test.de")
+        start = timezone.now() + timedelta(days=30)
+        self.toern = Toern.objects.create(
+            titel="Testtörn", anbieter=self.anbieter,
+            startdatum=start, enddatum=start + timedelta(days=7),
+            revier="Ostsee", preis_pro_person=500, status="ZUTEILUNG_FIXIERT",
+        )
+        self.boot = Boot.objects.create(name="Testboot", typ="Yacht", toern=self.toern)
+        self.skipper = _user("export-skipper@test.de")
+        self.skipper.first_name = "Svea"
+        self.skipper.last_name = "Segler"
+        self.skipper.save()
+        self.t_skipper = Teilnahme.objects.create(
+            toern=self.toern, user=self.skipper, status="bestaetigt",
+            rolle="skipper", boot=self.boot,
+        )
+        self.fremder = _user("export-fremder@test.de")
+
+        EinkaufslistenEintrag.objects.create(
+            boot=self.boot, toern=self.toern, name="Tomaten", menge="2 kg",
+            kategorie="obst_gemuese", einkaufer=self.t_skipper,
+        )
+        EinkaufslistenEintrag.objects.create(
+            boot=self.boot, toern=self.toern, name="Wasser", menge="30 l",
+            kategorie="getranke", erledigt=True, erledigt_von=self.skipper,
+        )
+        EinkaufslistenEintrag.objects.create(
+            boot=self.boot, toern=self.toern, name="Altes Brot",
+            kategorie="brot", archiviert=True,
+        )
+
+    def _url(self, name):
+        return reverse(name, args=[self.toern.id, self.boot.id])
+
+    def test_pdf_wird_ausgeliefert(self):
+        self.client.force_login(self.skipper)
+        resp = self.client.get(self._url("einkaufsliste_pdf"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp["Content-Type"], "application/pdf")
+        self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_xlsx_wird_ausgeliefert(self):
+        self.client.force_login(self.skipper)
+        resp = self.client.get(self._url("einkaufsliste_xlsx"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("spreadsheetml", resp["Content-Type"])
+        self.assertIn("attachment", resp["Content-Disposition"])
+        # XLSX ist ein ZIP-Container
+        self.assertTrue(resp.content.startswith(b"PK"))
+
+    def test_xlsx_enthaelt_posten_mit_menge_und_einkaeufer(self):
+        from io import BytesIO
+        from openpyxl import load_workbook
+
+        self.client.force_login(self.skipper)
+        resp = self.client.get(self._url("einkaufsliste_xlsx"))
+        ws = load_workbook(BytesIO(resp.content)).active
+        zellen = [str(c.value) for row in ws.iter_rows() for c in row if c.value is not None]
+
+        self.assertIn("Tomaten", zellen)
+        self.assertIn("2 kg", zellen)
+        self.assertIn("Svea Segler", zellen)
+        self.assertIn("Einkäufer", zellen)
+        # Archiviertes taucht im Export nicht auf
+        self.assertNotIn("Altes Brot", zellen)
+
+    def test_fremder_bekommt_kein_pdf(self):
+        self.client.force_login(self.fremder)
+        resp = self.client.get(self._url("einkaufsliste_pdf"))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_fremder_bekommt_kein_xlsx(self):
+        self.client.force_login(self.fremder)
+        resp = self.client.get(self._url("einkaufsliste_xlsx"))
+        self.assertEqual(resp.status_code, 403)
+
+    def test_leere_liste_liefert_trotzdem_ein_pdf(self):
+        EinkaufslistenEintrag.objects.filter(boot=self.boot).delete()
+        self.client.force_login(self.skipper)
+        resp = self.client.get(self._url("einkaufsliste_pdf"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.content.startswith(b"%PDF"))
+
+    def test_dashboard_zeigt_eingabe_ueber_der_liste_und_die_export_buttons(self):
+        self.client.force_login(self.skipper)
+        html = self.client.get(
+            reverse("boot_dashboard", args=[self.toern.id])
+        ).content.decode()
+
+        pos_eingabe = html.index('id="ek-name"')
+        pos_liste = html.index('id="einkauf-liste"')
+        self.assertLess(pos_eingabe, pos_liste, "Eingabefeld muss über der Liste stehen")
+
+        self.assertIn('id="ek-einheit"', html)
+        self.assertIn(">Flasche<", html)
+        self.assertIn(self._url("einkaufsliste_pdf"), html)
+        self.assertIn(self._url("einkaufsliste_xlsx"), html)
