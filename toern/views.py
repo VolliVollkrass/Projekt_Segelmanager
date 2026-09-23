@@ -2697,17 +2697,27 @@ def _deck_boot(teilnahme):
     return teilnahme.boot.name if teilnahme.boot else "ohne Boot"
 
 
-def deckblatt_besonderheiten(teilnahmen):
-    """Wer hat Allergien oder Unverträglichkeiten? (Name, Boot, Text)"""
-    ergebnis = []
+ESS_KATEGORIEN = ["alles", "vegetarisch", "vegan", ""]
+
+
+def deckblatt_ess_pro_boot(teilnahmen):
+    """Essgewohnheiten je Boot: [(Bootsname, {kategorie: anzahl}), …].
+
+    Reihenfolge wie in der Liste selbst: Boote alphabetisch, „ohne Boot"
+    zum Schluss. Namentliche Allergien stehen bewusst nicht hier, sondern
+    auf der Seite des jeweiligen Bootes.
+    """
+    pro_boot = {}
     for t in teilnahmen:
-        hinweise = []
-        if t.lebensmittelunvertraeglichkeiten:
-            hinweise.append(f"Unverträglichkeit: {t.lebensmittelunvertraeglichkeiten}")
-        if t.allergien:
-            hinweise.append(f"Allergie: {t.allergien}")
-        if hinweise:
-            ergebnis.append((_deck_name(t), _deck_boot(t), " &nbsp;·&nbsp; ".join(hinweise)))
+        name = _deck_boot(t)
+        zaehler = pro_boot.setdefault(name, {k: 0 for k in ESS_KATEGORIEN})
+        schluessel = t.essgewohnheiten if t.essgewohnheiten in zaehler else ""
+        zaehler[schluessel] += 1
+
+    ohne = pro_boot.pop("ohne Boot", None)
+    ergebnis = sorted(pro_boot.items())
+    if ohne:
+        ergebnis.append(("ohne Boot", ohne))
     return ergebnis
 
 
@@ -2909,7 +2919,7 @@ def teilnehmerliste_pdf(request, toern_id):
         elements.append(deck_tabelle(boot_rows, [38 * mm, 38 * mm, 33 * mm, 55 * mm, 16 * mm]))
         elements.append(Spacer(1, 5 * mm))
 
-    # --- Verpflegung: Zahlen und wer besondere Anforderungen hat ---
+    # --- Verpflegung: Gesamtzahlen, darunter die Aufteilung je Boot ---
     ess_parts = [f"{ess_labels[k]}: <b>{v}</b>" for k, v in ess_counts.items() if v > 0]
     elements.append(Paragraph("Verpflegung", deck_h))
     elements.append(Paragraph(
@@ -2918,19 +2928,26 @@ def teilnehmerliste_pdf(request, toern_id):
                        borderPadding=(4, 6, 4, 6))
     ))
 
-    besonderheiten = deckblatt_besonderheiten(teilnahmen)
+    ess_pro_boot = deckblatt_ess_pro_boot(teilnahmen)
+    # Nur Spalten zeigen, die überhaupt vorkommen — sonst vier leere Nullen
+    sichtbare_kategorien = [k for k in ESS_KATEGORIEN if ess_counts.get(k)]
 
-    if besonderheiten:
+    if len(ess_pro_boot) > 1 and sichtbare_kategorien:
         elements.append(Spacer(1, 3 * mm))
-        rows = [[
-            Paragraph("Name", deck_kopf), Paragraph("Boot", deck_kopf),
-            Paragraph("Allergien &amp; Unverträglichkeiten", deck_kopf),
-        ]]
-        rows += [
-            [Paragraph(name, deck_zelle), Paragraph(boot, deck_zelle), Paragraph(text, deck_zelle)]
-            for name, boot, text in besonderheiten
-        ]
-        elements.append(deck_tabelle(rows, [45 * mm, 40 * mm, 95 * mm]))
+        rows = [[Paragraph("Boot", deck_kopf)]
+                + [Paragraph(ess_labels[k], deck_kopf) for k in sichtbare_kategorien]
+                + [Paragraph("Gesamt", deck_kopf)]]
+        for boot_name, zaehler in ess_pro_boot:
+            rows.append(
+                [Paragraph(f"<b>{boot_name}</b>", deck_zelle)]
+                + [Paragraph(str(zaehler[k]), deck_zelle) for k in sichtbare_kategorien]
+                + [Paragraph(f"<b>{sum(zaehler.values())}</b>", deck_zelle)]
+            )
+        rest = 180 * mm - 50 * mm
+        spalten = [50 * mm] + [rest / (len(sichtbare_kategorien) + 1)] * (len(sichtbare_kategorien) + 1)
+        tbl = deck_tabelle(rows, spalten)
+        tbl.setStyle(TableStyle([("ALIGN", (1, 0), (-1, -1), "CENTER")]))
+        elements.append(tbl)
     elements.append(Spacer(1, 5 * mm))
 
     # --- Geburtstage während des Törns ---

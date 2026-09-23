@@ -200,26 +200,50 @@ class DeckblattDatenTests(DokumenteZipTestBase):
             ).select_related("user", "boot")
         )
 
-    def test_besonderheiten_sammeln_allergien_und_unvertraeglichkeiten(self):
-        from .views import deckblatt_besonderheiten
+    def test_essgewohnheiten_werden_je_boot_gezaehlt(self):
+        from .views import deckblatt_ess_pro_boot
 
-        t = Teilnahme.objects.get(toern=self.toern, user=self.crew)
-        t.allergien = "Nüsse"
-        t.lebensmittelunvertraeglichkeiten = "Laktose"
-        t.save()
+        for t in self._teilnahmen():
+            t.essgewohnheiten = "vegan" if t.user_id == self.crew.id else "alles"
+            t.save()
+        # Zweites Boot mit zwei Vegetariern
+        for i in range(2):
+            u = _user(f"zip-veg{i}@test.de", first_name=f"Veggie{i}")
+            Teilnahme.objects.create(
+                toern=self.toern, user=u, status="bestaetigt", rolle="crew",
+                boot=self.boot2, essgewohnheiten="vegetarisch",
+            )
 
-        besonderheiten = deckblatt_besonderheiten(self._teilnahmen())
-        self.assertEqual(len(besonderheiten), 1)
-        name, boot, text = besonderheiten[0]
-        self.assertEqual(name, "Jan Maat")
-        self.assertEqual(boot, "SY Dalmatinka")
-        self.assertIn("Laktose", text)
-        self.assertIn("Nüsse", text)
+        pro_boot = dict(deckblatt_ess_pro_boot(self._teilnahmen()))
+        self.assertEqual(pro_boot["SY Dalmatinka"]["alles"], 1)
+        self.assertEqual(pro_boot["SY Dalmatinka"]["vegan"], 1)
+        self.assertEqual(pro_boot["SY Jadran"]["vegetarisch"], 2)
+        self.assertEqual(sum(pro_boot["SY Jadran"].values()), 2)
 
-    def test_ohne_eintraege_bleibt_die_liste_leer(self):
-        from .views import deckblatt_besonderheiten
+    def test_boote_alphabetisch_ohne_boot_zuletzt(self):
+        from .views import deckblatt_ess_pro_boot
 
-        self.assertEqual(deckblatt_besonderheiten(self._teilnahmen()), [])
+        u = _user("zip-ohneboot@test.de", first_name="Nora")
+        Teilnahme.objects.create(
+            toern=self.toern, user=u, status="angemeldet", rolle="crew", boot=None,
+        )
+        Teilnahme.objects.create(
+            toern=self.toern, user=_user("zip-jadran@test.de", first_name="Ida"),
+            status="bestaetigt", rolle="crew", boot=self.boot2,
+        )
+
+        namen = [name for name, _ in deckblatt_ess_pro_boot(self._teilnahmen())]
+        self.assertEqual(namen, ["SY Dalmatinka", "SY Jadran", "ohne Boot"])
+
+    def test_fehlende_angabe_zaehlt_als_keine_angabe(self):
+        from .views import deckblatt_ess_pro_boot
+
+        for t in self._teilnahmen():
+            t.essgewohnheiten = ""
+            t.save()
+
+        pro_boot = dict(deckblatt_ess_pro_boot(self._teilnahmen()))
+        self.assertEqual(pro_boot["SY Dalmatinka"][""], 2)
 
     def test_geburtstage_nur_im_toern_zeitraum_und_chronologisch(self):
         from .views import deckblatt_geburtstage
