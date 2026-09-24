@@ -10,7 +10,7 @@ Gruppen, die Views zeigen sie als Vorschau und wenden sie erst nach Bestätigung
 an. Was zusammengehört, entscheidet `utils.produktnamen` bewusst konservativ.
 """
 from utils.produktnamen import anzeigename, normalisiere_produktname, varianten_hinweis
-from utils.rezept_skalierung import summiere_mengen
+from utils.rezept_skalierung import summiere_mengen, zerlege_mengen
 
 # Welche Quelle sich durchsetzt, wenn Einträge verschiedener Herkunft
 # verschmelzen: Manuell gewinnt, damit der zusammengeführte Posten beim
@@ -32,6 +32,15 @@ class Gruppe:
         self.behalten = next((e for e in eintraege if e.name == self.name), eintraege[0])
         self.entfernen = [e for e in eintraege if e.id != self.behalten.id]
         self.quelle = min((e.quelle for e in eintraege), key=lambda q: _QUELLE_RANG.get(q, 9))
+        # Eigene Menge des zusammengeführten Postens: nur die Anteile, die
+        # jemand von Hand erfasst hat. Rezept- und Grundeinkauf-Anteile werden
+        # beim nächsten Generieren ohnehin neu berechnet — stünden sie hier
+        # drin, würden sie doppelt gezählt.
+        self.manuelle_menge = summiere_mengen([
+            teil
+            for e in eintraege if e.quelle == 'manuell'
+            for teil in zerlege_mengen(e.manuelle_menge or e.menge)
+        ])
         self.erledigt = any(e.erledigt for e in eintraege)
         self.einkaufer_id = next((e.einkaufer_id for e in eintraege if e.einkaufer_id), None)
 
@@ -97,6 +106,7 @@ def fuehre_zusammen(gruppen):
         behalten.name = g.name
         behalten.menge = g.menge
         behalten.quelle = g.quelle
+        behalten.manuelle_menge = g.manuelle_menge
         behalten.erledigt = g.erledigt
         behalten.rezept_info = g.rezept_info
         if g.einkaufer_id and not behalten.einkaufer_id:

@@ -24,7 +24,7 @@ from boote.models import Boot
 from toern.models import Teilnahme, Toern
 
 from utils.produktnamen import anzeigename, varianten_hinweis
-from utils.rezept_skalierung import summiere_mengen
+from utils.rezept_skalierung import summiere_mengen, zerlege_mengen
 
 from .dubletten import fuehre_zusammen, plane_zusammenfuehrung
 from .models import EinkaufslistenEintrag, EinkaufslistenSnapshot
@@ -171,6 +171,16 @@ def einkaufsliste_merge(request, toern_id, boot_id):
         behalten.menge = (menge or '').strip()[:100]
         behalten.rezept_info = text[:500]
         behalten.quelle = 'manuell'
+        # Eigene Menge: die selbst getippte, sonst nur die manuellen Anteile.
+        # Rezept- und Grundeinkauf-Anteile kommen beim Generieren neu dazu.
+        if data.get('menge') is not None:
+            behalten.manuelle_menge = behalten.menge
+        else:
+            behalten.manuelle_menge = summiere_mengen([
+                teil
+                for e in eintraege if e.quelle == 'manuell'
+                for teil in zerlege_mengen(e.manuelle_menge or e.menge)
+            ])
         behalten.erledigt = any(e.erledigt for e in eintraege)
         if not behalten.einkaufer_id:
             behalten.einkaufer_id = next((e.einkaufer_id for e in eintraege if e.einkaufer_id), None)
