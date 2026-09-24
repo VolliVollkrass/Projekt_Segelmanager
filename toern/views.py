@@ -14,7 +14,7 @@ from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
 from utils.boot_access_allowed import is_boot_access_allowed
 from utils.packliste import BASIS_PACKLISTE, BOOT_STANDARD_LISTE, KALT_PACKLISTE, KALT_BOOT_LISTE, SKIPPER_LISTE
-from utils.rezept_skalierung import skaliere_menge, summiere_mengen
+from utils.rezept_skalierung import skaliere_menge, summiere_mengen, zerlege_mengen
 from utils.produktnamen import anzeigename, normalisiere_produktname, ohne_zusatz, varianten_hinweis
 from .models import KabinenWunsch, Toern, Teilnahme, CrewPraeferenz, PacklisteVorlage, PacklisteVorlageEintrag, PacklisteStandard, PacklisteStandardEintrag, ErinnerungsMailLog, PinnwandNachricht, Mitfahrangebot, Mitfahrtanfrage, Schadensmeldung, Rundmail
 from .emails import mail_zuteilung_fixiert, mail_teilnahme_bestaetigt, mail_teilnahme_abgelehnt, mail_teilnahme_abgesagt, mail_crew_daten_erinnerung, mail_toern_abgeschlossen, mail_rundmail
@@ -4801,21 +4801,53 @@ def einkaufsliste_generieren(request, toern_id, boot_id):
         sammle(e.name, _menge_aus_template(e.menge_template, crew_anzahl),
                e.kategorie, 'standard')
 
-    # Manuell erfasste Posten bleiben unangetastet — sie überleben das
-    # Generieren. Steht der Artikel schon von Hand auf der Liste, wird er nicht
-    # ein zweites Mal angelegt; die selbst eingetragene Menge bleibt damit so,
-    # wie der Mensch sie wollte.
-    manuelle_schluessel = {
-        normalisiere_produktname(n)
-        for n in EinkaufslistenEintrag.objects.filter(
-            boot=boot, toern=toern, archiviert=False, quelle='manuell'
-        ).values_list('name', flat=True)
-    }
+    # Manuell erfasste Posten überleben das Generieren — aber ihre Menge wird
+    # neu berechnet: eigene Menge PLUS was Rezepte und Grundeinkauf brauchen.
+    # Wer „1 l Milch" von Hand einträgt und dessen Rezept 50 ml verlangt, soll
+    # 1 l + 50 ml auf dem Zettel sehen. Früher wurde der Rezeptanteil hier
+    # kommentarlos verworfen — man kaufte zu wenig ein.
+    #
+    # Die eigene Menge steht dafür in `manuelle_menge`; nur so lässt sich
+    # mehrfach generieren, ohne die Rezeptmengen jedes Mal erneut aufzuaddieren.
+    manuelle_eintraege = list(EinkaufslistenEintrag.objects.filter(
+        boot=boot, toern=toern, archiviert=False, quelle='manuell'
+    ))
+    manuelle_schluessel = {}
+    for e in manuelle_eintraege:
+        schluessel = normalisiere_produktname(e.name)
+        if schluessel:
+            manuelle_schluessel.setdefault(schluessel, e)
+
+    aufgefuellt = 0
+    for schluessel, eintrag in manuelle_schluessel.items():
+        # Altbestand ohne eigene Menge: die aktuelle Menge IST die eigene.
+        if not eintrag.manuelle_menge:
+            eintrag.manuelle_menge = eintrag.menge
+
+        data = raw.get(schluessel)
+        # Die eigene Menge kann selbst schon zusammengesetzt sein
+        # ("250 ml + 1 l") — vor dem Summieren wieder zerlegen.
+        mengen = zerlege_mengen(eintrag.manuelle_menge) + (data['mengen'] if data else [])
+        eintrag.menge = _merge_mengen(mengen)
+
+        if data:
+            infos = [i for i in (eintrag.rezept_info or '').split(', ') if i]
+            for rezept in data['rezepte']:
+                if rezept not in infos:
+                    infos.append(rezept)
+            eintrag.rezept_info = ', '.join(infos)[:500]
+            aufgefuellt += 1
+
+        eintrag.save()
 
     uebersprungen = 0
     to_create = []
     for key, data in raw.items():
-        if key in archiv_namen or key in manuelle_schluessel:
+        # Was in einen manuellen Posten geflossen ist, darf nicht noch einmal
+        # als eigene Zeile entstehen.
+        if key in manuelle_schluessel:
+            continue
+        if key in archiv_namen:
             uebersprungen += 1
             continue
         name = anzeigename(data['namen'])
@@ -4833,7 +4865,12 @@ def einkaufsliste_generieren(request, toern_id, boot_id):
         ))
 
     EinkaufslistenEintrag.objects.bulk_create(to_create)
-    return JsonResponse({'ok': True, 'count': len(to_create), 'uebersprungen': uebersprungen})
+    return JsonResponse({
+        'ok': True,
+        'count': len(to_create),
+        'uebersprungen': uebersprungen,
+        'aufgefuellt': aufgefuellt,
+    })
 
 
 @login_required
@@ -4873,7 +4910,10 @@ def einkaufsliste_add(request, toern_id, boot_id):
     e = EinkaufslistenEintrag.objects.create(
         boot=boot, toern=toern,
         name=name, menge=menge,
-        kategorie=_detect_kategorie(name),
+        # Eigene Menge mitschreiben: beim nächsten Generieren kommen die
+        # Rezeptmengen hinzu, ohne dass diese hier verlorengeht.
+        manuelle_menge=menge,
+        kategorie=_detect_kategorie(ohne_zusatz(name)),
         quelle='manuell',
     )
     return JsonResponse({
@@ -4910,6 +4950,9 @@ def einkaufsliste_update(request, eintrag_id):
 
     if 'menge' in data:
         eintrag.menge = (data.get('menge') or '').strip()[:100]
+        # Was hier getippt wird, ist die eigene Menge. Beim nächsten
+        # Generieren kommen die Rezeptmengen oben drauf.
+        eintrag.manuelle_menge = eintrag.menge
 
     kategorie = data.get('kategorie')
     if kategorie in dict(EinkaufslistenEintrag.KATEGORIE_CHOICES):

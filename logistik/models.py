@@ -145,6 +145,11 @@ class EinkaufslistenEintrag(models.Model):
     toern        = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name='einkaufs_eintraege')
     name         = models.CharField(max_length=200)
     menge        = models.CharField(max_length=100, blank=True)
+    # Die von Hand eingetragene Menge — getrennt von `menge`, weil `menge`
+    # beim Generieren neu berechnet wird (eigene Menge + Rezepte + Grundeinkauf).
+    # Ohne diese Trennung ließe sich nicht wiederholt generieren, ohne die
+    # Rezeptmengen doppelt aufzuaddieren.
+    manuelle_menge = models.CharField(max_length=100, blank=True)
     kategorie    = models.CharField(max_length=20, choices=KATEGORIE_CHOICES, default='sonstiges')
     quelle       = models.CharField(max_length=20, default='manuell')   # rezept | standard | manuell
     rezept_info  = models.CharField(max_length=500, blank=True)          # "Pasta Napoli, Tomaten-Suppe"

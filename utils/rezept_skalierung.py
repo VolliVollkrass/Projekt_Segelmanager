@@ -89,6 +89,22 @@ def ist_kochmenge(menge):
     return False
 
 
+def zerlege_mengen(text):
+    """Eine zusammengefasste Angabe wieder in ihre Teile zerlegen.
+
+    `summiere_mengen` verbindet Angaben verschiedener Einheiten mit " + ".
+    Wird so ein Ergebnis später erneut summiert, muss es vorher wieder
+    auseinandergenommen werden — sonst liest der Parser "250 ml + 1 l" als
+    eine einzige Angabe mit der Einheit "ml + 1 l".
+
+    >>> zerlege_mengen("250 ml + 1 l")
+    ['250 ml', '1 l']
+    """
+    if not text:
+        return []
+    return [teil.strip() for teil in text.split(' + ') if teil.strip()]
+
+
 def summiere_mengen(menge_list):
     """Fasst Mengenangaben derselben Zutat zusammen (für die Einkaufsliste).
 
