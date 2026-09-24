@@ -1699,33 +1699,38 @@ function updateProgress() {
 document.addEventListener("DOMContentLoaded", updateProgress);
 
 // ── Mahlzeiten ──
-function addMahlzeit() {
-    const datum = document.getElementById("mz-datum").value;
-    const typ   = document.getElementById("mz-typ").value;
-    const name  = document.getElementById("mz-name").value.trim();
-    const koch  = document.getElementById("mz-koch").value;
-
-    if (!datum || !name) {
-        document.getElementById("mz-name").classList.add("input-error");
-        return;
-    }
-    document.getElementById("mz-name").classList.remove("input-error");
-
-    fetch(`/toern/{{ toern.id }}/mahlzeit/add/`, {
-        method: "POST",
-        headers: {
-            "X-CSRFToken": getCSRFToken(),
-            "Content-Type": "application/x-www-form-urlencoded"
-        },
-        body: `datum=${datum}&typ=${typ}&name=${encodeURIComponent(name)}&kochverantwortlich=${koch}`
-    }).then(() => location.href = "?tab=bordkueche");
-}
+// Hinzugefügt wird über addMahlzeitTag() im Tagesplan-Block weiter unten.
 
 function deleteMahlzeit(id) {
+    // Nur die Zeile entfernen — früher sprang die Seite hier auf den
+    // Bordküchen-Tab, obwohl der Knopf im Tagesplan sitzt.
     fetch(`/toern/mahlzeit/${id}/delete/`, {
         method: "POST",
         headers: { "X-CSRFToken": getCSRFToken() }
-    }).then(() => location.href = "?tab=bordkueche");
+    })
+    .then(res => {
+        if (res.status === 403) {
+            alert("Dafür fehlt dir die Berechtigung. Der Skipper kann dir im Tagesplan das Bearbeitungsrecht geben.");
+            return null;
+        }
+        if (!res.ok) { alert("Die Mahlzeit konnte nicht gelöscht werden."); return null; }
+        return res.json();
+    })
+    .then(data => {
+        if (!data || data.status !== "ok") return;
+        const row = document.getElementById(`mz-row-${id}`);
+        const liste = row?.parentElement;
+        row?.remove();
+        // War es die letzte Mahlzeit des Tages, den Hinweis wieder zeigen
+        if (liste && !liste.querySelector('[id^="mz-row-"]')) {
+            const hinweis = document.createElement("p");
+            hinweis.className = "text-xs text-base-content/30 italic";
+            hinweis.id = `mz-empty-${liste.id.replace("mahlzeiten-list-", "")}`;
+            hinweis.textContent = "Noch nichts geplant";
+            liste.appendChild(hinweis);
+        }
+    })
+    .catch(() => alert("Die Mahlzeit konnte nicht gelöscht werden."));
 }
 </script>
 

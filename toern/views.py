@@ -3380,9 +3380,16 @@ def add_mahlzeit(request, toern_id):
 @login_required
 @require_POST
 def delete_mahlzeit(request, mahlzeit_id):
+    """Mahlzeit aus dem Tagesplan entfernen.
+
+    Dieselbe Rechteprüfung wie beim Anlegen (tagesplan_mahlzeit_add) und beim
+    Löschen von Tagesaufgaben: Skipper, Co-Skipper, Anbieter — und Crew mit
+    Tagesplan-Bearbeitungsrecht. Vorher galt hier nur Skipper/Co, wodurch ein
+    Crewmitglied eine Mahlzeit anlegen, aber nicht wieder löschen konnte.
+    """
     mahlzeit = get_object_or_404(Mahlzeit, id=mahlzeit_id)
     teilnahme = Teilnahme.objects.filter(user=request.user, toern=mahlzeit.toern).first()
-    if not teilnahme or teilnahme.rolle not in ["skipper", "coskipper"]:
+    if not _hat_tagesplan_edit(request, mahlzeit.toern, mahlzeit.boot, teilnahme):
         raise PermissionDenied
     mahlzeit.delete()
     return JsonResponse({"status": "ok"})
