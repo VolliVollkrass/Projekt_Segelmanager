@@ -1115,6 +1115,11 @@
                 <div>
                     <p class="text-2xl font-bold">{{ kasse_pro_person|floatformat:2 }} €</p>
                     <p class="text-xs text-base-content/40 mt-0.5">Pro Person</p>
+                    {% if kasse_einzeln %}
+                    <p class="text-[10px] text-base-content/30 leading-tight mt-0.5">
+                        ohne {{ kasse_einzeln|floatformat:2 }} € für Einzelne
+                    </p>
+                    {% endif %}
                 </div>
             </div>
         </div>

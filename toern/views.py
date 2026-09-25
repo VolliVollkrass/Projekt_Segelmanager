@@ -2155,8 +2155,20 @@ def boot_dashboard(request, toern_id):
     kasse_salden = berechne_salden(kasse_ausgaben, crew_liste)
     kasse_transfers = berechne_ausgleich(kasse_salden)
     kasse_gesamt = sum((a.betrag for a in kasse_ausgaben), Decimal("0"))
+
+    # „Pro Person" zählt nur, was die ganze Crew gemeinsam trägt. Kauft jemand
+    # etwas für einen Einzelnen mit — die Packung Kaugummi für Hubert —, gehört
+    # das nicht in diese Kennzahl: Der Betrag verteilt sich ja nicht auf alle.
+    # Unten in Salden und Ausgleich ist er weiterhin vollständig enthalten.
+    crew_ids = {t.id for t in crew_liste}
+    kasse_gemeinsam = sum(
+        (a.betrag for a in kasse_ausgaben
+         if crew_ids and {t.id for t in a.beteiligt.all()} == crew_ids),
+        Decimal("0"),
+    )
+    kasse_einzeln = kasse_gesamt - kasse_gemeinsam
     kasse_pro_person = (
-        (kasse_gesamt / len(crew_liste)).quantize(Decimal("0.01"))
+        (kasse_gemeinsam / len(crew_liste)).quantize(Decimal("0.01"))
         if crew_liste else Decimal("0")
     )
     mein_kasse_saldo = next(
@@ -2211,6 +2223,7 @@ def boot_dashboard(request, toern_id):
         "kasse_transfers": kasse_transfers,
         "kasse_gesamt": kasse_gesamt,
         "kasse_pro_person": kasse_pro_person,
+        "kasse_einzeln": kasse_einzeln,
         "mein_kasse_saldo": mein_kasse_saldo,
         "kasse_darf_verwalten": kasse_darf_verwalten,
         # Dokumente digital abhaken — nur Skipper/Co dieses Boots
