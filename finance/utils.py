@@ -83,6 +83,26 @@ def berechne_salden(ausgaben, teilnahmen):
     return salden
 
 
+def wende_zahlungen_an(salden, zahlungen):
+    """Bereits geflossene Ausgleichszahlungen in die Salden einrechnen.
+
+    Wer bezahlt hat, hat seine Schuld getilgt — sein Saldo steigt um den
+    Betrag; beim Empfänger sinkt er entsprechend. Dadurch verschwindet der
+    zugehörige Vorschlag aus `berechne_ausgleich`, ohne dass irgendwo ein
+    „erledigt"-Häkchen an einem Vorschlag kleben müsste, den es als Datensatz
+    gar nicht gibt.
+    """
+    nach_id = {e["teilnahme"].id: e for e in salden}
+    for zahlung in zahlungen:
+        if zahlung.von_id in nach_id:
+            nach_id[zahlung.von_id]["saldo"] += zahlung.betrag
+        if zahlung.an_id in nach_id:
+            nach_id[zahlung.an_id]["saldo"] -= zahlung.betrag
+
+    salden.sort(key=lambda e: e["saldo"], reverse=True)
+    return salden
+
+
 def berechne_ausgleich(salden):
     """Minimale Überweisungen zum Ausgleich der Salden (Greedy).
 

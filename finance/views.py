@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST
 
 from boote.models import Boot
 from toern.models import Teilnahme, Toern
-from .models import Ausgabe, TopfAusgabe, TopfBeleg
+from .models import Ausgabe, Ausgleichszahlung, TopfAusgabe, TopfBeleg
 from .utils import rate_kategorie
 
 # Maximal pro Upload angenommene Belegfotos (gegen versehentliche Massen-Uploads).
@@ -65,6 +65,85 @@ def _ist_toern_skipper(user, toern):
     return Teilnahme.objects.filter(
         toern=toern, user=user, rolle__in=("skipper", "coskipper")
     ).exists()
+
+
+# ───────────────────────── Ausgleichszahlungen ─────────────────────────
+
+@login_required
+@require_POST
+def ausgleich_beglichen(request, toern_id, boot_id):
+    """Festhalten, dass zwischen zwei Personen wirklich Geld geflossen ist.
+
+    Erfassen darf es jede der beiden Seiten: wer überwiesen hat, und wer den
+    Eingang auf dem Konto sieht. Die Zahlung fließt in die Salden ein, wodurch
+    der zugehörige Vorschlag verschwindet.
+    """
+    toern = get_object_or_404(Toern, id=toern_id)
+    boot = get_object_or_404(Boot, id=boot_id, toern=toern)
+    kasse_url = f"{reverse('boot_dashboard', args=[toern.id])}?tab=kasse"
+
+    meine_teilnahme = Teilnahme.objects.filter(
+        toern=toern, boot=boot, user=request.user, status="bestaetigt"
+    ).first()
+    if not meine_teilnahme:
+        raise PermissionDenied
+
+    von = Teilnahme.objects.filter(
+        id=request.POST.get("von"), toern=toern, boot=boot, status="bestaetigt"
+    ).first()
+    an = Teilnahme.objects.filter(
+        id=request.POST.get("an"), toern=toern, boot=boot, status="bestaetigt"
+    ).first()
+    betrag = _parse_betrag(request.POST.get("betrag"))
+
+    if not von or not an or von.id == an.id or betrag is None or betrag <= 0:
+        messages.error(request, "Diese Zahlung konnte nicht zugeordnet werden.")
+        return redirect(kasse_url)
+
+    # Nur die beiden Beteiligten dürfen die Zahlung bestätigen — sie sind die
+    # Einzigen, die wissen können, ob das Geld angekommen ist.
+    if meine_teilnahme.id not in (von.id, an.id):
+        messages.error(
+            request,
+            "Nur die beiden Beteiligten können diese Zahlung als beglichen markieren.",
+        )
+        return redirect(kasse_url)
+
+    Ausgleichszahlung.objects.create(
+        boot=boot, toern=toern, von=von, an=an, betrag=betrag,
+        erfasst_von=request.user,
+    )
+    messages.success(
+        request,
+        f"Zahlung über {betrag} € von {von.user.first_name} an {an.user.first_name} "
+        f"ist eingetragen.",
+    )
+    return redirect(kasse_url)
+
+
+@login_required
+@require_POST
+def ausgleich_zuruecknehmen(request, zahlung_id):
+    """Eine eingetragene Zahlung wieder entfernen — für den Fall, dass sie
+    versehentlich oder zu früh bestätigt wurde."""
+    zahlung = get_object_or_404(
+        Ausgleichszahlung.objects.select_related("toern", "von", "an"), id=zahlung_id
+    )
+    toern = zahlung.toern
+    kasse_url = f"{reverse('boot_dashboard', args=[toern.id])}?tab=kasse"
+
+    meine_teilnahme = Teilnahme.objects.filter(
+        toern=toern, boot=zahlung.boot, user=request.user, status="bestaetigt"
+    ).first()
+    if not meine_teilnahme:
+        raise PermissionDenied
+    if meine_teilnahme.id not in (zahlung.von_id, zahlung.an_id):
+        messages.error(request, "Nur die beiden Beteiligten können diese Zahlung zurücknehmen.")
+        return redirect(kasse_url)
+
+    zahlung.delete()
+    messages.success(request, "Die Zahlung wurde zurückgenommen.")
+    return redirect(kasse_url)
 
 
 # ───────────────────────── Bootskasse ─────────────────────────
