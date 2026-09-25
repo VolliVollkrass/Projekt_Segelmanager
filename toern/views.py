@@ -7,8 +7,8 @@ from decimal import Decimal
 
 from boote.models import Boot, Kabine
 from config import settings
-from finance.models import Ausgabe, TopfAusgabe
-from finance.utils import berechne_salden, berechne_ausgleich
+from finance.models import Ausgabe, Ausgleichszahlung, TopfAusgabe
+from finance.utils import berechne_salden, berechne_ausgleich, wende_zahlungen_an
 from logistik.models import Einkaufspunkt, EinkaufslistenEintrag, EinkaufsStandard, EinkaufsStandardEintrag, EinkaufsVorlage, EinkaufsVorlageEintrag, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
@@ -2152,7 +2152,14 @@ def boot_dashboard(request, toern_id):
     ).select_related("bezahlt_von__user", "erstellt_von").prefetch_related("beteiligt__user")
 
     crew_liste = list(crew_bestaetigt)
+    kasse_zahlungen = list(
+        Ausgleichszahlung.objects.filter(boot=boot, toern=toern)
+        .select_related("von__user", "an__user")
+    )
     kasse_salden = berechne_salden(kasse_ausgaben, crew_liste)
+    # Schon geflossenes Geld einrechnen, sonst schlägt der Ausgleich weiter
+    # Überweisungen vor, die längst getätigt sind.
+    wende_zahlungen_an(kasse_salden, kasse_zahlungen)
     kasse_transfers = berechne_ausgleich(kasse_salden)
     kasse_gesamt = sum((a.betrag for a in kasse_ausgaben), Decimal("0"))
 
@@ -2221,6 +2228,7 @@ def boot_dashboard(request, toern_id):
         "kasse_ausgaben": kasse_ausgaben,
         "kasse_salden": kasse_salden,
         "kasse_transfers": kasse_transfers,
+        "kasse_zahlungen": kasse_zahlungen,
         "kasse_gesamt": kasse_gesamt,
         "kasse_pro_person": kasse_pro_person,
         "kasse_einzeln": kasse_einzeln,

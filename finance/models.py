@@ -31,6 +31,42 @@ class Ausgabe(models.Model):
         return f"{self.beschreibung} ({self.betrag} €)"
 
 
+class Ausgleichszahlung(models.Model):
+    """Eine tatsächlich geflossene Zahlung zwischen zwei Crew-Mitgliedern.
+
+    Die Vorschläge unter „So gleicht ihr aus" werden aus den Salden gerechnet
+    und stehen nirgends — erst hier wird festgehalten, dass wirklich Geld den
+    Besitzer gewechselt hat. Die Zahlung fließt in die Salden ein, wodurch der
+    zugehörige Vorschlag verschwindet.
+
+    Erfassen darf sie jede der beiden beteiligten Personen: wer überwiesen hat,
+    und wer den Eingang auf dem Konto sieht.
+    """
+    boot = models.ForeignKey(Boot, on_delete=models.CASCADE, related_name="ausgleichszahlungen")
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="ausgleichszahlungen")
+    von = models.ForeignKey(
+        Teilnahme, on_delete=models.CASCADE, related_name="geleistete_ausgleichszahlungen"
+    )
+    an = models.ForeignKey(
+        Teilnahme, on_delete=models.CASCADE, related_name="erhaltene_ausgleichszahlungen"
+    )
+    betrag = models.DecimalField(max_digits=8, decimal_places=2)
+    erfasst_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="erfasste_ausgleichszahlungen",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.von} → {self.an}: {self.betrag} €"
+
+
 class TopfAusgabe(models.Model):
     """Ausgabe aus dem Skipper-Topf (Budget des Anbieters für den ganzen Törn)."""
 
