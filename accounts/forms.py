@@ -215,7 +215,7 @@ class AccountEditForm(forms.ModelForm):
             }),
             "zahlung_wero": forms.TextInput(attrs={
                 "class": "input input-bordered w-full",
-                "placeholder": "Handynummer oder E-Mail",
+                "placeholder": "https://… (dein Wero-Link)",
             }),
         }
 

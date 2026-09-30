@@ -85,7 +85,7 @@ class User(AbstractUser):
     zahlung_kontoinhaber = models.CharField("Kontoinhaber", max_length=100, blank=True)
     zahlung_wero = models.CharField(
         "Wero", max_length=254, blank=True,
-        help_text="Handynummer oder E-Mail-Adresse, unter der du Wero nutzt",
+        help_text="Dein Wero-Zahlungslink",
     )
 
     profilbild = models.ImageField(

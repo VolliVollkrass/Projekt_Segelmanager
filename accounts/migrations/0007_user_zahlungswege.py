@@ -28,6 +28,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='user',
             name='zahlung_wero',
-            field=models.CharField(blank=True, help_text='Handynummer oder E-Mail-Adresse, unter der du Wero nutzt', max_length=254, verbose_name='Wero'),
+            field=models.CharField(blank=True, help_text='Dein Wero-Zahlungslink', max_length=254, verbose_name='Wero'),
         ),
     ]

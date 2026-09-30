@@ -85,13 +85,19 @@ class PaypalTests(SimpleTestCase):
 
 
 class WeroTests(SimpleTestCase):
-    def test_telefon_und_email(self):
-        self.assertEqual(normalisiere_wero(" +49 171 1234567 "), "+49 171 1234567")
-        self.assertEqual(normalisiere_wero("ich@example.de"), "ich@example.de")
+    def test_link_wird_uebernommen(self):
+        self.assertEqual(
+            normalisiere_wero(" https://example.com/pay/abc123 "),
+            "https://example.com/pay/abc123",
+        )
 
-    def test_unsinn_wird_abgelehnt(self):
-        with self.assertRaises(ValidationError):
-            normalisiere_wero("irgendwas")
+    def test_link_ohne_schema_bekommt_https(self):
+        self.assertEqual(normalisiere_wero("example.com/pay/abc"), "https://example.com/pay/abc")
+
+    def test_telefon_email_und_http_werden_abgelehnt(self):
+        for eingabe in ["+49 171 1234567", "ich@example.de", "http://example.com/pay", "irgendwas"]:
+            with self.subTest(eingabe=eingabe), self.assertRaises(ValidationError):
+                normalisiere_wero(eingabe)
 
 
 class ProfilFormularTests(TestCase):
@@ -107,7 +113,7 @@ class ProfilFormularTests(TestCase):
         form = self._form(
             zahlung_iban="de89 3704 0044 0532 0130 00",
             zahlung_paypal="https://paypal.me/zora",
-            zahlung_wero="+49 171 1234567",
+            zahlung_wero="https://example.com/pay/zora",
             zahlung_kontoinhaber="Zora Z.",
         )
         self.assertTrue(form.is_valid(), form.errors)
@@ -137,6 +143,7 @@ class SichtbarkeitInBootskasseTests(AusgleichTestBase):
         super().setUp()
         self.erika.zahlung_iban = GUELTIGE_IBAN
         self.erika.zahlung_paypal = "erikasegelt"
+        self.erika.zahlung_wero = "https://example.com/pay/erika"
         self.erika.save()
         # Hubert hat auch eine IBAN — aber niemand schuldet ihm etwas.
         self.hubert.zahlung_iban = "NL91ABNA0417164300"
@@ -152,6 +159,7 @@ class SichtbarkeitInBootskasseTests(AusgleichTestBase):
         html = self._html(self.hubert)
         self.assertIn("DE89 3704 0044 0532 0130 00", html)
         self.assertIn("https://paypal.me/erikasegelt/30.00EUR", html)
+        self.assertIn('href="https://example.com/pay/erika"', html)
 
     def test_empfaenger_sieht_eigene_daten_nicht_als_zahlungsweg(self):
         html = self._html(self.erika)
@@ -174,5 +182,6 @@ class SichtbarkeitInBootskasseTests(AusgleichTestBase):
     def test_hinweis_wenn_nichts_hinterlegt(self):
         self.erika.zahlung_iban = ""
         self.erika.zahlung_paypal = ""
+        self.erika.zahlung_wero = ""
         self.erika.save()
         self.assertIn("Erika hat noch keine Zahlungswege hinterlegt", self._html(self.hubert))

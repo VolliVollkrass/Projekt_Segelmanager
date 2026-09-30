@@ -8,14 +8,14 @@ import re
 from decimal import Decimal
 
 from django.core.exceptions import ValidationError
-from django.core.validators import validate_email
+from django.core.validators import URLValidator, validate_email
 
 # Länder-Präfix, zwei Prüfziffern, Kontokennung — die Länge variiert je Land
 # (DE 22, NL 18, MT 31 …); die Prüfsumme fängt Tippfehler zuverlässig ab.
 _IBAN_RE = re.compile(r"^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$")
 _PAYPAL_URL_RE = re.compile(r"^(?:https?://)?(?:www\.)?paypal\.me/", re.IGNORECASE)
 _PAYPAL_NAME_RE = re.compile(r"^[A-Za-z0-9]{1,50}$")
-_TELEFON_RE = re.compile(r"^\+?[\d\s/()-]{6,}$")
+_HTTPS_URL = URLValidator(schemes=["https"])
 
 
 def normalisiere_iban(wert):
@@ -68,13 +68,24 @@ def normalisiere_paypal(wert):
 
 
 def normalisiere_wero(wert):
-    """Wero läuft über Handynummer oder E-Mail — beides wird akzeptiert."""
+    """Wero wird als Zahlungslink hinterlegt — keine Handynummer, keine E-Mail.
+
+    Das genaue Link-Format ist nicht festgelegt, daher reicht ein gültiger
+    https-Link; ohne Schema eingefügte Links bekommen https:// vorangestellt.
+    """
     wert = (wert or "").strip()
     if not wert:
         return ""
-    if _ist_email(wert) or _TELEFON_RE.match(wert):
-        return wert
-    raise ValidationError("Bitte die Handynummer oder E-Mail-Adresse angeben, unter der du Wero nutzt.")
+    fehler = ValidationError("Bitte deinen Wero-Zahlungslink einfügen (beginnt mit https://).")
+    if _ist_email(wert):
+        raise fehler
+    if "://" not in wert:
+        wert = f"https://{wert}"
+    try:
+        _HTTPS_URL(wert)
+    except ValidationError:
+        raise fehler
+    return wert
 
 
 def paypal_link(paypal, betrag=None):
@@ -119,6 +130,6 @@ def zahlungswege(user, betrag=None):
             "art": "wero",
             "label": "Wero",
             "wert": user.zahlung_wero,
-            "link": None,
+            "link": user.zahlung_wero,
         })
     return wege
