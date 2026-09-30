@@ -9,6 +9,7 @@ from boote.models import Boot, Kabine
 from config import settings
 from finance.models import Ausgabe, Ausgleichszahlung, TopfAusgabe
 from finance.utils import berechne_salden, berechne_ausgleich, wende_zahlungen_an
+from accounts.zahlungswege import zahlungswege
 from logistik.models import Einkaufspunkt, EinkaufslistenEintrag, EinkaufsStandard, EinkaufsStandardEintrag, EinkaufsVorlage, EinkaufsVorlageEintrag, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
 from utils.profil_fortschritt import teilnahme_fortschritt
 from utils.user_profil_fortschritt import user_profil_fortschritt
@@ -2161,6 +2162,11 @@ def boot_dashboard(request, toern_id):
     # Überweisungen vor, die längst getätigt sind.
     wende_zahlungen_an(kasse_salden, kasse_zahlungen)
     kasse_transfers = berechne_ausgleich(kasse_salden)
+    # Zahlungswege des Empfängers nur an den, der ihm gerade Geld schuldet —
+    # IBAN & Co. sollen nicht für die ganze Crew offen herumstehen.
+    for t in kasse_transfers:
+        if t["von"].id == teilnahme.id:
+            t["zahlungswege"] = zahlungswege(t["an"].user, t["betrag"])
     kasse_gesamt = sum((a.betrag for a in kasse_ausgaben), Decimal("0"))
 
     # „Pro Person" zählt nur, was die ganze Crew gemeinsam trägt. Kauft jemand

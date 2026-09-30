@@ -1,0 +1,23 @@
+{# Zahlungswege eines Empfängers. Erwartet: wege (Liste aus accounts.zahlungswege.zahlungswege), empfaenger (User). #}
+<div class="w-full mt-1 pt-2 border-t border-base-300 space-y-2">
+    {% for w in wege %}
+        <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+                <p class="text-[11px] text-base-content/50">
+                    {{ w.label }}{% if w.inhaber %} · {{ w.inhaber }}{% endif %}
+                </p>
+                <p class="font-mono text-xs break-all">{{ w.wert }}</p>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+                {% if w.link %}
+                    <a href="{{ w.link }}" target="_blank" rel="noopener noreferrer" class="btn btn-xs btn-primary">Öffnen</a>
+                {% endif %}
+                <button type="button" class="btn btn-xs btn-ghost js-kopieren" data-kopieren="{{ w.wert }}">Kopieren</button>
+            </div>
+        </div>
+    {% empty %}
+        <p class="text-xs text-base-content/50 italic">
+            {{ empfaenger.first_name }} hat noch keine Zahlungswege hinterlegt.
+        </p>
+    {% endfor %}
+</div>

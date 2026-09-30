@@ -149,6 +149,16 @@
                     {% endif %}
                 </span>
             </div>
+            <div class="flex justify-between items-center px-5 py-3">
+                <span class="text-sm text-base-content/50">Zahlungswege</span>
+                <span class="text-sm font-medium text-right {% if not user.hat_zahlungswege %}text-base-content/30 italic{% endif %}">
+                    {% if user.hat_zahlungswege %}
+                        {% if user.zahlung_paypal %}PayPal{% endif %}{% if user.zahlung_paypal and user.zahlung_wero %} · {% endif %}{% if user.zahlung_wero %}Wero{% endif %}{% if user.zahlung_iban %}{% if user.zahlung_paypal or user.zahlung_wero %} · {% endif %}IBAN ••••{{ user.zahlung_iban|slice:"-4:" }}{% endif %}
+                    {% else %}
+                        Nicht angegeben
+                    {% endif %}
+                </span>
+            </div>
         </div>
     </div>
 

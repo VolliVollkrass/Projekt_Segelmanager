@@ -34,6 +34,14 @@ class CustomUserAdmin(UserAdmin):
                 "profilbild",
             )
         }),
+        ("Zahlungswege", {
+            "fields": (
+                "zahlung_paypal",
+                "zahlung_iban",
+                "zahlung_kontoinhaber",
+                "zahlung_wero",
+            )
+        }),
     )
 
     add_fieldsets = UserAdmin.add_fieldsets + (

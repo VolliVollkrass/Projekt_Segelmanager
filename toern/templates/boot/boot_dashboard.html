@@ -1204,6 +1204,9 @@
                                 </form>
                                 {% endif %}
                             </span>
+                            {% if t.von.id == teilnahme.id %}
+                                {% include "boot/_zahlungswege.html" with wege=t.zahlungswege empfaenger=t.an.user %}
+                            {% endif %}
                         </div>
                     {% endfor %}
                 </div>
@@ -2715,5 +2718,32 @@ async function pollEinkaufStatus() {
 })();
 </script>
 {% endif %}
+
+<script>
+// Bootskasse: Zahlungswege (IBAN, PayPal, Wero) in die Zwischenablage
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.js-kopieren');
+    if (!btn) return;
+    const text = btn.dataset.kopieren;
+    const kopiert = () => {
+        btn.textContent = '✓ Kopiert';
+        setTimeout(() => { btn.textContent = 'Kopieren'; }, 2000);
+    };
+    const altmodisch = () => {
+        const tmp = document.createElement('textarea');
+        tmp.value = text;
+        document.body.appendChild(tmp);
+        tmp.select();
+        document.execCommand('copy');
+        tmp.remove();
+        kopiert();
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(kopiert, altmodisch);
+    } else {
+        altmodisch();
+    }
+});
+</script>
 
 {% endblock %}
