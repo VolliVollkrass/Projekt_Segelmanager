@@ -74,6 +74,20 @@ class User(AbstractUser):
 
     telefonnummer = models.CharField(max_length=20, blank=True)
 
+    # Zahlungswege — damit Mitsegler offene Beträge begleichen können.
+    # Sichtbar nur für die, die dieser Person gerade Geld schulden
+    # (siehe accounts/zahlungswege.py und die Bootskasse).
+    zahlung_paypal = models.CharField(
+        "PayPal", max_length=254, blank=True,
+        help_text="PayPal.Me-Name oder PayPal-E-Mail-Adresse",
+    )
+    zahlung_iban = models.CharField("IBAN", max_length=34, blank=True)
+    zahlung_kontoinhaber = models.CharField("Kontoinhaber", max_length=100, blank=True)
+    zahlung_wero = models.CharField(
+        "Wero", max_length=254, blank=True,
+        help_text="Dein Wero-Zahlungslink",
+    )
+
     profilbild = models.ImageField(
         upload_to=profilbild_upload_path,
         null=True,
@@ -111,6 +125,10 @@ class User(AbstractUser):
         super().save(*args, **kwargs)
 
     # --------------------------------------------------
+    @property
+    def hat_zahlungswege(self):
+        return bool(self.zahlung_paypal or self.zahlung_iban or self.zahlung_wero)
+
     def is_anbieter(self):
         return self.groups.filter(name="Anbieter").exists()
 

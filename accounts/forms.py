@@ -8,6 +8,7 @@ from io import BytesIO
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from .models import User, Lizenz
+from .zahlungswege import normalisiere_iban, normalisiere_paypal, normalisiere_wero
 from utils.image_optimizer import optimize_image
 import uuid
 
@@ -180,6 +181,10 @@ class AccountEditForm(forms.ModelForm):
             "plz",
             "ort",
             "profilbild",
+            "zahlung_paypal",
+            "zahlung_iban",
+            "zahlung_kontoinhaber",
+            "zahlung_wero",
         ]
 
         widgets = {
@@ -195,7 +200,33 @@ class AccountEditForm(forms.ModelForm):
             "plz": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
             "ort": forms.TextInput(attrs={"class": "input input-bordered w-full"}),
             "profilbild": forms.FileInput(attrs={"class": "file-input file-input-bordered w-full"}),
+            "zahlung_paypal": forms.TextInput(attrs={
+                "class": "input input-bordered w-full",
+                "placeholder": "paypal.me/meinname oder E-Mail",
+            }),
+            "zahlung_iban": forms.TextInput(attrs={
+                "class": "input input-bordered w-full font-mono",
+                "placeholder": "DE00 0000 0000 0000 0000 00",
+                "autocomplete": "off",
+            }),
+            "zahlung_kontoinhaber": forms.TextInput(attrs={
+                "class": "input input-bordered w-full",
+                "placeholder": "Leer = dein Name",
+            }),
+            "zahlung_wero": forms.TextInput(attrs={
+                "class": "input input-bordered w-full",
+                "placeholder": "https://… (dein Wero-Link)",
+            }),
         }
+
+    def clean_zahlung_iban(self):
+        return normalisiere_iban(self.cleaned_data.get("zahlung_iban"))
+
+    def clean_zahlung_paypal(self):
+        return normalisiere_paypal(self.cleaned_data.get("zahlung_paypal"))
+
+    def clean_zahlung_wero(self):
+        return normalisiere_wero(self.cleaned_data.get("zahlung_wero"))
 
     def clean(self):
 

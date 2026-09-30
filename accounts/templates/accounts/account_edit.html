@@ -109,6 +109,40 @@
 
         </div>
 
+        <!-- Zahlungswege -->
+        <div class="mt-6 w-full">
+          <label class="label mb-1">
+            <span class="label-text font-semibold text-lg">Zahlungswege (optional)</span>
+          </label>
+          <p class="text-sm text-base-content/60 mb-3">
+            Damit dir Mitsegler Geld aus der Bootskasse zurückzahlen können.
+            Sichtbar ist das nur für die, die dir gerade etwas schulden.
+          </p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="form-control">
+              <label class="label" for="{{ form.zahlung_paypal.id_for_label }}"><span class="label-text">PayPal</span></label>
+              {{ form.zahlung_paypal }}
+              {% if form.zahlung_paypal.errors %}<p class="text-error text-sm mt-1">{{ form.zahlung_paypal.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="form-control">
+              <label class="label" for="{{ form.zahlung_wero.id_for_label }}"><span class="label-text">Wero</span></label>
+              {{ form.zahlung_wero }}
+              {% if form.zahlung_wero.errors %}<p class="text-error text-sm mt-1">{{ form.zahlung_wero.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="form-control">
+              <label class="label" for="{{ form.zahlung_iban.id_for_label }}"><span class="label-text">IBAN</span></label>
+              {{ form.zahlung_iban }}
+              {% if form.zahlung_iban.errors %}<p class="text-error text-sm mt-1">{{ form.zahlung_iban.errors.0 }}</p>{% endif %}
+            </div>
+            <div class="form-control">
+              <label class="label" for="{{ form.zahlung_kontoinhaber.id_for_label }}"><span class="label-text">Kontoinhaber</span></label>
+              {{ form.zahlung_kontoinhaber }}
+              {% if form.zahlung_kontoinhaber.errors %}<p class="text-error text-sm mt-1">{{ form.zahlung_kontoinhaber.errors.0 }}</p>{% endif %}
+            </div>
+          </div>
+        </div>
+
         <!-- Passwort ändern -->
         <div class="mt-6 w-full">
           <label class="label mb-2">
