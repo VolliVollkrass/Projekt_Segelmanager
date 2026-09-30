@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}{% if umlage %}Umlage bearbeiten{% else %}Törn-Umlage anlegen{% endif %}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6 space-y-5">
+
+    <div>
+        <a href="{{ zurueck_url }}" class="text-sm text-primary hover:underline">← Zurück zur Kasse</a>
+        <h1 class="text-2xl font-bold mt-2">{% if umlage %}Umlage bearbeiten{% else %}Törn-Umlage anlegen{% endif %}</h1>
+        <p class="text-sm text-base-content/60 mt-1">
+            Eine Rechnung für Leute aus dem ganzen Törn, über alle Boote hinweg, z. B. das Restaurant.
+            Jeder sieht seinen Anteil in seiner Bootskasse und zahlt direkt an den, der bezahlt hat.
+        </p>
+    </div>
+
+    {% if fehler %}
+        <div class="alert alert-error text-sm">{{ fehler }}</div>
+    {% endif %}
+
+    <form method="post" id="umlage-form" class="space-y-5">
+        {% csrf_token %}
+
+        <div class="bg-base-100 border border-base-300 rounded-xl p-5 space-y-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="form-control">
+                    <label class="label py-1" for="u-beschreibung"><span class="label-text text-xs">Beschreibung</span></label>
+                    <input id="u-beschreibung" type="text" name="beschreibung" required maxlength="200"
+                           value="{{ werte.beschreibung }}" placeholder="z.B. Restaurant Abschlussabend"
+                           class="input input-bordered input-sm w-full">
+                </div>
+                <div class="form-control">
+                    <label class="label py-1" for="u-betrag"><span class="label-text text-xs">Gesamtbetrag (€)</span></label>
+                    <input id="u-betrag" type="text" name="betrag" required inputmode="decimal"
+                           value="{{ werte.betrag }}" placeholder="z.B. 1300"
+                           class="input input-bordered input-sm w-full">
+                </div>
+            </div>
+            <div class="form-control">
+                <label class="label py-1" for="u-zahler"><span class="label-text text-xs">Bezahlt von</span></label>
+                <select id="u-zahler" name="bezahlt_von" class="select select-bordered select-sm w-full">
+                    {% for t in teilnehmer %}
+                        <option value="{{ t.id }}" {% if t.id == werte.bezahlt_von %}selected{% endif %}>
+                            {{ t.user.first_name }} {{ t.user.last_name }}{% if t.boot %} ({{ t.boot.name }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Zusammenfassung (live) -->
+        <div class="bg-base-200/60 rounded-xl px-4 py-3 text-sm">
+            <div class="flex flex-wrap gap-x-4 gap-y-1">
+                <span><span class="text-base-content/50">Personen:</span> <b id="s-anzahl">–</b></span>
+                <span><span class="text-base-content/50">Extras:</span> <b id="s-extras">–</b></span>
+                <span><span class="text-base-content/50">Pro Kopf:</span> <b id="s-prokopf">–</b></span>
+            </div>
+            <p id="s-warnung" class="text-error text-xs mt-1 hidden">Die Extras sind höher als der Gesamtbetrag.</p>
+            <p class="text-[11px] text-base-content/40 mt-1">
+                Extras (z. B. Wein) stecken im Gesamtbetrag. Sie gehen nur an die jeweilige Person,
+                der Rest wird gleichmäßig verteilt. Eine Anzahlung (schon gegebenes Geld) wird vom Anteil abgezogen.
+            </p>
+        </div>
+
+        {% for boot_name, leute in gruppen %}
+        <div class="bg-base-100 border border-base-300 rounded-xl overflow-hidden">
+            <div class="flex items-center justify-between px-4 py-2.5 bg-base-200/50 border-b border-base-300">
+                <h2 class="font-semibold text-sm">{{ boot_name }}</h2>
+                <button type="button" class="btn btn-ghost btn-xs js-gruppe-toggle">Alle / keine</button>
+            </div>
+            <div class="divide-y divide-base-200">
+                {% for t in leute %}
+                <div class="px-4 py-2.5 js-person" data-id="{{ t.id }}">
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="flex items-center gap-2 cursor-pointer text-sm min-w-0">
+                            <input type="checkbox" name="teilnehmer" value="{{ t.id }}"
+                                   {% if t.ist_ausgewaehlt %}checked{% endif %}
+                                   class="checkbox checkbox-sm checkbox-primary js-dabei">
+                            <span class="truncate">{{ t.user.first_name }} {{ t.user.last_name }}</span>
+                        </label>
+                        <span class="text-sm text-right shrink-0">
+                            <b class="js-anteil">–</b>
+                            <span class="block text-[11px] text-base-content/50 js-offen"></span>
+                        </span>
+                    </div>
+                    <div class="flex gap-2 mt-1.5 pl-7 js-felder">
+                        <label class="flex items-center gap-1 text-xs text-base-content/60 whitespace-nowrap">
+                            Extra
+                            <input type="text" name="extra_{{ t.id }}" value="{{ t.wert_extra }}" inputmode="decimal"
+                                   placeholder="0" class="input input-bordered input-xs w-20 js-extra">
+                        </label>
+                        <label class="flex items-center gap-1 text-xs text-base-content/60 whitespace-nowrap js-gegeben-label">
+                            Anzahlung
+                            <input type="text" name="gegeben_{{ t.id }}" value="{{ t.wert_gegeben }}" inputmode="decimal"
+                                   placeholder="0" class="input input-bordered input-xs w-20 js-gegeben">
+                        </label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="flex gap-2 justify-end">
+            <a href="{{ zurueck_url }}" class="btn btn-sm">Abbrechen</a>
+            <button class="btn btn-primary btn-sm">{% if umlage %}Änderungen speichern{% else %}Umlage anlegen{% endif %}</button>
+        </div>
+    </form>
+</div>
+
+<script>
+(() => {
+    const form = document.getElementById('umlage-form');
+    const personen = [...form.querySelectorAll('.js-person')];
+    const zahlerSelect = document.getElementById('u-zahler');
+
+    // In Cent rechnen — so wie der Server, damit die Vorschau exakt passt
+    const cent = (raw) => {
+        const v = parseFloat(String(raw || '').trim().replace(',', '.'));
+        return isNaN(v) || v < 0 ? 0 : Math.round(v * 100);
+    };
+    const euro = (c) => (c / 100).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €';
+
+    function rechne() {
+        const gesamt = cent(document.getElementById('u-betrag').value);
+        const zahlerId = zahlerSelect.value;
+        const dabei = personen.filter(p => p.querySelector('.js-dabei').checked);
+        const extras = dabei.reduce((s, p) => s + cent(p.querySelector('.js-extra').value), 0);
+        const rest = gesamt - extras;
+        const n = dabei.length;
+        const basis = n && rest >= 0 ? Math.floor(rest / n) : 0;
+        const uebrig = n && rest >= 0 ? rest % n : 0;
+
+        document.getElementById('s-anzahl').textContent = n;
+        document.getElementById('s-extras').textContent = euro(extras);
+        document.getElementById('s-prokopf').textContent = n && rest >= 0 ? euro(basis) : '–';
+        document.getElementById('s-warnung').classList.toggle('hidden', rest >= 0);
+
+        let pos = 0;
+        personen.forEach(p => {
+            const an = p.querySelector('.js-dabei').checked;
+            const istZahler = p.dataset.id === zahlerId;
+            p.querySelector('.js-felder').classList.toggle('opacity-40', !an);
+            // Der Zahler zahlt sich nichts selbst an
+            p.querySelector('.js-gegeben-label').classList.toggle('hidden', istZahler);
+            const anteilEl = p.querySelector('.js-anteil');
+            const offenEl = p.querySelector('.js-offen');
+            if (!an || rest < 0) {
+                anteilEl.textContent = '–';
+                offenEl.textContent = '';
+                return;
+            }
+            const anteil = basis + (pos < uebrig ? 1 : 0) + cent(p.querySelector('.js-extra').value);
+            pos++;
+            anteilEl.textContent = euro(anteil);
+            if (istZahler) {
+                offenEl.textContent = 'hat bezahlt';
+                return;
+            }
+            const offen = anteil - cent(p.querySelector('.js-gegeben').value);
+            offenEl.textContent = offen > 0 ? 'offen ' + euro(offen)
+                : offen < 0 ? 'bekommt ' + euro(-offen) + ' zurück' : 'erledigt';
+        });
+    }
+
+    form.addEventListener('input', rechne);
+    form.addEventListener('change', rechne);
+    form.querySelectorAll('.js-gruppe-toggle').forEach(btn => btn.addEventListener('click', () => {
+        const boxen = [...btn.closest('.rounded-xl').querySelectorAll('.js-dabei')];
+        const alleAn = boxen.every(b => b.checked);
+        boxen.forEach(b => { b.checked = !alleAn; });
+        rechne();
+    }));
+    rechne();
+})();
+</script>
+{% endblock %}

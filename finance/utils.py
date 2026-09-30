@@ -138,3 +138,30 @@ def berechne_ausgleich(salden):
             si += 1
 
     return transfers
+
+
+def verteile_umlage(betrag, teilnehmer_ids, extras=None):
+    """Verteilt eine Umlage auf die Teilnehmer.
+
+    Extras (z. B. Haralds Wein) stecken schon im Gesamtbetrag: Sie werden
+    vorab herausgerechnet und nur der jeweiligen Person zugeschlagen, der Rest
+    geht zu gleichen Teilen an alle. Übrige Cents bekommen die ersten in der
+    Liste, damit die Summe exakt dem Betrag entspricht.
+
+    Rückgabe: {teilnehmer_id: anteil}. ValueError, wenn niemand ausgewählt ist
+    oder die Extras den Betrag übersteigen.
+    """
+    extras = extras or {}
+    if not teilnehmer_ids:
+        raise ValueError("Bitte mindestens eine Person auswählen.")
+    summe_extras = sum((extras.get(i, Decimal("0")) for i in teilnehmer_ids), Decimal("0"))
+    rest_cent = int(((betrag - summe_extras) * 100).to_integral_value(rounding=ROUND_HALF_UP))
+    if rest_cent < 0:
+        raise ValueError("Die Extras sind zusammen höher als der Gesamtbetrag.")
+
+    basis, uebrig = divmod(rest_cent, len(teilnehmer_ids))
+    anteile = {}
+    for pos, tid in enumerate(teilnehmer_ids):
+        cent = basis + (1 if pos < uebrig else 0)
+        anteile[tid] = (Decimal(cent) / 100).quantize(CENT) + extras.get(tid, Decimal("0"))
+    return anteile

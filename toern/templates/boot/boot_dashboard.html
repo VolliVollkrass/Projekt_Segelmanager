@@ -1176,6 +1176,128 @@
             </div>
         </div>
 
+        <!-- Törn-Umlagen (über alle Boote, neben den Boots-Salden) -->
+        {% if umlage_darf_anlegen or umlage_meine_anteile or umlage_uebersicht %}
+            <div class="bg-base-100 border border-base-300 rounded-xl p-5 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                    <h3 class="font-semibold text-sm">🍽️ Törn-Umlagen</h3>
+                    {% if umlage_darf_anlegen %}
+                        <a href="{% url 'umlage_erstellen' toern.id %}" class="btn btn-primary btn-xs">+ Umlage</a>
+                    {% endif %}
+                </div>
+                {% if not umlage_meine_anteile and not umlage_uebersicht %}
+                    <p class="text-xs text-base-content/50">
+                        Für Rechnungen quer über alle Boote, z. B. das Restaurant: Betrag auf alle
+                        oder einzelne verteilen, mit Extras und Anzahlungen.
+                    </p>
+                {% endif %}
+
+                {% for a in umlage_meine_anteile %}
+                    <div class="bg-base-200/60 rounded-lg px-3 py-2 text-sm">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="font-medium">{{ a.umlage.beschreibung }}</p>
+                                <p class="text-xs text-base-content/50">
+                                    an {{ a.umlage.bezahlt_von.user.first_name }} {{ a.umlage.bezahlt_von.user.last_name }}
+                                    · Anteil {{ a.anteil|floatformat:2 }} €{% if a.extra %} (inkl. Extra {{ a.extra|floatformat:2 }} €){% endif %}{% if a.schon_gegeben %} · gegeben {{ a.schon_gegeben|floatformat:2 }} €{% endif %}
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                {% if a.beglichen_am %}
+                                    <span class="badge badge-success badge-sm">✓ beglichen</span>
+                                    <form method="post" action="{% url 'umlage_anteil_beglichen' a.id %}"
+                                          onsubmit="return confirm('Wieder als offen markieren?');">
+                                        {% csrf_token %}
+                                        <button type="submit" title="Zurücknehmen" class="btn btn-ghost btn-xs text-error px-1">✕</button>
+                                    </form>
+                                {% elif a.offen == 0 %}
+                                    <span class="badge badge-success badge-sm">✓ erledigt</span>
+                                {% else %}
+                                    <span class="font-bold">
+                                        {% if a.offen > 0 %}{{ a.offen|floatformat:2 }} €{% else %}+{{ a.zurueck|floatformat:2 }} € zurück{% endif %}
+                                    </span>
+                                    <form method="post" action="{% url 'umlage_anteil_beglichen' a.id %}"
+                                          onsubmit="return confirm('{% if a.offen > 0 %}Du hast {{ a.offen|floatformat:2 }} € an {{ a.umlage.bezahlt_von.user.first_name|escapejs }} bezahlt?{% else %}Du hast dein Geld zurückbekommen?{% endif %}');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-xs btn-success">✓ Beglichen</button>
+                                    </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% if a.zahlungswege is not None %}
+                            {% include "boot/_zahlungswege.html" with wege=a.zahlungswege empfaenger=a.umlage.bezahlt_von.user %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+
+                {% for u in umlage_uebersicht %}
+                    <details class="border border-base-300 rounded-lg">
+                        <summary class="cursor-pointer px-3 py-2 text-sm flex flex-wrap items-center justify-between gap-2">
+                            <span class="min-w-0">
+                                <span class="font-medium">{{ u.umlage.beschreibung }}</span>
+                                <span class="text-xs text-base-content/50">
+                                    · {{ u.umlage.betrag|floatformat:2 }} € · bezahlt von {% if u.ich_bin_zahler %}dir{% else %}{{ u.umlage.bezahlt_von.user.first_name }}{% endif %}
+                                </span>
+                            </span>
+                            {% if u.offen_anzahl %}
+                                <span class="badge badge-warning badge-sm">{{ u.offen_anzahl }} offen{% if u.offen_summe %} · {{ u.offen_summe|floatformat:2 }} €{% endif %}</span>
+                            {% else %}
+                                <span class="badge badge-success badge-sm">✓ alle erledigt</span>
+                            {% endif %}
+                        </summary>
+                        <div class="px-3 pb-3 space-y-1.5">
+                            {% for a in u.anteile %}
+                                <div class="text-sm {% if a.erledigt %}text-base-content/50{% endif %}">
+                                    <div class="flex flex-wrap items-center justify-between gap-2">
+                                        <span class="min-w-0">
+                                            {{ a.teilnahme.user.first_name }} {{ a.teilnahme.user.last_name }}
+                                            <span class="text-[11px] text-base-content/40">
+                                                {% if a.teilnahme.boot %}{{ a.teilnahme.boot.name }} · {% endif %}{{ a.anteil|floatformat:2 }} €{% if a.extra %} inkl. Extra {{ a.extra|floatformat:2 }} €{% endif %}{% if a.schon_gegeben %} · gegeben {{ a.schon_gegeben|floatformat:2 }} €{% endif %}
+                                            </span>
+                                        </span>
+                                        <span class="flex items-center gap-2 shrink-0">
+                                            {% if a.ist_zahler %}
+                                                <span class="text-xs">hat bezahlt</span>
+                                            {% elif a.beglichen_am %}
+                                                <span class="text-xs text-success">✓ beglichen</span>
+                                            {% elif a.offen == 0 %}
+                                                <span class="text-xs text-success">✓ erledigt</span>
+                                            {% elif a.offen > 0 %}
+                                                <span class="text-xs font-semibold">offen {{ a.offen|floatformat:2 }} €</span>
+                                            {% else %}
+                                                <span class="text-xs font-semibold">bekommt {{ a.zurueck|floatformat:2 }} € zurück</span>
+                                            {% endif %}
+                                            {% if u.ich_bin_zahler and not a.ist_zahler and a.offen != 0 %}
+                                                <form method="post" action="{% url 'umlage_anteil_beglichen' a.id %}">
+                                                    {% csrf_token %}
+                                                    {% if a.beglichen_am %}
+                                                        <button type="submit" title="Wieder offen" class="btn btn-ghost btn-xs text-error px-1">✕</button>
+                                                    {% else %}
+                                                        <button type="submit" class="btn btn-xs btn-success">✓</button>
+                                                    {% endif %}
+                                                </form>
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    {% if a.zahlungswege is not None %}
+                                        {% include "boot/_zahlungswege.html" with wege=a.zahlungswege empfaenger=a.teilnahme.user %}
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                            <div class="flex gap-2 justify-end pt-2">
+                                <a href="{% url 'umlage_bearbeiten' toern.id u.umlage.id %}" class="btn btn-ghost btn-xs">Bearbeiten</a>
+                                <form method="post" action="{% url 'umlage_loeschen' u.umlage.id %}"
+                                      onsubmit="return confirm('Umlage „{{ u.umlage.beschreibung|escapejs }}“ wirklich löschen? Alle Anteile verschwinden.');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-ghost btn-xs text-error">Löschen</button>
+                                </form>
+                            </div>
+                        </div>
+                    </details>
+                {% endfor %}
+            </div>
+        {% endif %}
+
         <!-- Ausgleich -->
         {% if kasse_transfers %}
             <div class="bg-base-100 border border-base-300 rounded-xl p-5">

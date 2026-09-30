@@ -67,6 +67,89 @@ class Ausgleichszahlung(models.Model):
         return f"{self.von} → {self.an}: {self.betrag} €"
 
 
+class Umlage(models.Model):
+    """Eine Rechnung, die jemand für Leute aus dem ganzen Törn ausgelegt hat —
+    typisch die Restaurantrechnung am letzten Abend, quer über alle Boote.
+
+    Läuft bewusst neben der Bootskasse her: Der Zahler sitzt nur auf einem
+    Boot, in den Salden der anderen Boote würde er fehlen. Deshalb schuldet
+    hier jeder direkt dem Zahler, ohne Verrechnung.
+    """
+    toern = models.ForeignKey(Toern, on_delete=models.CASCADE, related_name="umlagen")
+    beschreibung = models.CharField(max_length=200)
+    betrag = models.DecimalField(max_digits=8, decimal_places=2)
+    bezahlt_von = models.ForeignKey(
+        Teilnahme, on_delete=models.CASCADE, related_name="bezahlte_umlagen"
+    )
+    erstellt_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="erfasste_umlagen",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.beschreibung} ({self.betrag} €)"
+
+
+class UmlageAnteil(models.Model):
+    """Was eine Person von einer Umlage trägt.
+
+    `anteil` = gleicher Teil vom Rest + eigenes Extra (z. B. der Wein).
+    `schon_gegeben` = Anzahlung, die der Zahler vorab bekommen hat.
+    Offen ist die Differenz; negativ heißt, der Zahler muss etwas zurückgeben.
+    """
+    umlage = models.ForeignKey(Umlage, on_delete=models.CASCADE, related_name="anteile")
+    teilnahme = models.ForeignKey(
+        Teilnahme, on_delete=models.CASCADE, related_name="umlage_anteile"
+    )
+    extra = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    schon_gegeben = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    anteil = models.DecimalField(max_digits=8, decimal_places=2)
+    beglichen_am = models.DateTimeField(null=True, blank=True)
+    beglichen_von = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="beglichene_umlage_anteile",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["umlage", "teilnahme"], name="umlage_anteil_einmal_pro_person"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.teilnahme} – {self.anteil} €"
+
+    @property
+    def offen(self):
+        return self.anteil - self.schon_gegeben
+
+    @property
+    def zurueck(self):
+        """Was der Zahler zurückgeben muss, wenn zu viel angezahlt wurde."""
+        return -self.offen
+
+    @property
+    def ist_zahler(self):
+        return self.teilnahme_id == self.umlage.bezahlt_von_id
+
+    @property
+    def erledigt(self):
+        """Nichts mehr zu tun: der Zahler selbst, beglichen, oder durch die
+        Anzahlung genau abgedeckt."""
+        return self.ist_zahler or self.beglichen_am is not None or self.offen == 0
+
+
 class TopfAusgabe(models.Model):
     """Ausgabe aus dem Skipper-Topf (Budget des Anbieters für den ganzen Törn)."""
 
