@@ -6,15 +6,16 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
-from django.shortcuts import get_object_or_404, redirect
+from django.db import transaction
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from boote.models import Boot
 from toern.models import Teilnahme, Toern
-from .models import Ausgabe, Ausgleichszahlung, TopfAusgabe, TopfBeleg
-from .utils import rate_kategorie
+from .models import Ausgabe, Ausgleichszahlung, TopfAusgabe, TopfBeleg, Umlage, UmlageAnteil
+from .utils import rate_kategorie, verteile_umlage
 
 # Maximal pro Upload angenommene Belegfotos (gegen versehentliche Massen-Uploads).
 MAX_BELEGE_PRO_UPLOAD = 20
@@ -144,6 +145,250 @@ def ausgleich_zuruecknehmen(request, zahlung_id):
     zahlung.delete()
     messages.success(request, "Die Zahlung wurde zurückgenommen.")
     return redirect(kasse_url)
+
+
+# ───────────────────────── Törn-Umlage ─────────────────────────
+
+def _darf_umlage_anlegen(user, toern):
+    return user == toern.anbieter or _ist_toern_skipper(user, toern)
+
+
+def _darf_umlage_bearbeiten(user, umlage):
+    return (
+        _darf_umlage_anlegen(user, umlage.toern)
+        or user == umlage.erstellt_von
+        or user == umlage.bezahlt_von.user
+    )
+
+
+def _parse_optionaler_betrag(raw):
+    """Extra/Anzahlung: leer = 0, sonst ≥ 0. None, wenn ungültig."""
+    raw = str(raw or "").strip()
+    if not raw:
+        return Decimal("0")
+    try:
+        betrag = Decimal(raw.replace(",", ".")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except InvalidOperation:
+        return None
+    return betrag if betrag >= 0 else None
+
+
+def _kasse_url(user, toern):
+    """Zurück in die Bootskasse — wer (als Anbieter) auf keinem Boot sitzt,
+    landet im Kasse-Tab des Skipper-Dashboards."""
+    auf_boot = Teilnahme.objects.filter(
+        toern=toern, user=user, status="bestaetigt", boot__isnull=False
+    ).exists()
+    if auf_boot:
+        return f"{reverse('boot_dashboard', args=[toern.id])}?tab=kasse"
+    return f"{reverse('skipper_dashboard', args=[toern.id])}?tab=kasse"
+
+
+def _umlage_teilnehmer(toern):
+    return list(
+        Teilnahme.objects.filter(toern=toern, status="bestaetigt")
+        .select_related("user", "boot")
+        .order_by("boot__name", "user__first_name", "user__last_name")
+    )
+
+
+@login_required
+def umlage_formular(request, toern_id, umlage_id=None):
+    """Umlage anlegen oder bearbeiten.
+
+    Eigene Seite statt Klappformular: bei 30 Leuten mit je zwei Feldern
+    braucht es Platz, und bei einem Eingabefehler bleibt alles Eingetippte
+    stehen.
+    """
+    toern = get_object_or_404(Toern, id=toern_id)
+    umlage = None
+    if umlage_id is not None:
+        umlage = get_object_or_404(
+            Umlage.objects.select_related("bezahlt_von__user", "toern"),
+            id=umlage_id, toern=toern,
+        )
+        if not _darf_umlage_bearbeiten(request.user, umlage):
+            raise PermissionDenied
+    elif not _darf_umlage_anlegen(request.user, toern):
+        raise PermissionDenied
+
+    teilnehmer = _umlage_teilnehmer(toern)
+    nach_id = {t.id: t for t in teilnehmer}
+    meine = next((t for t in teilnehmer if t.user_id == request.user.id), None)
+    fehler = None
+
+    if request.method == "POST":
+        beschreibung = request.POST.get("beschreibung", "").strip()
+        betrag = _parse_betrag(request.POST.get("betrag"))
+        zahler = nach_id.get(_int_oder_none(request.POST.get("bezahlt_von")))
+        # Reihenfolge der Liste, nicht der POST-Daten — sie bestimmt, wer
+        # übrige Cents bekommt, und muss zur Vorschau im Browser passen.
+        gewaehlte_ids = {_int_oder_none(x) for x in request.POST.getlist("teilnehmer")}
+        ausgewaehlt = [t for t in teilnehmer if t.id in gewaehlte_ids]
+        extras, gegeben = {}, {}
+        for t in ausgewaehlt:
+            extras[t.id] = _parse_optionaler_betrag(request.POST.get(f"extra_{t.id}"))
+            gegeben[t.id] = _parse_optionaler_betrag(request.POST.get(f"gegeben_{t.id}"))
+
+        if not beschreibung or betrag is None:
+            fehler = "Bitte Beschreibung und einen gültigen Gesamtbetrag angeben."
+        elif not zahler:
+            fehler = "Bitte auswählen, wer die Rechnung bezahlt hat."
+        elif any(v is None for v in list(extras.values()) + list(gegeben.values())):
+            fehler = "Extras und Anzahlungen müssen Beträge ab 0 € sein."
+        else:
+            try:
+                anteile = verteile_umlage(betrag, [t.id for t in ausgewaehlt], extras)
+            except ValueError as e:
+                fehler = str(e)
+
+        if not fehler:
+            # Der Zahler zahlt sich nichts selbst an
+            gegeben[zahler.id] = Decimal("0")
+            zurueckgesetzt = _speichere_umlage(
+                request.user, toern, umlage, beschreibung, betrag, zahler,
+                ausgewaehlt, extras, gegeben, anteile,
+            )
+            text = f"Umlage „{beschreibung}“ ({betrag} €) gespeichert."
+            if zurueckgesetzt:
+                text += (
+                    f" Bei {zurueckgesetzt} Person(en) hat sich der offene Betrag geändert"
+                    " — „beglichen“ wurde dort zurückgesetzt."
+                )
+            messages.success(request, text)
+            return redirect(_kasse_url(request.user, toern))
+
+        werte = {
+            "beschreibung": beschreibung,
+            "betrag": request.POST.get("betrag", ""),
+            "bezahlt_von": zahler.id if zahler else None,
+            "ausgewaehlt": {t.id for t in ausgewaehlt},
+            "extra": {t.id: request.POST.get(f"extra_{t.id}", "") for t in teilnehmer},
+            "gegeben": {t.id: request.POST.get(f"gegeben_{t.id}", "") for t in teilnehmer},
+        }
+    elif umlage:
+        bestehend = {a.teilnahme_id: a for a in umlage.anteile.all()}
+        werte = {
+            "beschreibung": umlage.beschreibung,
+            "betrag": f"{umlage.betrag:.2f}".replace(".", ","),
+            "bezahlt_von": umlage.bezahlt_von_id,
+            "ausgewaehlt": set(bestehend),
+            "extra": {i: _fmt(a.extra) for i, a in bestehend.items()},
+            "gegeben": {i: _fmt(a.schon_gegeben) for i, a in bestehend.items()},
+        }
+    else:
+        werte = {
+            "beschreibung": "",
+            "betrag": "",
+            "bezahlt_von": meine.id if meine else None,
+            "ausgewaehlt": {t.id for t in teilnehmer},
+            "extra": {},
+            "gegeben": {},
+        }
+
+    gruppen = {}
+    for t in teilnehmer:
+        t.ist_ausgewaehlt = t.id in werte["ausgewaehlt"]
+        t.wert_extra = werte["extra"].get(t.id, "")
+        t.wert_gegeben = werte["gegeben"].get(t.id, "")
+        gruppen.setdefault(t.boot.name if t.boot else "Ohne Boot", []).append(t)
+
+    return render(request, "finance/umlage_formular.html", {
+        "toern": toern,
+        "umlage": umlage,
+        "teilnehmer": teilnehmer,
+        "gruppen": list(gruppen.items()),
+        "werte": werte,
+        "fehler": fehler,
+        "zurueck_url": _kasse_url(request.user, toern),
+    })
+
+
+def _int_oder_none(raw):
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
+def _fmt(betrag):
+    """0 → leeres Feld, sonst deutsches Komma."""
+    return "" if not betrag else f"{betrag:.2f}".replace(".", ",")
+
+
+@transaction.atomic
+def _speichere_umlage(user, toern, umlage, beschreibung, betrag, zahler,
+                      ausgewaehlt, extras, gegeben, anteile):
+    """Legt die Umlage an bzw. aktualisiert sie. Rückgabe: Anzahl der Anteile,
+    deren „beglichen“ zurückgesetzt wurde, weil sich der offene Betrag geändert hat."""
+    if umlage is None:
+        umlage = Umlage(toern=toern, erstellt_von=user)
+    umlage.beschreibung = beschreibung
+    umlage.betrag = betrag
+    umlage.bezahlt_von = zahler
+    umlage.save()
+
+    bestehend = {a.teilnahme_id: a for a in umlage.anteile.all()}
+    zurueckgesetzt = 0
+    for t in ausgewaehlt:
+        a = bestehend.pop(t.id, None) or UmlageAnteil(umlage=umlage, teilnahme=t)
+        neu_offen = anteile[t.id] - gegeben[t.id]
+        # Beglichen gilt für einen bestimmten Betrag. Ändert der sich, ist die
+        # Bestätigung nichts mehr wert.
+        if a.pk and a.beglichen_am and a.offen != neu_offen:
+            a.beglichen_am = None
+            a.beglichen_von = None
+            zurueckgesetzt += 1
+        a.anteil = anteile[t.id]
+        a.extra = extras[t.id]
+        a.schon_gegeben = gegeben[t.id]
+        a.save()
+    # Wer nicht mehr ausgewählt ist, fällt raus
+    UmlageAnteil.objects.filter(id__in=[a.id for a in bestehend.values()]).delete()
+    return zurueckgesetzt
+
+
+@login_required
+@require_POST
+def umlage_loeschen(request, umlage_id):
+    umlage = get_object_or_404(
+        Umlage.objects.select_related("toern", "bezahlt_von__user"), id=umlage_id
+    )
+    if not _darf_umlage_bearbeiten(request.user, umlage):
+        raise PermissionDenied
+    toern = umlage.toern
+    beschreibung = umlage.beschreibung
+    umlage.delete()
+    messages.success(request, f"Umlage „{beschreibung}“ gelöscht.")
+    return redirect(_kasse_url(request.user, toern))
+
+
+@login_required
+@require_POST
+def umlage_anteil_beglichen(request, anteil_id):
+    """Anteil als beglichen markieren bzw. zurücknehmen.
+
+    Wie beim Ausgleich dürfen das beide Seiten: wer schuldet und wer die
+    Rechnung bezahlt hat.
+    """
+    anteil = get_object_or_404(
+        UmlageAnteil.objects.select_related("umlage__toern", "umlage__bezahlt_von", "teilnahme"),
+        id=anteil_id,
+    )
+    umlage = anteil.umlage
+    if request.user.id not in (anteil.teilnahme.user_id, umlage.bezahlt_von.user_id):
+        raise PermissionDenied
+
+    if anteil.beglichen_am:
+        anteil.beglichen_am = None
+        anteil.beglichen_von = None
+        messages.success(request, f"„{umlage.beschreibung}“: wieder als offen markiert.")
+    else:
+        anteil.beglichen_am = timezone.now()
+        anteil.beglichen_von = request.user
+        messages.success(request, f"„{umlage.beschreibung}“: als beglichen markiert.")
+    anteil.save(update_fields=["beglichen_am", "beglichen_von"])
+    return redirect(_kasse_url(request.user, umlage.toern))
 
 
 # ───────────────────────── Bootskasse ─────────────────────────

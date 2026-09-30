@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from boote.models import Boot, Kabine
 from config import settings
-from finance.models import Ausgabe, Ausgleichszahlung, TopfAusgabe
+from finance.models import Ausgabe, Ausgleichszahlung, TopfAusgabe, Umlage, UmlageAnteil
 from finance.utils import berechne_salden, berechne_ausgleich, wende_zahlungen_an
 from accounts.zahlungswege import zahlungswege
 from logistik.models import Einkaufspunkt, EinkaufslistenEintrag, EinkaufsStandard, EinkaufsStandardEintrag, EinkaufsVorlage, EinkaufsVorlageEintrag, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
@@ -2194,6 +2194,58 @@ def boot_dashboard(request, toern_id):
         or request.user == toern.anbieter
     )
 
+    # 🍽️ Törn-Umlagen — laufen neben den Boots-Salden her (siehe finance.Umlage).
+    # Anlegen dürfen Skipper/Co-Skipper des ganzen Törns und der Anbieter.
+    umlage_darf_anlegen = (
+        request.user == toern.anbieter
+        or Teilnahme.objects.filter(
+            toern=toern, user=request.user, rolle__in=("skipper", "coskipper")
+        ).exists()
+    )
+    # Eigene Anteile an Umlagen, die jemand anderes bezahlt hat
+    umlage_meine_anteile = list(
+        UmlageAnteil.objects.filter(teilnahme=teilnahme, umlage__toern=toern)
+        .exclude(umlage__bezahlt_von=teilnahme)
+        .select_related("umlage__bezahlt_von__user")
+        .order_by("-umlage__created_at")
+    )
+    for a in umlage_meine_anteile:
+        a.zahlungswege = (
+            zahlungswege(a.umlage.bezahlt_von.user, a.offen)
+            if a.offen > 0 and not a.beglichen_am else None
+        )
+    # Gesamtübersicht: für wer bezahlt hat, wer sie angelegt hat, und die Verwalter
+    umlagen_qs = Umlage.objects.filter(toern=toern).select_related(
+        "bezahlt_von__user", "erstellt_von"
+    ).prefetch_related("anteile__teilnahme__user", "anteile__teilnahme__boot")
+    if not umlage_darf_anlegen:
+        umlagen_qs = umlagen_qs.filter(
+            Q(bezahlt_von=teilnahme) | Q(erstellt_von=request.user)
+        )
+    umlage_uebersicht = []
+    for u in umlagen_qs:
+        anteile = sorted(
+            u.anteile.all(),
+            key=lambda a: (a.teilnahme.boot.name if a.teilnahme.boot else "",
+                           a.teilnahme.user.first_name),
+        )
+        offene = [a for a in anteile if not a.erledigt]
+        # Hat jemand zu viel angezahlt, schuldet der Zahler ihm etwas —
+        # dann sieht (nur) der Zahler dessen Zahlungswege.
+        for a in anteile:
+            a.zahlungswege = (
+                zahlungswege(a.teilnahme.user, a.zurueck)
+                if u.bezahlt_von_id == teilnahme.id and not a.erledigt and a.offen < 0
+                else None
+            )
+        umlage_uebersicht.append({
+            "umlage": u,
+            "anteile": anteile,
+            "offen_summe": sum((a.offen for a in offene if a.offen > 0), Decimal("0")),
+            "offen_anzahl": len(offene),
+            "ich_bin_zahler": u.bezahlt_von_id == teilnahme.id,
+        })
+
     # 🛠️ Schadensprotokoll — die ganze Boots-Crew liest/erstellt/bearbeitet.
     # Löschen darf nur Autor oder Skipper/Co (Flag pro Eintrag am Template gesetzt).
     schaeden = list(
@@ -2240,6 +2292,9 @@ def boot_dashboard(request, toern_id):
         "kasse_einzeln": kasse_einzeln,
         "mein_kasse_saldo": mein_kasse_saldo,
         "kasse_darf_verwalten": kasse_darf_verwalten,
+        "umlage_darf_anlegen": umlage_darf_anlegen,
+        "umlage_meine_anteile": umlage_meine_anteile,
+        "umlage_uebersicht": umlage_uebersicht,
         # Dokumente digital abhaken — nur Skipper/Co dieses Boots
         "darf_dokumente": teilnahme.rolle in ("skipper", "coskipper"),
         # Direktlink ins Skipper-Dashboard im Kopfbereich

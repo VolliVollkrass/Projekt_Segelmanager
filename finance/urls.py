@@ -13,6 +13,9 @@ from .views import (
     topf_beleg_loeschen,
     topf_belege_pdf,
     topf_abrechnung_xlsx,
+    umlage_formular,
+    umlage_loeschen,
+    umlage_anteil_beglichen,
 )
 
 urlpatterns = [
@@ -21,6 +24,10 @@ urlpatterns = [
     path("ausgabe/<int:ausgabe_id>/loeschen/", ausgabe_loeschen, name="ausgabe_loeschen"),
     path("<int:toern_id>/boot/<int:boot_id>/ausgleich/beglichen/", ausgleich_beglichen, name="ausgleich_beglichen"),
     path("ausgleich/<int:zahlung_id>/zuruecknehmen/", ausgleich_zuruecknehmen, name="ausgleich_zuruecknehmen"),
+    path("<int:toern_id>/umlage/neu/", umlage_formular, name="umlage_erstellen"),
+    path("<int:toern_id>/umlage/<int:umlage_id>/bearbeiten/", umlage_formular, name="umlage_bearbeiten"),
+    path("umlage/<int:umlage_id>/loeschen/", umlage_loeschen, name="umlage_loeschen"),
+    path("umlage/anteil/<int:anteil_id>/beglichen/", umlage_anteil_beglichen, name="umlage_anteil_beglichen"),
     path("<int:toern_id>/topf/add/", topf_ausgabe_erstellen, name="topf_ausgabe_erstellen"),
     path("topf/<int:ausgabe_id>/bearbeiten/", topf_ausgabe_bearbeiten, name="topf_ausgabe_bearbeiten"),
     path("topf/<int:ausgabe_id>/loeschen/", topf_ausgabe_loeschen, name="topf_ausgabe_loeschen"),
