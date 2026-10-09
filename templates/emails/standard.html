@@ -1,0 +1,14 @@
+{% extends "emails/layout.html" %}
+{% comment %}
+Bausteine für alle automatischen Mails — jeweils optional:
+  anrede            "Hallo Carla,"
+  absaetze          Liste von Textabsätzen
+  highlight         {"wert": "187 sm", "label": "Deine gesegelten Seemeilen"}
+  infozeilen        Liste von (Label, Wert) → graue Info-Karte
+  liste_titel/liste Aufzählung (z. B. fehlende Angaben)
+  buttons           Liste von {"url", "label", "zweitrangig"}
+  nachsatz          Liste von Absätzen nach den Knöpfen
+  gruss             z. B. "Bis bald an Bord,"
+{% endcomment %}
+{% block inhalt %}{% if anrede %}<p style="margin:0 0 14px;">{{ anrede }}</p>{% endif %}{% for a in absaetze %}<p style="margin:0 0 14px;">{{ a|linebreaksbr }}</p>{% endfor %}{% endblock %}
+{% block extras %}{% if highlight %}<tr><td style="padding:6px 0 10px;"><div style="background:#ecfdf5;border:1px solid #99f6e4;border-radius:12px;padding:16px 18px;text-align:center;"><div style="color:#0D9488;font-size:34px;font-weight:800;line-height:1.1;">{{ highlight.wert }}</div><div style="color:#4b5563;font-size:14px;margin-top:4px;">{{ highlight.label }}</div></div></td></tr>{% endif %}{% if infozeilen %}<tr><td style="padding:6px 0 10px;"><div style="background:#f1f5f9;border-radius:10px;padding:12px 16px;">{% for label, wert in infozeilen %}<div style="font-size:15px;padding:3px 0;"><span style="color:#64748b;">{{ label }}:</span> <strong style="color:#0f2942;">{{ wert }}</strong></div>{% endfor %}</div></td></tr>{% endif %}{% if liste %}<tr><td style="padding:6px 0 10px;"><div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 16px;">{% if liste_titel %}<div style="color:#9a3412;font-weight:600;font-size:14px;margin-bottom:4px;">{{ liste_titel }}</div>{% endif %}{% for punkt in liste %}<div style="color:#1f2937;font-size:15px;padding:2px 0;">• {{ punkt }}</div>{% endfor %}</div></td></tr>{% endif %}{% for b in buttons %}<tr><td style="padding:6px 0;"><a href="{{ b.url }}" style="display:inline-block;{% if b.zweitrangig %}background:#ffffff;color:#0D9488;border:2px solid #0D9488;padding:9px 20px;{% else %}background:#0D9488;color:#ffffff;padding:11px 22px;{% endif %}text-decoration:none;border-radius:8px;font-weight:600;font-size:15px;">{{ b.label }}</a></td></tr>{% endfor %}{% if nachsatz or gruss %}<tr><td style="padding:14px 0 0;color:#1f2937;font-size:16px;line-height:1.6;">{% for a in nachsatz %}<p style="margin:0 0 14px;">{{ a|linebreaksbr }}</p>{% endfor %}{% if gruss %}<p style="margin:0;">{{ gruss }}<br><strong>Das Meer erleben Team</strong></p>{% endif %}</td></tr>{% endif %}{% endblock %}

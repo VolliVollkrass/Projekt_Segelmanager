@@ -1,8 +1,8 @@
 """Tests: Nach dem Abschluss bleibt die Bootskasse erreichbar.
 
 Abgerechnet wird oft erst nach dem Törn — das Boot-Dashboard zeigt dann nur
-noch die Kasse, die Navigation führt weiter dorthin, und im Crew-Dashboard
-steht die Abschluss-Karte mit Seemeilen, Fotos und dem Weg zur Kasse oben.
+noch die Kasse. In der Navigation verschwindet „Boot"; der Weg zur Kasse
+führt über die Abschluss-Karte oben im Crew-Dashboard.
 """
 from datetime import timedelta
 
@@ -50,11 +50,15 @@ class AbschlussKasseTests(TestCase):
         self.assertFalse(resp.context["toern_abgeschlossen"])
         self.assertContains(resp, 'data-tab="packliste"')
 
-    def test_navigation_fuehrt_weiter_zum_boot(self):
+    def test_navigation_ohne_boot_nach_abschluss(self):
         resp = self.client.get(reverse("crew_dashboard", args=[self.toern.id]))
-        self.assertEqual(resp.context["nav_boot_toern_id"], self.toern.id)
+        self.assertNotIn("nav_boot_toern_id", resp.context)
+        # Direkt erreichbar bleibt das Boot-Dashboard trotzdem
+        self.assertEqual(
+            self.client.get(reverse("boot_dashboard", args=[self.toern.id])).status_code, 200
+        )
 
-    def test_laufender_toern_hat_vorrang_in_der_navigation(self):
+    def test_neuer_toern_bringt_boot_zurueck_in_die_navigation(self):
         start = timezone.now() + timedelta(days=5)
         neu = Toern.objects.create(
             titel="Nächster", anbieter=self.anbieter,
