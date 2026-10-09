@@ -372,12 +372,22 @@ def umlage_anteil_beglichen(request, anteil_id):
     Rechnung bezahlt hat.
     """
     anteil = get_object_or_404(
-        UmlageAnteil.objects.select_related("umlage__toern", "umlage__bezahlt_von", "teilnahme"),
+        UmlageAnteil.objects.select_related("umlage__toern", "umlage__bezahlt_von__user", "teilnahme"),
         id=anteil_id,
     )
     umlage = anteil.umlage
     if request.user.id not in (anteil.teilnahme.user_id, umlage.bezahlt_von.user_id):
         raise PermissionDenied
+
+    if not anteil.beglichen_am and anteil.ueber_bootskasse:
+        # Läuft schon über „So gleicht ihr aus" — hier zusätzlich abzuhaken,
+        # würde das Geld doppelt zählen.
+        messages.error(
+            request,
+            "Dieser Anteil wird über eure Bootskasse verrechnet — bitte dort unter "
+            "„So gleicht ihr aus“ begleichen.",
+        )
+        return redirect(_kasse_url(request.user, umlage.toern))
 
     if anteil.beglichen_am:
         anteil.beglichen_am = None

@@ -8,7 +8,7 @@ from decimal import Decimal
 from boote.models import Boot, Kabine
 from config import settings
 from finance.models import Ausgabe, Ausgleichszahlung, TopfAusgabe, Umlage, UmlageAnteil
-from finance.utils import berechne_salden, berechne_ausgleich, wende_zahlungen_an
+from finance.utils import berechne_salden, berechne_ausgleich, umlage_zahlungen, wende_zahlungen_an
 from accounts.zahlungswege import zahlungswege
 from logistik.models import Einkaufspunkt, EinkaufslistenEintrag, EinkaufsStandard, EinkaufsStandardEintrag, EinkaufsVorlage, EinkaufsVorlageEintrag, Gegenstand, Mahlzeit, Mitbringer, PersönlicherGegenstand, Tagesaufgabe, Tagesimpuls, TagesplanBearbeitungsrecht, Tagesthema
 from utils.profil_fortschritt import teilnahme_fortschritt
@@ -1957,12 +1957,11 @@ def boot_dashboard(request, toern_id):
         raise PermissionDenied
 
     # 🔐 Zugriff
-    if not (
-        teilnahme.status == "bestaetigt"
-        and teilnahme.boot
-        and toern.status == "ZUTEILUNG_FIXIERT"
-    ):
+    if not is_boot_access_allowed(teilnahme):
         raise PermissionDenied
+    # Nach dem Abschluss zählt nur noch die Abrechnung — das Dashboard zeigt
+    # dann ausschließlich die Bootskasse.
+    toern_abgeschlossen = toern.status == "ABGESCHLOSSEN"
 
     # 🔥 Persönliche Packliste nur einmal erstellen — aus der Törn-Vorlage
     # (respektiert Warm/Kalt und Anpassungen des Skippers)
@@ -2157,17 +2156,38 @@ def boot_dashboard(request, toern_id):
         Ausgleichszahlung.objects.filter(boot=boot, toern=toern)
         .select_related("von__user", "an__user")
     )
-    kasse_salden = berechne_salden(kasse_ausgaben, crew_liste)
+    # Törn-Umlagen, die jemand von diesem Boot bezahlt hat: Die Anteile der
+    # eigenen Crew werden hier mit verrechnet; die anderen Boote begleichen
+    # ihren Anteil weiterhin direkt in der Umlage.
+    kasse_umlage_anteile = list(
+        UmlageAnteil.objects.filter(
+            umlage__toern=toern, umlage__bezahlt_von__boot=boot, teilnahme__boot=boot,
+        ).select_related("umlage__bezahlt_von__user", "teilnahme")
+    )
+    kasse_salden = berechne_salden(kasse_ausgaben, crew_liste, kasse_umlage_anteile)
     # Schon geflossenes Geld einrechnen, sonst schlägt der Ausgleich weiter
     # Überweisungen vor, die längst getätigt sind.
     wende_zahlungen_an(kasse_salden, kasse_zahlungen)
+    wende_zahlungen_an(kasse_salden, umlage_zahlungen(kasse_umlage_anteile))
     kasse_transfers = berechne_ausgleich(kasse_salden)
     # Zahlungswege des Empfängers nur an den, der ihm gerade Geld schuldet —
     # IBAN & Co. sollen nicht für die ganze Crew offen herumstehen.
     for t in kasse_transfers:
         if t["von"].id == teilnahme.id:
             t["zahlungswege"] = zahlungswege(t["an"].user, t["betrag"])
-    kasse_gesamt = sum((a.betrag for a in kasse_ausgaben), Decimal("0"))
+    kasse_umlagen = {}
+    for a in kasse_umlage_anteile:
+        eintrag = kasse_umlagen.setdefault(
+            a.umlage_id, {"umlage": a.umlage, "betrag": Decimal("0"), "anzahl": 0}
+        )
+        eintrag["betrag"] += a.anteil
+        eintrag["anzahl"] += 1
+    kasse_umlagen = sorted(
+        kasse_umlagen.values(), key=lambda e: e["umlage"].created_at, reverse=True
+    )
+    kasse_umlage_summe = sum((e["betrag"] for e in kasse_umlagen), Decimal("0"))
+    kasse_ausgaben_summe = sum((a.betrag for a in kasse_ausgaben), Decimal("0"))
+    kasse_gesamt = kasse_ausgaben_summe + kasse_umlage_summe
 
     # „Pro Person" zählt nur, was die ganze Crew gemeinsam trägt. Kauft jemand
     # etwas für einen Einzelnen mit — die Packung Kaugummi für Hubert —, gehört
@@ -2179,7 +2199,9 @@ def boot_dashboard(request, toern_id):
          if crew_ids and {t.id for t in a.beteiligt.all()} == crew_ids),
         Decimal("0"),
     )
-    kasse_einzeln = kasse_gesamt - kasse_gemeinsam
+    # Umlagen tauchen hier nicht auf: Ihre Anteile sind pro Person verschieden
+    # und werden unter „Gesamt" eigens ausgewiesen.
+    kasse_einzeln = kasse_ausgaben_summe - kasse_gemeinsam
     kasse_pro_person = (
         (kasse_gemeinsam / len(crew_liste)).quantize(Decimal("0.01"))
         if crew_liste else Decimal("0")
@@ -2206,13 +2228,13 @@ def boot_dashboard(request, toern_id):
     umlage_meine_anteile = list(
         UmlageAnteil.objects.filter(teilnahme=teilnahme, umlage__toern=toern)
         .exclude(umlage__bezahlt_von=teilnahme)
-        .select_related("umlage__bezahlt_von__user")
+        .select_related("umlage__bezahlt_von__user", "teilnahme")
         .order_by("-umlage__created_at")
     )
     for a in umlage_meine_anteile:
         a.zahlungswege = (
             zahlungswege(a.umlage.bezahlt_von.user, a.offen)
-            if a.offen > 0 and not a.beglichen_am else None
+            if a.offen > 0 and not a.beglichen_am and not a.ueber_bootskasse else None
         )
     # Gesamtübersicht: für wer bezahlt hat, wer sie angelegt hat, und die Verwalter
     umlagen_qs = Umlage.objects.filter(toern=toern).select_related(
@@ -2288,10 +2310,13 @@ def boot_dashboard(request, toern_id):
         "kasse_transfers": kasse_transfers,
         "kasse_zahlungen": kasse_zahlungen,
         "kasse_gesamt": kasse_gesamt,
+        "kasse_umlagen": kasse_umlagen,
+        "kasse_umlage_summe": kasse_umlage_summe,
         "kasse_pro_person": kasse_pro_person,
         "kasse_einzeln": kasse_einzeln,
         "mein_kasse_saldo": mein_kasse_saldo,
         "kasse_darf_verwalten": kasse_darf_verwalten,
+        "toern_abgeschlossen": toern_abgeschlossen,
         "umlage_darf_anlegen": umlage_darf_anlegen,
         "umlage_meine_anteile": umlage_meine_anteile,
         "umlage_uebersicht": umlage_uebersicht,
