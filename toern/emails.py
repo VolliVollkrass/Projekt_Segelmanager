@@ -1,17 +1,50 @@
-from django.core.mail import EmailMessage, EmailMultiAlternatives
+import logging
+
 from django.conf import settings
-from django.utils.html import escape
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.templatetags.static import static
+
+logger = logging.getLogger(__name__)
+
+LOGO_PFAD = "medien/Logo_Meer_erleben.png"
 
 
-def _send(subject, body, recipient):
+def logo_url(request):
+    """Öffentliche Logo-URL für Mails. Brevo kann keine Inline-/CID-Bilder,
+    und WhiteNoise liefert /static/ auch ohne Login aus."""
+    return request.build_absolute_uri(static(LOGO_PFAD)) if request else None
+
+
+def render_mail_html(request, template="emails/standard.html", **context):
+    """HTML-Teil einer Mail im gemeinsamen Meer-erleben-Design."""
+    return render_to_string(template, {"logo_url": logo_url(request), **context})
+
+
+def _send(subject, body, recipient, html=None):
+    """Plaintext + HTML-Alternative an eine Adresse.
+
+    Ein Fehler bei Brevo bricht den auslösenden Vorgang (Bestätigen,
+    Abschließen …) nicht ab, landet aber im Log statt still zu verschwinden.
+    """
     reply_to = [settings.REPLY_TO_EMAIL] if settings.REPLY_TO_EMAIL else []
-    EmailMessage(
+    mail = EmailMultiAlternatives(
         subject=subject,
         body=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
         to=[recipient],
         reply_to=reply_to,
-    ).send(fail_silently=True)
+    )
+    if html:
+        mail.attach_alternative(html, "text/html")
+    try:
+        mail.send(fail_silently=False)
+    except Exception:
+        logger.exception("Mailversand fehlgeschlagen: %r an %s", subject, recipient)
+
+
+def _zeitraum(toern):
+    return f"{toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')}"
 
 
 def mail_zuteilung_fixiert(teilnahme, request):
@@ -21,24 +54,37 @@ def mail_zuteilung_fixiert(teilnahme, request):
     kabine = teilnahme.kabine
 
     dashboard_url = request.build_absolute_uri(f"/toern/{toern.id}/crew/")
-    boot_info = f"Boot: {boot.name}" if boot else "Boot: noch nicht zugewiesen"
+    boot_name = boot.name if boot else "noch nicht zugewiesen"
     kabine_zeile = f"Kabine: {kabine.name}\n" if kabine else ""
 
     body = (
         f"Hallo {user.first_name},\n\n"
-        f'die Zuteilung fuer den Toern "{toern.titel}" ist abgeschlossen!\n\n'
-        f"{boot_info}\n"
+        f'die Zuteilung für den Törn "{toern.titel}" ist abgeschlossen!\n\n'
+        f"Boot: {boot_name}\n"
         f"{kabine_zeile}"
         f"\nDu kannst ab sofort dein Crew-Dashboard aufrufen:\n{dashboard_url}\n\n"
-        "Wir freuen uns auf deinen Toern!\n\n"
+        "Wir freuen uns auf deinen Törn!\n\n"
         "Bis bald an Bord,\n"
         "Das Meer erleben Team"
     )
+    infozeilen = [("Boot", boot_name)]
+    if kabine:
+        infozeilen.append(("Kabine", kabine.name))
+    html = render_mail_html(
+        request,
+        anrede=f"Hallo {user.first_name},",
+        absaetze=[f"die Zuteilung für den Törn „{toern.titel}“ ist abgeschlossen!"],
+        infozeilen=infozeilen,
+        buttons=[{"url": dashboard_url, "label": "Zum Crew-Dashboard"}],
+        nachsatz=["Wir freuen uns auf deinen Törn!"],
+        gruss="Bis bald an Bord,",
+    )
 
     _send(
-        subject=f'Deine Bootszuteilung fuer "{toern.titel}" steht fest!',
+        subject=f'Deine Bootszuteilung für "{toern.titel}" steht fest!',
         body=body,
         recipient=user.email,
+        html=html,
     )
 
 
@@ -46,51 +92,77 @@ def mail_teilnahme_bestaetigt(teilnahme, request):
     toern = teilnahme.toern
     user = teilnahme.user
     dashboard_url = request.build_absolute_uri(f"/toern/{toern.id}/crew/")
-    # Toern-Datenformular (enthaelt auch Essgewohnheiten/Unvertraeglichkeiten) — nicht das Account-Profil
+    # Törn-Datenformular (enthält auch Essgewohnheiten/Unverträglichkeiten) — nicht das Account-Profil
     daten_url = request.build_absolute_uri(f"/toern/{toern.id}/daten/")
+    daten_text = (
+        "Damit der Skipper alle nötigen Daten für die Crewliste hat, stelle bitte sicher, "
+        "dass deine Törn-Daten vollständig ausgefüllt sind (Vorname, Nachname, Geburtsdatum, "
+        "Geburtsort, Geburtsland, Nationalität, Ausweis-/Passnummer, Adresse, Telefon, "
+        "Essgewohnheiten und Unverträglichkeiten)."
+    )
 
     body = (
         f"Hallo {user.first_name},\n\n"
-        f'deine Teilnahme am Toern \"{toern.titel}\" wurde bestaetigt.\n\n'
+        f'deine Teilnahme am Törn "{toern.titel}" wurde bestätigt.\n\n'
         f"Dein Crew-Dashboard:\n{dashboard_url}\n\n"
         "---\n"
-        "Damit der Skipper alle noetigen Daten fuer die Crewliste hat, stelle bitte sicher,\n"
-        "dass deine Toern-Daten vollstaendig ausgefuellt sind (Vorname, Nachname, Geburtsdatum,\n"
-        "Geburtsort, Geburtsland, Nationalitaet, Ausweis-/Passnummer, Adresse, Telefon,\n"
-        "Essgewohnheiten und Unvertraeglichkeiten).\n\n"
-        f"Jetzt Daten vervollstaendigen:\n{daten_url}\n"
+        f"{daten_text}\n\n"
+        f"Jetzt Daten vervollständigen:\n{daten_url}\n"
         "---\n\n"
         "Bis bald an Bord,\n"
         "Das Meer erleben Team"
     )
+    html = render_mail_html(
+        request,
+        anrede=f"Hallo {user.first_name},",
+        absaetze=[f"deine Teilnahme am Törn „{toern.titel}“ wurde bestätigt.", daten_text],
+        buttons=[
+            {"url": daten_url, "label": "Jetzt Daten vervollständigen"},
+            {"url": dashboard_url, "label": "Zum Crew-Dashboard", "zweitrangig": True},
+        ],
+        gruss="Bis bald an Bord,",
+    )
 
     _send(
-        subject=f"Teilnahme bestaetigt - {toern.titel}",
+        subject=f"Teilnahme bestätigt – {toern.titel}",
         body=body,
         recipient=user.email,
+        html=html,
     )
 
 
 def mail_crew_daten_erinnerung(user, toern, fehlende_felder, request):
-    # Toern-Datenformular (enthaelt auch Essgewohnheiten/Unvertraeglichkeiten) — nicht das Account-Profil
+    # Törn-Datenformular (enthält auch Essgewohnheiten/Unverträglichkeiten) — nicht das Account-Profil
     daten_url = request.build_absolute_uri(f"/toern/{toern.id}/daten/")
     fehlend_str = "\n".join(f"  - {f}" for f in fehlende_felder)
+    vorname = user.first_name or user.email
 
     body = (
-        f"Hallo {user.first_name or user.email},\n\n"
-        f'du bist fuer den Toern \"{toern.titel}\" angemeldet.\n\n'
-        "Fuer die Crewliste fehlen noch folgende Angaben:\n\n"
+        f"Hallo {vorname},\n\n"
+        f'du bist für den Törn "{toern.titel}" angemeldet.\n\n'
+        "Für die Crewliste fehlen noch folgende Angaben:\n\n"
         f"{fehlend_str}\n\n"
-        f"Bitte vervollstaendige deine Daten jetzt:\n{daten_url}\n\n"
+        f"Bitte vervollständige deine Daten jetzt:\n{daten_url}\n\n"
         "Das dauert nur wenige Minuten!\n\n"
-        "Viele Gruesse,\n"
+        "Viele Grüße,\n"
         "Das Meer erleben Team"
+    )
+    html = render_mail_html(
+        request,
+        anrede=f"Hallo {vorname},",
+        absaetze=[f"du bist für den Törn „{toern.titel}“ angemeldet."],
+        liste_titel="Für die Crewliste fehlen noch:",
+        liste=list(fehlende_felder),
+        buttons=[{"url": daten_url, "label": "Daten vervollständigen"}],
+        nachsatz=["Das dauert nur wenige Minuten!"],
+        gruss="Viele Grüße,",
     )
 
     _send(
-        subject=f"Bitte vervollstaendige deine Crewdaten - {toern.titel}",
+        subject=f"Bitte vervollständige deine Crewdaten – {toern.titel}",
         body=body,
         recipient=user.email,
+        html=html,
     )
 
 
@@ -99,18 +171,30 @@ def mail_teilnahme_abgesagt(teilnahme, request):
     toern = teilnahme.toern
     user = teilnahme.user
     anbieter = toern.anbieter
+    name = f"{user.first_name} {user.last_name}"
 
+    info_text = f'{name} hat die Teilnahme am Törn "{toern.titel}" abgesagt.'
     body_info = (
-        f"{user.first_name} {user.last_name} hat die Teilnahme am Toern \"{toern.titel}\" abgesagt.\n\n"
-        f"Datum: {toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')}\n\n"
-        "Viele Gruesse,\n"
+        f"{info_text}\n\n"
+        f"Datum: {_zeitraum(toern)}\n\n"
+        "Viele Grüße,\n"
         "Das Meer erleben Team"
     )
 
+    def info_html(vorname):
+        return render_mail_html(
+            request,
+            anrede=f"Hallo {vorname},",
+            absaetze=[f"{name} hat die Teilnahme am Törn „{toern.titel}“ abgesagt."],
+            infozeilen=[("Törn", toern.titel), ("Datum", _zeitraum(toern))],
+            gruss="Viele Grüße,",
+        )
+
     _send(
-        subject=f"Absage: {user.first_name} {user.last_name} – {toern.titel}",
+        subject=f"Absage: {name} – {toern.titel}",
         body=f"Hallo {anbieter.first_name},\n\n" + body_info,
         recipient=anbieter.email,
+        html=info_html(anbieter.first_name),
     )
 
     skipper_qs = _Teilnahme.objects.filter(
@@ -120,38 +204,50 @@ def mail_teilnahme_abgesagt(teilnahme, request):
 
     for s in skipper_qs:
         _send(
-            subject=f"Absage: {user.first_name} {user.last_name} – {toern.titel}",
+            subject=f"Absage: {name} – {toern.titel}",
             body=f"Hallo {s.user.first_name},\n\n" + body_info,
             recipient=s.user.email,
+            html=info_html(s.user.first_name),
         )
 
     body_user = (
         f"Hallo {user.first_name},\n\n"
-        f"deine Absage fuer den Toern \"{toern.titel}\" wurde bestaetigt.\n\n"
+        f'deine Absage für den Törn "{toern.titel}" wurde bestätigt.\n\n'
         "Bei Fragen antworte einfach auf diese Mail.\n\n"
-        "Viele Gruesse,\n"
+        "Viele Grüße,\n"
         "Das Meer erleben Team"
     )
     _send(
         subject=f"Deine Absage – {toern.titel}",
         body=body_user,
         recipient=user.email,
+        html=render_mail_html(
+            request,
+            anrede=f"Hallo {user.first_name},",
+            absaetze=[
+                f"deine Absage für den Törn „{toern.titel}“ wurde bestätigt.",
+                "Bei Fragen antworte einfach auf diese Mail.",
+            ],
+            gruss="Viele Grüße,",
+        ),
     )
 
 
 def mail_toern_abgeschlossen(toern, teilnahmen, request):
     dashboard_base = request.build_absolute_uri(f"/toern/{toern.id}/crew/")
+    kasse_url = request.build_absolute_uri(f"/toern/{toern.id}/boot/?tab=kasse")
 
     for t in teilnahmen:
         user = t.user
         boot = t.boot
 
         meilen = t.individuelle_meilen or (boot.skipper_meilen if boot else None)
-        meilen_zeile = f"Gesegelten Seemeilen: {meilen} sm\n" if meilen else ""
+        meilen_zeile = f"Gesegelte Seemeilen: {meilen} sm\n" if meilen else ""
 
         foto_upload_zeile = f"Fotos hochladen: {toern.foto_upload_link}\n" if toern.foto_upload_link else ""
         foto_download_zeile = f"Fotos ansehen: {toern.foto_download_link}\n" if toern.foto_download_link else ""
 
+        logbuch_url = None
         logbuch_zeile = ""
         if boot and boot.logbuch_pdf:
             logbuch_url = request.build_absolute_uri(boot.logbuch_pdf.url)
@@ -161,25 +257,49 @@ def mail_toern_abgeschlossen(toern, teilnahmen, request):
 
         body = (
             f"Hallo {user.first_name},\n\n"
-            f'der Toern "{toern.titel}" ist offiziell abgeschlossen!\n\n'
+            f'der Törn "{toern.titel}" ist offiziell abgeschlossen!\n\n'
             f"Revier: {toern.revier}\n"
-            f"Zeitraum: {toern.startdatum.strftime('%d.%m.%Y')} – {toern.enddatum.strftime('%d.%m.%Y')}\n"
+            f"Zeitraum: {_zeitraum(toern)}\n"
         )
-
         if extras:
             body += f"\n{extras}"
-
+        if boot:
+            body += f"\nOffene Beträge in der Bootskasse:\n{kasse_url}\n"
         body += (
             f"\nDein Crew-Dashboard:\n{dashboard_base}\n\n"
-            "Vielen Dank fuer eine tolle Zeit an Bord!\n\n"
-            "Bis zum naechsten Toern,\n"
+            "Vielen Dank für eine tolle Zeit an Bord!\n\n"
+            "Bis zum nächsten Törn,\n"
             "Das Meer erleben Team"
         )
 
+        buttons = []
+        if toern.foto_upload_link:
+            buttons.append({"url": toern.foto_upload_link, "label": "📤 Deine Fotos hochladen"})
+        if toern.foto_download_link:
+            buttons.append({"url": toern.foto_download_link, "label": "🖼️ Alle Fotos ansehen", "zweitrangig": True})
+        if logbuch_url:
+            buttons.append({"url": logbuch_url, "label": "📖 Logbuch (PDF)", "zweitrangig": True})
+        if boot:
+            buttons.append({"url": kasse_url, "label": "💶 Zur Bootskasse", "zweitrangig": True})
+        buttons.append({"url": dashboard_base, "label": "Zum Crew-Dashboard", "zweitrangig": True})
+
+        html = render_mail_html(
+            request,
+            anrede=f"Hallo {user.first_name},",
+            absaetze=[f"der Törn „{toern.titel}“ ist offiziell abgeschlossen! ⚓"],
+            highlight={"wert": f"{meilen} sm", "label": "Deine gesegelten Seemeilen"} if meilen else None,
+            infozeilen=[("Revier", toern.revier), ("Zeitraum", _zeitraum(toern))]
+                       + ([("Boot", boot.name)] if boot else []),
+            buttons=buttons,
+            nachsatz=["Vielen Dank für eine tolle Zeit an Bord!"],
+            gruss="Bis zum nächsten Törn,",
+        )
+
         _send(
-            subject=f'Toern abgeschlossen: "{toern.titel}"',
+            subject=f'Törn abgeschlossen: "{toern.titel}"',
             body=body,
             recipient=user.email,
+            html=html,
         )
 
 
@@ -189,16 +309,25 @@ def mail_teilnahme_abgelehnt(teilnahme, request):
 
     body = (
         f"Hallo {user.first_name},\n\n"
-        f'leider koennen wir deine Teilnahme am Toern "{toern.titel}" nicht bestaetigen.\n\n'
+        f'leider können wir deine Teilnahme am Törn "{toern.titel}" nicht bestätigen.\n\n'
         "Bei Fragen antworte einfach auf diese Mail.\n\n"
-        "Viele Gruesse,\n"
+        "Viele Grüße,\n"
         "Das Meer erleben Team"
     )
 
     _send(
-        subject=f"Teilnahme - {toern.titel}",
+        subject=f"Teilnahme – {toern.titel}",
         body=body,
         recipient=user.email,
+        html=render_mail_html(
+            request,
+            anrede=f"Hallo {user.first_name},",
+            absaetze=[
+                f"leider können wir deine Teilnahme am Törn „{toern.titel}“ nicht bestätigen.",
+                "Bei Fragen antworte einfach auf diese Mail.",
+            ],
+            gruss="Viele Grüße,",
+        ),
     )
 
 
@@ -233,75 +362,16 @@ def _termin_text(rundmail):
 
 
 def _rundmail_html(body_text, rundmail, logo_url=None):
-    """Baut die HTML-Variante der Rundmail im Corporate-Design (Logo, Farben).
-
-    Das Logo wird per oeffentlicher URL eingebunden (Brevo unterstuetzt keine
-    Inline-/CID-Anhaenge). Faellt auf einen Text-Schriftzug zurueck, wenn keine
-    URL vorliegt oder das Bild im Client blockiert wird (alt-Text).
-    """
-    primary = "#0f2942"   # dunkles Blau
-    teal = "#0D9488"      # Secondary
-
-    text_html = escape(body_text).replace("\n", "<br>")
-
-    if logo_url:
-        logo_html = (
-            f'<img src="{escape(logo_url)}" alt="Meer erleben" '
-            f'width="150" style="display:block;margin:0 auto;max-width:150px;height:auto;">'
-        )
-    else:
-        logo_html = (
-            f'<div style="font-size:22px;font-weight:700;color:{primary};letter-spacing:0.5px;">'
-            f'⚓ Meer erleben</div>'
-        )
-
-    info_blocks = ""
-    if rundmail.meeting_link:
-        link = escape(rundmail.meeting_link)
-        info_blocks += (
-            f'<tr><td style="padding:6px 0;">'
-            f'<a href="{link}" style="display:inline-block;background:{teal};color:#ffffff;'
-            f'text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:600;font-size:15px;">'
-            f'💻 Zum digitalen Treffen</a></td></tr>'
-        )
-    termin_zeile = _termin_zeile(rundmail)
-    if termin_zeile:
-        ort = rundmail.termin_ort or ("Online" if rundmail.meeting_link else "")
-        ort_html = (f'<div style="color:#4b5563;font-size:14px;margin-top:2px;">📍 {escape(ort)}</div>'
-                    if ort else "")
-        info_blocks += (
-            f'<tr><td style="padding:10px 0 0;">'
-            f'<div style="background:#f1f5f9;border-radius:10px;padding:14px 16px;">'
-            f'<div style="color:{primary};font-weight:600;font-size:15px;">📅 {escape(termin_zeile)}</div>'
-            f'{ort_html}'
-            f'<div style="color:#94a3b8;font-size:12px;margin-top:6px;">Termin liegt dieser Mail als Kalenderdatei bei.</div>'
-            f'</div></td></tr>'
-        )
-
-    return f"""\
-<!DOCTYPE html>
-<html lang="de">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background:#eef2f5;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef2f5;padding:24px 12px;">
-    <tr><td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);border:1px solid #e5e7eb;">
-        <tr><td style="background:#ffffff;padding:26px 24px 20px;text-align:center;">{logo_html}</td></tr>
-        <tr><td style="height:3px;background:{teal};line-height:3px;font-size:0;">&nbsp;</td></tr>
-        <tr><td style="padding:28px 28px 8px;color:#1f2937;font-size:16px;line-height:1.6;">
-          {text_html}
-        </td></tr>
-        <tr><td style="padding:4px 28px 24px;">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">{info_blocks}</table>
-        </td></tr>
-        <tr><td style="padding:16px 28px;background:#f8fafc;border-top:1px solid #e5e7eb;text-align:center;color:#94a3b8;font-size:12px;">
-          Meer erleben · Diese Mail wurde über den Segelmanager verschickt.
-        </td></tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>"""
+    """HTML-Variante der Rundmail im gemeinsamen Mail-Layout
+    (templates/emails/layout.html). Logo per öffentlicher URL — Brevo
+    unterstützt keine Inline-/CID-Anhänge."""
+    return render_to_string("emails/rundmail.html", {
+        "logo_url": logo_url,
+        "text": body_text,
+        "meeting_link": rundmail.meeting_link,
+        "termin_zeile": _termin_zeile(rundmail),
+        "termin_ort": rundmail.termin_ort or ("Online" if rundmail.meeting_link else ""),
+    })
 
 
 def mail_rundmail(rundmail, teilnahme, ics_text=None, anhang_bytes=None,

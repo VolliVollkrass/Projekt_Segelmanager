@@ -3,8 +3,6 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash, authenticate, login
 from django.contrib.auth.views import LoginView
-from django.core.mail import EmailMessage
-from django.conf import settings
 from django_ratelimit.decorators import ratelimit
 from django.views.decorators.http import require_POST
 
@@ -15,7 +13,7 @@ from .models import Lizenz, EmailVerificationToken, ManuellerSeemeilenEintrag
 def send_verification_email(user, request):
     token_obj, _ = EmailVerificationToken.objects.get_or_create(user=user)
     verify_url = request.build_absolute_uri(f"/accounts/email-verifizieren/{token_obj.token}/")
-    reply_to = [settings.REPLY_TO_EMAIL] if settings.REPLY_TO_EMAIL else []
+    from toern.emails import _send, render_mail_html
 
     body = (
         f"Hallo {user.first_name},\n\n"
@@ -25,14 +23,21 @@ def send_verification_email(user, request):
         "Bis bald an Bord,\n"
         "Das Meer erleben Team"
     )
+    html = render_mail_html(
+        request,
+        anrede=f"Hallo {user.first_name},",
+        absaetze=["willkommen bei Meer erleben! Bitte bestätige deine E-Mail-Adresse."],
+        buttons=[{"url": verify_url, "label": "E-Mail-Adresse bestätigen"}],
+        nachsatz=["Der Link ist 24 Stunden gültig."],
+        gruss="Bis bald an Bord,",
+    )
 
-    EmailMessage(
+    _send(
         subject="E-Mail-Adresse bestätigen – Meer erleben",
         body=body,
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        to=[user.email],
-        reply_to=reply_to,
-    ).send(fail_silently=True)
+        recipient=user.email,
+        html=html,
+    )
 
 @ratelimit(key='ip', rate='5/h', block=True)
 @ratelimit(key='post:email', rate='3/h', block=True)
