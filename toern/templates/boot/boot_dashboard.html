@@ -34,6 +34,12 @@
         </div>
     </div>
 
+    {% if toern_abgeschlossen %}
+    <!-- Nach dem Abschluss: nur noch die Bootskasse -->
+    <div class="alert bg-success/5 border border-success/20 text-sm mb-5">
+        <span>⚓ Der Törn ist abgeschlossen. Hier bleibt eure <strong>Bootskasse</strong> offen, bis alles beglichen ist.</span>
+    </div>
+    {% else %}
     <!-- TAB-NAVIGATION Mobile (Icon + Label) -->
     <div class="lg:hidden -mx-4 px-4 mb-5 overflow-x-auto">
         <div class="flex gap-1 min-w-max">
@@ -113,9 +119,10 @@
             {% endif %}
         </div>
     </div>
+    {% endif %}
 
     <!-- ========================= TAB: CREW & BOOT ========================= -->
-    <div id="tab-uebersicht" class="space-y-5">
+    <div id="tab-uebersicht" class="space-y-5{% if toern_abgeschlossen %} hidden{% endif %}">
 
         <!-- Skipper -->
         <div>
@@ -1097,7 +1104,7 @@
     {% endif %}
 
     <!-- ========================= TAB: BOOTSKASSE ========================= -->
-    <div id="tab-kasse" class="space-y-5 hidden">
+    <div id="tab-kasse" class="space-y-5{% if not toern_abgeschlossen %} hidden{% endif %}">
 
         <!-- Stats -->
         <div class="bg-base-100 border border-base-300 rounded-xl p-5">
@@ -1105,6 +1112,11 @@
                 <div>
                     <p class="text-2xl font-bold">{{ kasse_gesamt|floatformat:2 }} €</p>
                     <p class="text-xs text-base-content/40 mt-0.5">Gesamt</p>
+                    {% if kasse_umlage_summe %}
+                    <p class="text-[10px] text-base-content/30 leading-tight mt-0.5">
+                        inkl. {{ kasse_umlage_summe|floatformat:2 }} € Törn-Umlage
+                    </p>
+                    {% endif %}
                 </div>
                 <div>
                     <p class="text-2xl font-bold {% if mein_kasse_saldo > 0 %}text-success{% elif mein_kasse_saldo < 0 %}text-error{% endif %}">
@@ -1188,7 +1200,8 @@
                 {% if not umlage_meine_anteile and not umlage_uebersicht %}
                     <p class="text-xs text-base-content/50">
                         Für Rechnungen quer über alle Boote, z. B. das Restaurant: Betrag auf alle
-                        oder einzelne verteilen, mit Extras und Anzahlungen.
+                        oder einzelne verteilen, mit Extras und Anzahlungen. Wer auf dem Boot des
+                        Zahlers ist, rechnet seinen Anteil direkt über die Bootskasse ab.
                     </p>
                 {% endif %}
 
@@ -1210,6 +1223,8 @@
                                         {% csrf_token %}
                                         <button type="submit" title="Zurücknehmen" class="btn btn-ghost btn-xs text-error px-1">✕</button>
                                     </form>
+                                {% elif a.ueber_bootskasse %}
+                                    <span class="badge badge-info badge-sm" title="Wird mit den übrigen Ausgaben eures Boots verrechnet">über Bootskasse</span>
                                 {% elif a.offen == 0 %}
                                     <span class="badge badge-success badge-sm">✓ erledigt</span>
                                 {% else %}
@@ -1260,6 +1275,8 @@
                                                 <span class="text-xs">hat bezahlt</span>
                                             {% elif a.beglichen_am %}
                                                 <span class="text-xs text-success">✓ beglichen</span>
+                                            {% elif a.ueber_bootskasse %}
+                                                <span class="text-xs text-info">über Bootskasse</span>
                                             {% elif a.offen == 0 %}
                                                 <span class="text-xs text-success">✓ erledigt</span>
                                             {% elif a.offen > 0 %}
@@ -1267,7 +1284,7 @@
                                             {% else %}
                                                 <span class="text-xs font-semibold">bekommt {{ a.zurueck|floatformat:2 }} € zurück</span>
                                             {% endif %}
-                                            {% if u.ich_bin_zahler and not a.ist_zahler and a.offen != 0 %}
+                                            {% if u.ich_bin_zahler and not a.ist_zahler and a.offen != 0 and not a.ueber_bootskasse or u.ich_bin_zahler and a.beglichen_am %}
                                                 <form method="post" action="{% url 'umlage_anteil_beglichen' a.id %}">
                                                     {% csrf_token %}
                                                     {% if a.beglichen_am %}
@@ -1336,7 +1353,7 @@
                     und wer den Eingang auf dem Konto sieht.
                 </p>
             </div>
-        {% elif kasse_ausgaben %}
+        {% elif kasse_ausgaben or kasse_umlagen %}
             <div class="alert alert-success text-sm">✓ Alles ausgeglichen — niemand schuldet jemandem etwas.</div>
         {% endif %}
 
@@ -1371,7 +1388,7 @@
         {% endif %}
 
         <!-- Salden -->
-        {% if kasse_ausgaben %}
+        {% if kasse_ausgaben or kasse_umlagen %}
             <div class="bg-base-100 border border-base-300 rounded-xl p-5">
                 <h3 class="font-semibold text-sm mb-3">Salden</h3>
                 <div class="space-y-1.5">
@@ -1392,8 +1409,20 @@
         <!-- Ausgabenliste -->
         <div class="bg-base-100 border border-base-300 rounded-xl p-5">
             <h3 class="font-semibold text-sm mb-3">Ausgaben</h3>
-            {% if kasse_ausgaben %}
+            {% if kasse_ausgaben or kasse_umlagen %}
                 <div class="space-y-2">
+                    {% for e in kasse_umlagen %}
+                        <div class="flex items-start justify-between gap-3 bg-secondary/5 border border-secondary/20 rounded-lg px-3 py-2">
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium">🍽️ {{ e.umlage.beschreibung }} <span class="badge badge-ghost badge-xs align-middle">Törn-Umlage</span></p>
+                                <p class="text-xs text-base-content/50 mt-0.5">
+                                    {{ e.umlage.bezahlt_von.user.first_name }} zahlte · Anteil von {{ e.anzahl }} Person{{ e.anzahl|pluralize:"en" }} dieses Boots
+                                    · {{ e.umlage.created_at|date:"d.m.Y" }}
+                                </p>
+                            </div>
+                            <span class="font-bold text-sm whitespace-nowrap shrink-0">{{ e.betrag|floatformat:2 }} €</span>
+                        </div>
+                    {% endfor %}
                     {% for a in kasse_ausgaben %}
                         <div class="flex items-start justify-between gap-3 bg-base-200/40 rounded-lg px-3 py-2">
                             <div class="min-w-0">
@@ -1648,11 +1677,15 @@ document.querySelectorAll(".tab-btn, .mtab-btn").forEach(btn => {
     btn.addEventListener("click", () => switchToTab(btn.dataset.tab));
 });
 
-// URL-Tab beim Laden
+// URL-Tab beim Laden — nach dem Abschluss gibt es nur noch die Kasse
 (function() {
+    {% if toern_abgeschlossen %}
+    switchToTab("kasse");
+    {% else %}
     const params = new URLSearchParams(location.search);
     const tab = params.get("tab");
     if (tab) switchToTab(tab);
+    {% endif %}
 })();
 
 function getCSRFToken() {

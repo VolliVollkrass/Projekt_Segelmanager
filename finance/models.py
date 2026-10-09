@@ -144,10 +144,22 @@ class UmlageAnteil(models.Model):
         return self.teilnahme_id == self.umlage.bezahlt_von_id
 
     @property
+    def ueber_bootskasse(self):
+        """Sitzt die Person auf dem Boot des Zahlers, läuft ihr Anteil über
+        die Bootskasse und wird dort mit den übrigen Ausgaben verrechnet."""
+        zahler_boot = self.umlage.bezahlt_von.boot_id
+        return zahler_boot is not None and self.teilnahme.boot_id == zahler_boot
+
+    @property
     def erledigt(self):
-        """Nichts mehr zu tun: der Zahler selbst, beglichen, oder durch die
-        Anzahlung genau abgedeckt."""
-        return self.ist_zahler or self.beglichen_am is not None or self.offen == 0
+        """In der Umlage nichts mehr zu tun: der Zahler selbst, beglichen,
+        durch die Anzahlung genau abgedeckt oder über die Bootskasse verrechnet."""
+        return (
+            self.ist_zahler
+            or self.beglichen_am is not None
+            or self.offen == 0
+            or self.ueber_bootskasse
+        )
 
 
 class TopfAusgabe(models.Model):

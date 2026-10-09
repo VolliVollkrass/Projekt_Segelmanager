@@ -171,13 +171,77 @@ class BootskasseAnzeigeTests(UmlageTestBase):
         ctx = self._ctx(self.volker)
         self.assertEqual(ctx["umlage_meine_anteile"], [])
         uebersicht = ctx["umlage_uebersicht"][0]
-        self.assertEqual(uebersicht["offen_anzahl"], 3)
-        self.assertEqual(uebersicht["offen_summe"], Decimal("280.00"))  # 60 + 90 + 130
+        # Olaf sitzt auf Volkers Boot → läuft über die Bootskasse, nicht hier
+        self.assertEqual(uebersicht["offen_anzahl"], 2)
+        self.assertEqual(uebersicht["offen_summe"], Decimal("220.00"))  # 90 + 130
 
-    def test_boots_salden_bleiben_unberuehrt(self):
-        ctx = self._ctx(self.olaf)
+    def test_anderes_boot_bleibt_ausserhalb_der_bootskasse(self):
+        ctx = self._ctx(self.ralf)
         self.assertEqual(ctx["kasse_gesamt"], Decimal("0"))
         self.assertEqual(ctx["kasse_transfers"], [])
+        self.assertFalse(ctx["umlage_meine_anteile"][0].ueber_bootskasse)
+
+
+class EigenesBootVerrechnungTests(UmlageTestBase):
+    """Volker (Zahler) und Olaf sitzen auf Alpha: Olafs Anteil von 90 € läuft
+    über die Bootskasse, seine 30 € Anzahlung zählen als geflossenes Geld."""
+
+    def setUp(self):
+        super().setUp()
+        self._anlegen()
+
+    def _transfers(self, user):
+        return [
+            (t["von"].user.first_name, t["an"].user.first_name, t["betrag"])
+            for t in self._ctx(user)["kasse_transfers"]
+        ]
+
+    def test_umlage_landet_im_ausgleich(self):
+        self.assertEqual(self._transfers(self.olaf), [("Olaf", "Volker", Decimal("60.00"))])
+
+    def test_gesamt_und_ausgabenliste(self):
+        ctx = self._ctx(self.olaf)
+        self.assertEqual(ctx["kasse_gesamt"], Decimal("180.00"))  # Volker + Olaf je 90
+        self.assertEqual(ctx["kasse_umlage_summe"], Decimal("180.00"))
+        self.assertEqual(ctx["kasse_umlagen"][0]["anzahl"], 2)
+        # „Pro Person" bleibt bei den gemeinsamen Ausgaben
+        self.assertEqual(ctx["kasse_pro_person"], Decimal("0.00"))
+
+    def test_verrechnet_mit_anderen_ausgaben(self):
+        """Olaf hat Diesel für beide bezahlt — beides wird gegeneinander verrechnet."""
+        from finance.models import Ausgabe
+        a = Ausgabe.objects.create(
+            boot=self.boot1, toern=self.toern, beschreibung="Diesel",
+            betrag=Decimal("100"), bezahlt_von=self.t_olaf, erstellt_von=self.olaf,
+        )
+        a.beteiligt.set([self.t_volker, self.t_olaf])
+        # Olaf schuldet 60 aus der Umlage, Volker ihm 50 aus dem Diesel → 10
+        self.assertEqual(self._transfers(self.volker), [("Olaf", "Volker", Decimal("10.00"))])
+
+    def test_eigene_karte_zeigt_ueber_bootskasse(self):
+        anteil = self._ctx(self.olaf)["umlage_meine_anteile"][0]
+        self.assertTrue(anteil.ueber_bootskasse)
+        self.assertIsNone(anteil.zahlungswege)
+
+    def test_in_der_umlage_nicht_nochmal_begleichen(self):
+        self.client.force_login(self.olaf)
+        self.client.post(reverse("umlage_anteil_beglichen", args=[self._anteil(self.t_olaf).id]))
+        self.assertIsNone(self._anteil(self.t_olaf).beglichen_am)
+
+    def test_schon_beglichener_anteil_wird_nicht_doppelt_verlangt(self):
+        """Wurde Olafs Anteil vor dieser Änderung in der Umlage abgehakt,
+        ist das Geld geflossen — die Bootskasse darf es nicht erneut fordern."""
+        a = self._anteil(self.t_olaf)
+        a.beglichen_am = timezone.now()
+        a.save()
+        self.assertEqual(self._transfers(self.olaf), [])
+
+    def test_zahler_wechselt_boot(self):
+        """Läuft immer über das Boot, auf dem der Zahler gerade sitzt."""
+        self.t_volker.boot = self.boot2
+        self.t_volker.save()
+        self.assertEqual(self._transfers(self.olaf), [])
+        self.assertFalse(self._ctx(self.olaf)["umlage_meine_anteile"][0].ueber_bootskasse)
 
     def test_seite_rendert_mit_iban(self):
         self.client.force_login(self.harald)

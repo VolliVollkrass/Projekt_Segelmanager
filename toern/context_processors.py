@@ -5,15 +5,14 @@ def active_boot_dashboard(request):
     if not request.user.is_authenticated:
         return {}
 
+    # Laufender Törn zuerst; sonst der zuletzt abgeschlossene, damit die
+    # Bootskasse nach dem Törn erreichbar bleibt.
+    teilnahmen = Teilnahme.objects.filter(
+        user=request.user, status="bestaetigt", boot__isnull=False,
+    ).select_related("boot", "toern")
     teilnahme = (
-        Teilnahme.objects.filter(
-            user=request.user,
-            status="bestaetigt",
-            boot__isnull=False,
-            toern__status="ZUTEILUNG_FIXIERT",
-        )
-        .select_related("boot", "toern")
-        .first()
+        teilnahmen.filter(toern__status="ZUTEILUNG_FIXIERT").first()
+        or teilnahmen.filter(toern__status="ABGESCHLOSSEN").order_by("-toern__enddatum").first()
     )
 
     if teilnahme:

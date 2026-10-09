@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 
 CENT = Decimal("0.01")
@@ -45,11 +46,15 @@ def rate_kategorie(beschreibung):
     return "sonstiges"
 
 
-def berechne_salden(ausgaben, teilnahmen):
+def berechne_salden(ausgaben, teilnahmen, umlage_anteile=()):
     """Netto-Saldo pro Teilnahme über alle Ausgaben.
 
     Positiv = hat mehr gezahlt als verbraucht (bekommt Geld),
     negativ = schuldet Geld.
+    `umlage_anteile`: Anteile an Törn-Umlagen, die über diese Bootskasse
+    laufen (Zahler und Person auf demselben Boot). Sie zählen wie eine
+    Ausgabe mit festem Betrag pro Person; Anzahlungen kommen über
+    `umlage_zahlungen` als geflossenes Geld dazu.
     Rückgabe: Liste von Dicts {teilnahme, gezahlt, anteil, saldo},
     sortiert nach Saldo absteigend.
     """
@@ -71,6 +76,11 @@ def berechne_salden(ausgaben, teilnahmen):
         for teilnahme in beteiligte:
             if teilnahme.id in daten:
                 daten[teilnahme.id]["anteil"] += anteil
+
+    for a in umlage_anteile:
+        if a.umlage.bezahlt_von_id in daten and a.teilnahme_id in daten:
+            daten[a.umlage.bezahlt_von_id]["gezahlt"] += a.anteil
+            daten[a.teilnahme_id]["anteil"] += a.anteil
 
     salden = []
     for eintrag in daten.values():
@@ -101,6 +111,31 @@ def wende_zahlungen_an(salden, zahlungen):
 
     salden.sort(key=lambda e: e["saldo"], reverse=True)
     return salden
+
+
+@dataclass
+class _Zahlung:
+    von_id: int
+    an_id: int
+    betrag: Decimal
+
+
+def umlage_zahlungen(umlage_anteile):
+    """Schon geflossenes Geld zu Umlage-Anteilen, die über die Bootskasse
+    laufen — im Format, das `wende_zahlungen_an` versteht.
+
+    Die Anzahlung ist an den Zahler gegangen. Wurde ein Anteil schon in der
+    Umlage als beglichen markiert (bevor er über die Bootskasse lief), ist
+    auch der Rest geflossen — sonst würde er hier ein zweites Mal verlangt.
+    """
+    zahlungen = []
+    for a in umlage_anteile:
+        if a.ist_zahler:
+            continue
+        betrag = a.anteil if a.beglichen_am else a.schon_gegeben
+        if betrag:
+            zahlungen.append(_Zahlung(a.teilnahme_id, a.umlage.bezahlt_von_id, betrag))
+    return zahlungen
 
 
 def berechne_ausgleich(salden):
