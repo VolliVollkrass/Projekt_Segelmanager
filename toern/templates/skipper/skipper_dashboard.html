@@ -1386,9 +1386,28 @@
             </form>
         </div>
 
+        <!-- Bootsauswahl: eigenes Boot vorausgewählt, die anderen per Klick -->
+        {% if abschluss_data|length > 1 %}
+        <div class="bg-base-100 border border-base-300 rounded-2xl p-4 space-y-2">
+            <p class="text-sm font-medium">Für welches Boot trägst du ein?</p>
+            <div class="flex flex-wrap gap-2" id="abschluss-boot-wahl">
+                {% for eintrag in abschluss_data %}
+                <button type="button" data-abschluss-wahl="{{ eintrag.boot.id }}"
+                        class="btn btn-sm gap-1.5 {% if eintrag.boot.id == abschluss_boot_id %}btn-primary{% else %}btn-outline{% endif %}">
+                    {% if eintrag.hat_eintrag %}<span class="text-success" title="Seemeilen oder Logbuch eingetragen">✓</span>{% endif %}
+                    {{ eintrag.boot.name }}
+                    {% if eintrag.ist_eigenes %}<span class="badge badge-xs badge-secondary">dein Boot</span>{% endif %}
+                </button>
+                {% endfor %}
+            </div>
+            <p class="text-xs text-base-content/40">Skipper, Co-Skipper und Anbieter können für jedes Boot Seemeilen und Logbuch eintragen.</p>
+        </div>
+        {% endif %}
+
         <!-- Pro Boot: Seemeilen + Logbuch + individuelle Ausnahmen -->
         {% for eintrag in abschluss_data %}
-        <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden">
+        <div class="bg-base-100 border border-base-300 rounded-2xl overflow-hidden{% if eintrag.boot.id != abschluss_boot_id %} hidden{% endif %}"
+             data-abschluss-boot="{{ eintrag.boot.id }}">
 
             <div class="px-5 py-4 border-b border-base-200 flex items-center justify-between">
                 <div>
@@ -1831,6 +1850,22 @@ const avoidMap = {
     // ein TDZ-ReferenceError, der den restlichen Script-Block abbricht.
     queueMicrotask(() => activate(initial));
 })();
+
+// ===================== ABSCHLUSS: Bootsauswahl =====================
+document.querySelectorAll('[data-abschluss-wahl]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const id = btn.dataset.abschlussWahl;
+        document.querySelectorAll('[data-abschluss-boot]').forEach(karte => {
+            karte.classList.toggle('hidden', karte.dataset.abschlussBoot !== id);
+        });
+        document.querySelectorAll('[data-abschluss-wahl]').forEach(b => {
+            const aktiv = b === btn;
+            b.classList.toggle('btn-primary', aktiv);
+            b.classList.toggle('btn-outline', !aktiv);
+        });
+        history.replaceState(null, '', '?tab=abschluss&boot=' + id);
+    });
+});
 
 // ===================== CSRF =====================
 function getCSRFToken() {
