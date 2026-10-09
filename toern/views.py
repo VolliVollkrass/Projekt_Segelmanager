@@ -984,22 +984,30 @@ def skipper_dashboard(request, toern_id):
     # =========================
     # 8. Abschluss-Daten (je Boot)
     # =========================
-    if is_toern_anbieter:
-        abschluss_boote_qs = boote
-    else:
-        user_boot_ids = Teilnahme.objects.filter(
-            user=request.user,
-            toern=toern,
-            rolle__in=["skipper", "coskipper"]
+    # Skipper, Co-Skipper und Anbieter dürfen für jedes Boot eintragen —
+    # das eigene Boot steht vorn und ist vorausgewählt.
+    eigene_boot_ids = set(
+        Teilnahme.objects.filter(
+            user=request.user, toern=toern, boot__isnull=False,
         ).values_list("boot_id", flat=True)
-        abschluss_boote_qs = boote.filter(id__in=user_boot_ids)
-
+    )
     abschluss_data = []
-    for boot in abschluss_boote_qs:
+    for boot in sorted(boote, key=lambda b: b.id not in eigene_boot_ids):
         crew = Teilnahme.objects.filter(
             toern=toern, boot=boot, status="bestaetigt"
         ).select_related("user").order_by("user__last_name", "user__first_name")
-        abschluss_data.append({"boot": boot, "crew": list(crew)})
+        abschluss_data.append({
+            "boot": boot,
+            "crew": list(crew),
+            "ist_eigenes": boot.id in eigene_boot_ids,
+            "hat_eintrag": bool(boot.skipper_meilen or boot.logbuch_pdf),
+        })
+    try:
+        abschluss_boot_id = int(request.GET.get("boot", ""))
+    except ValueError:
+        abschluss_boot_id = None
+    if abschluss_boot_id not in {e["boot"].id for e in abschluss_data}:
+        abschluss_boot_id = abschluss_data[0]["boot"].id if abschluss_data else None
 
     # =========================
     # 9. Skipper-Topf
@@ -1039,6 +1047,7 @@ def skipper_dashboard(request, toern_id):
 
         # Abschluss
         "abschluss_data": abschluss_data,
+        "abschluss_boot_id": abschluss_boot_id,
 
         # Präferenz-Modus
         "boote_count": boote.count(),
@@ -1072,15 +1081,16 @@ def boot_abschluss_update(request, boot_id):
     boot = get_object_or_404(Boot, id=boot_id)
     toern = boot.toern
 
+    # Jeder Skipper/Co-Skipper des Törns (auch von einem anderen Boot) und
+    # der Anbieter dürfen Seemeilen und Logbuch für jedes Boot eintragen.
     is_anbieter = toern.anbieter == request.user
-    is_boot_skipper = Teilnahme.objects.filter(
+    is_toern_skipper = Teilnahme.objects.filter(
         user=request.user,
         toern=toern,
-        boot=boot,
         rolle__in=["skipper", "coskipper"]
     ).exists()
 
-    if not is_anbieter and not is_boot_skipper:
+    if not is_anbieter and not is_toern_skipper:
         raise PermissionDenied
 
     # Boot-spezifisch: Standard-Seemeilen + Logbuch
@@ -1108,7 +1118,9 @@ def boot_abschluss_update(request, boot_id):
         t.save(update_fields=["individuelle_meilen"])
 
     messages.success(request, f'Daten für "{boot.name}" gespeichert.')
-    return redirect("skipper_dashboard", toern_id=toern.id)
+    return redirect(
+        f"{reverse('skipper_dashboard', args=[toern.id])}?tab=abschluss&boot={boot.id}"
+    )
 
 
 @login_required
